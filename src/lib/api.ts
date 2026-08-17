@@ -38,3 +38,29 @@ export type ApiCart = {
   id: string;
   items: ApiCartItem[];
 };
+
+export type ApiFeedComment = {
+  id: string;
+  text: string;
+  createdAt: string;
+  authorName: string;
+};
+
+export type ApiFeedItem = {
+  id: string;
+  itemKey: string;
+  kind: "achievement" | "content";
+  title: string;
+  message: string;
+  extra: string;
+  imageUrl?: string | null;
+  dateLabel: string;
+  liked: boolean;
+  likeCount: number;
+  comments: ApiFeedComment[];
+};
+
+export type ApiFeedPage = {
+  items: ApiFeedItem[];
+  hasMore: boolean;
+};
