@@ -84,7 +84,7 @@ function MiniBarChart({
         {last.map((p, i) => {
           const heightPct = 15 + ((p.value - min) / range) * 85;
           return (
-            <View key={i} className="flex-1 items-center justify-end">
+            <View key={i} className="h-full flex-1 items-center justify-end">
               <View
                 style={{ height: `${heightPct}%`, backgroundColor: color }}
                 className="w-full rounded"
@@ -223,6 +223,21 @@ export default function SaudeScreen() {
 
   return (
     <ScrollView className="flex-1 bg-cream" contentContainerClassName="p-4 pb-24">
+      {(pesoPoints.length > 0 ||
+        sistolicaPoints.length > 0 ||
+        gorduraPoints.length > 0 ||
+        glicemiaPoints.length > 0) && (
+        <>
+          <Text className="mb-2 text-sm font-semibold text-navy">Evolução</Text>
+          <View className="mb-5 flex-row flex-wrap justify-between gap-y-3">
+            <MiniBarChart title="Peso (kg)" points={pesoPoints} color="#e63946" />
+            <MiniBarChart title="Pressão sistólica" points={sistolicaPoints} color="#e63946" />
+            <MiniBarChart title="Gordura corporal (%)" points={gorduraPoints} color="#2ec4b6" />
+            <MiniBarChart title="Glicemia (mg/dL)" points={glicemiaPoints} color="#2ec4b6" />
+          </View>
+        </>
+      )}
+
       <Text className="mb-2 text-sm font-semibold text-navy">Novo registro</Text>
       <View className="gap-3 rounded-2xl bg-card p-4 shadow-sm">
         <View className="flex-row gap-2">
@@ -293,21 +308,6 @@ export default function SaudeScreen() {
           )}
         </Pressable>
       </View>
-
-      {(pesoPoints.length > 0 ||
-        sistolicaPoints.length > 0 ||
-        gorduraPoints.length > 0 ||
-        glicemiaPoints.length > 0) && (
-        <>
-          <Text className="mb-2 mt-5 text-sm font-semibold text-navy">Evolução</Text>
-          <View className="flex-row flex-wrap justify-between gap-y-3">
-            <MiniBarChart title="Peso (kg)" points={pesoPoints} color="#e63946" />
-            <MiniBarChart title="Pressão sistólica" points={sistolicaPoints} color="#e63946" />
-            <MiniBarChart title="Gordura corporal (%)" points={gorduraPoints} color="#2ec4b6" />
-            <MiniBarChart title="Glicemia (mg/dL)" points={glicemiaPoints} color="#2ec4b6" />
-          </View>
-        </>
-      )}
 
       <Text className="mb-2 mt-5 text-sm font-semibold text-navy">Histórico</Text>
       {days.length === 0 ? (

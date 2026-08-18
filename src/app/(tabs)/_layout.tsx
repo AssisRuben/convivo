@@ -61,6 +61,14 @@ export default function TabsLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="carrinho"
+        options={{
+          title: "Carrinho",
+          // Só acessível pelo ícone do header — sem botão na barra de baixo.
+          href: null,
+        }}
+      />
     </Tabs>
   );
 }

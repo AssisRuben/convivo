@@ -59,7 +59,7 @@ export default function CarrinhoScreen() {
       <FlatList
         data={items}
         keyExtractor={(item) => item.id}
-        contentContainerClassName="gap-3 p-4"
+        contentContainerClassName="gap-3 p-4 pb-24"
         ListEmptyComponent={
           <Text className="mt-8 text-center text-navy/60">Seu carrinho está vazio.</Text>
         }

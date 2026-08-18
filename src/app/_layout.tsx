@@ -24,7 +24,6 @@ function RootNavigator() {
         name="produto/[id]"
         options={{ ...brandHeaderOptions, headerShown: true }}
       />
-      <Stack.Screen name="carrinho" options={{ ...brandHeaderOptions, headerShown: true }} />
     </Stack>
   );
 }

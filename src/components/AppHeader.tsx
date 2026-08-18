@@ -39,4 +39,7 @@ export const brandHeaderOptions = {
   headerTitleAlign: "center" as const,
   headerTitle: AppHeaderTitle,
   headerRight: CartHeaderButton,
+  // Sem seta de voltar em lugar nenhum — a navegação é pelas abas de
+  // baixo (voltar por gesto/botão do sistema continua funcionando).
+  headerBackVisible: false,
 };
