@@ -83,7 +83,7 @@ export default function ComunidadeScreen() {
       className="flex-1 bg-cream"
       data={items}
       keyExtractor={(item) => item.itemKey}
-      contentContainerClassName="gap-3 p-4"
+      contentContainerClassName="gap-3 p-4 pb-24"
       onEndReachedThreshold={0.4}
       onEndReached={onEndReached}
       ListEmptyComponent={

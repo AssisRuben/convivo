@@ -43,7 +43,7 @@ export default function CatalogScreen() {
       className="flex-1 bg-cream"
       data={products}
       keyExtractor={(item) => item.id}
-      contentContainerClassName="gap-3 p-4"
+      contentContainerClassName="gap-3 p-4 pb-24"
       ListEmptyComponent={
         <Text className="mt-8 text-center text-navy/60">Nenhum produto cadastrado ainda.</Text>
       }

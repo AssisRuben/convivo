@@ -38,7 +38,7 @@ export default function PerfilScreen() {
   }
 
   return (
-    <ScrollView className="flex-1 bg-cream" contentContainerClassName="p-4 pb-10">
+    <ScrollView className="flex-1 bg-cream" contentContainerClassName="p-4 pb-24">
       <View className="items-center gap-3 rounded-2xl bg-card p-6 shadow-sm">
         <View className="h-16 w-16 items-center justify-center rounded-full bg-navy/10">
           <Ionicons name="person" size={28} color="#0b1e3d" />
@@ -50,11 +50,10 @@ export default function PerfilScreen() {
       </View>
 
       <View className="mt-4 overflow-hidden rounded-2xl bg-card shadow-sm">
-        <MenuLink href="/meus-dados" icon="person-circle-outline" label="Meus dados" />
-        <MenuLink href="/saude" icon="pulse-outline" label="Saúde" />
-        <MenuLink href="/pedidos" icon="receipt-outline" label="Meus pedidos" />
-        <MenuLink href="/comunidade" icon="people-outline" label="Comunidade" />
-        <MenuLink href="/indicacao" icon="gift-outline" label="Indique e ganhe" last />
+        <MenuLink href="/perfil/meus-dados" icon="person-circle-outline" label="Meus dados" />
+        <MenuLink href="/perfil/pedidos" icon="receipt-outline" label="Meus pedidos" />
+        <MenuLink href="/perfil/comunidade" icon="people-outline" label="Comunidade" />
+        <MenuLink href="/perfil/indicacao" icon="gift-outline" label="Indique e ganhe" last />
       </View>
 
       <Pressable

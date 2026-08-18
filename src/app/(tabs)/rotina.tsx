@@ -148,7 +148,7 @@ export default function RotinaScreen() {
   })).filter((group) => group.items.length > 0);
 
   return (
-    <ScrollView className="flex-1 bg-cream" contentContainerClassName="p-4 pb-10">
+    <ScrollView className="flex-1 bg-cream" contentContainerClassName="p-4 pb-24">
       <View className="mb-4 flex-row items-center justify-between">
         <Text className="text-xl font-bold text-navy">Minha rotina</Text>
         <Pressable

@@ -114,7 +114,7 @@ export default function FeedScreen() {
       className="flex-1 bg-cream"
       data={items}
       keyExtractor={(item) => item.itemKey}
-      contentContainerClassName="gap-3 p-4"
+      contentContainerClassName="gap-3 p-4 pb-24"
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#0b1e3d" />
       }

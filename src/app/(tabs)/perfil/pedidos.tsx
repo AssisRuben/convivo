@@ -66,13 +66,15 @@ export default function PedidosScreen() {
       className="flex-1 bg-cream"
       data={orders}
       keyExtractor={(item) => item.id}
-      contentContainerClassName="gap-3 p-4"
+      contentContainerClassName="gap-3 p-4 pb-24"
       ListEmptyComponent={
         <Text className="mt-8 text-center text-navy/60">Você ainda não fez nenhum pedido.</Text>
       }
       renderItem={({ item }) => (
         <Pressable
-          onPress={() => router.push({ pathname: "/pedidos/[id]", params: { id: item.id } })}
+          onPress={() =>
+            router.push({ pathname: "/perfil/pedidos/[id]", params: { id: item.id } })
+          }
           className="flex-row items-center justify-between rounded-2xl bg-card p-4 shadow-sm"
         >
           <View>

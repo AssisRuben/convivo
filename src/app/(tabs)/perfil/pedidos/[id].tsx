@@ -52,7 +52,7 @@ export default function PedidoDetailScreen() {
   }
 
   return (
-    <ScrollView className="flex-1 bg-cream" contentContainerClassName="p-4">
+    <ScrollView className="flex-1 bg-cream" contentContainerClassName="p-4 pb-24">
       <Text className="mb-1 text-xl font-bold text-navy">Pedido #{order.id.slice(-8)}</Text>
       <Text className={`mb-4 font-medium ${STATUS_COLOR[order.status]}`}>
         {STATUS_LABEL[order.status]}

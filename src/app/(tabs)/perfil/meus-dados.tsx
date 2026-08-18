@@ -165,7 +165,7 @@ export default function MeusDadosScreen() {
   }
 
   return (
-    <ScrollView className="flex-1 bg-cream" contentContainerClassName="p-4 pb-10">
+    <ScrollView className="flex-1 bg-cream" contentContainerClassName="p-4 pb-24">
       <SectionTitle>Dados pessoais</SectionTitle>
       <View className="gap-3">
         <Field label="Nome completo" value={form.name} onChangeText={(v) => update("name", v)} />

@@ -1,6 +1,7 @@
 import { Redirect, Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/lib/auth";
+import { brandHeaderOptions } from "@/components/AppHeader";
 
 export default function TabsLayout() {
   const { token } = useAuth();
@@ -9,7 +10,7 @@ export default function TabsLayout() {
   return (
     <Tabs
       screenOptions={{
-        headerTintColor: "#0b1e3d",
+        ...brandHeaderOptions,
         tabBarActiveTintColor: "#e63946",
         tabBarInactiveTintColor: "#0b1e3d99",
       }}
@@ -17,7 +18,6 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Farmácia Conviva Parquelândia",
           tabBarLabel: "Início",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="newspaper-outline" size={size} color={color} />
@@ -34,11 +34,11 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="carrinho"
+        name="saude"
         options={{
-          title: "Carrinho",
+          title: "Saúde",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="cart-outline" size={size} color={color} />
+            <Ionicons name="pulse-outline" size={size} color={color} />
           ),
         }}
       />
@@ -55,6 +55,7 @@ export default function TabsLayout() {
         name="perfil"
         options={{
           title: "Perfil",
+          headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="person-outline" size={size} color={color} />
           ),
