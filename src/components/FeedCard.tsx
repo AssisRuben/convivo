@@ -16,11 +16,11 @@ export function FeedCard({
 
   return (
     <View className="overflow-hidden rounded-2xl bg-card shadow-sm">
-      {item.imageUrl && (
-        <Image source={{ uri: item.imageUrl }} className="h-56 w-full" resizeMode="cover" />
+      {Boolean(item.imageUrl) && (
+        <Image source={{ uri: item.imageUrl! }} className="h-56 w-full" resizeMode="cover" />
       )}
       <View className="gap-1 p-4">
-        {item.authorName && (
+        {Boolean(item.authorName) && (
           <Text className="mb-0.5 text-xs font-medium text-mint">
             🎉 {item.authorName} conquistou algo!
           </Text>
@@ -32,13 +32,13 @@ export function FeedCard({
         <Text className="font-semibold text-navy">{item.title}</Text>
         <Text className="text-sm text-navy/70">{item.message}</Text>
 
-        {item.sourceUrl && (
+        {Boolean(item.sourceUrl) && (
           <Pressable onPress={() => Linking.openURL(item.sourceUrl!)} className="mt-1">
             <Text className="text-xs font-medium text-mint">Ler notícia completa →</Text>
           </Pressable>
         )}
 
-        {item.extra && (
+        {Boolean(item.extra) && (
           <Pressable
             onPress={() => setExpanded((prev) => !prev)}
             className="mt-1 flex-row items-center gap-1"
@@ -73,7 +73,7 @@ export function FeedCard({
             </Text>
           </Pressable>
 
-          {item.shareState && onToggleShare && (
+          {Boolean(item.shareState) && onToggleShare && (
             <Pressable
               onPress={() => onToggleShare(item)}
               className="ml-auto flex-row items-center gap-1.5"

@@ -2,7 +2,14 @@ import { prisma } from "@/lib/prisma";
 import { formatDateLabel, todayDateString } from "@/lib/timeline/format";
 import { getExtraInfo } from "@/lib/timeline/extraInfo";
 import { getReactionStates } from "@/lib/timeline/reactions";
-import { fetchDiverseCoverImages, fetchNews, fetchNinjaFacts } from "@/lib/timeline/externalContent";
+import {
+  fetchCoverImage,
+  fetchDiverseCoverImages,
+  fetchFinanceSnippet,
+  fetchFunQuote,
+  fetchNews,
+  fetchNinjaFacts,
+} from "@/lib/timeline/externalContent";
 import type { TimelineFeedItem } from "@/lib/timeline/types";
 
 /**
@@ -184,16 +191,50 @@ export async function getFeedPage(
   limit = 10
 ): Promise<{ items: TimelineFeedItem[]; hasMore: boolean }> {
   const day = todayDateString();
-  const [facts, factImages, news, achievements] = await Promise.all([
-    fetchNinjaFacts(),
-    fetchDiverseCoverImages(30),
-    fetchNews(),
-    prisma.timelineEvent.findMany({
-      where: { userId },
-      orderBy: { occurredAt: "desc" },
-      take: 100,
-    }),
-  ]);
+  const [facts, factImages, news, achievements, finance, quote, financeImage, quoteImage] =
+    await Promise.all([
+      fetchNinjaFacts(),
+      fetchDiverseCoverImages(30),
+      fetchNews(),
+      prisma.timelineEvent.findMany({
+        where: { userId },
+        orderBy: { occurredAt: "desc" },
+        take: 100,
+      }),
+      fetchFinanceSnippet(),
+      fetchFunQuote(),
+      fetchCoverImage("dinheiro finanças"),
+      fetchCoverImage("motivação"),
+    ]);
+
+  // Mercado/frase são fixos no dia (uma leitura só, não tem por que
+  // paginar) — sempre no topo do pool, antes de curiosidade/notícia/
+  // conquista intercaladas.
+  const pinnedItems: PoolEntry[] = [];
+  if (finance) {
+    pinnedItems.push({
+      id: "content-finance",
+      itemKey: `finance-${day}`,
+      kind: "content",
+      title: "Mercado hoje",
+      message: finance.text,
+      extra: getExtraInfo("content-finance"),
+      imageUrl: financeImage,
+      dateLabel: "Hoje",
+    });
+  }
+  if (quote) {
+    pinnedItems.push({
+      id: "content-quote",
+      itemKey: `quote-${day}`,
+      kind: "content",
+      title: "Frase do dia",
+      message: `"${quote.text}" — ${quote.author}`,
+      extra: getExtraInfo("content-quote"),
+      imageUrl: quoteImage,
+      dateLabel: "Hoje",
+    });
+  }
 
   const factItems: PoolEntry[] = facts.map((fact, i) => ({
     id: `content-fact-${i}`,
@@ -240,7 +281,7 @@ export async function getFeedPage(
     shareState: event.sharedAt ? "shared" : "shareable",
   }));
 
-  const pool = interleave([factItems, newsItems, achievementItems]);
+  const pool = [...pinnedItems, ...interleave([factItems, newsItems, achievementItems])];
   const pageEntries = pool.slice(offset, offset + limit);
 
   const reactionStates = await getReactionStates(userId, pageEntries.map((e) => e.itemKey));
