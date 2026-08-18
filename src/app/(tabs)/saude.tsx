@@ -10,7 +10,12 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import Svg, { Circle, Polyline } from "react-native-svg";
 import { apiFetch } from "@/lib/api";
+
+const CHART_WIDTH = 140;
+const CHART_HEIGHT = 80;
+const CHART_PADDING = 8;
 
 type MeasurementType = "PRESSAO" | "PESO" | "GORDURA" | "GLICEMIA";
 
@@ -62,7 +67,7 @@ function groupByDay(items: ApiHealthMeasurement[]): DayGroup[] {
   }));
 }
 
-function MiniBarChart({
+function MiniLineChart({
   title,
   points,
   color,
@@ -72,27 +77,35 @@ function MiniBarChart({
   color: string;
 }) {
   if (points.length === 0) return null;
-  const max = Math.max(...points.map((p) => p.value));
-  const min = Math.min(...points.map((p) => p.value));
-  const range = max - min || 1;
   const last = points.slice(-8);
+  const max = Math.max(...last.map((p) => p.value));
+  const min = Math.min(...last.map((p) => p.value));
+  const range = max - min || 1;
+  const innerWidth = CHART_WIDTH - CHART_PADDING * 2;
+  const innerHeight = CHART_HEIGHT - CHART_PADDING * 2;
+  const stepX = last.length > 1 ? innerWidth / (last.length - 1) : 0;
+
+  const coords = last.map((p, i) => ({
+    x: CHART_PADDING + i * stepX,
+    y: CHART_PADDING + (1 - (p.value - min) / range) * innerHeight,
+  }));
 
   return (
     <View className="w-[48%] rounded-2xl bg-card p-3 shadow-sm">
       <Text className="mb-2 text-xs font-medium text-navy">{title}</Text>
-      <View className="h-20 flex-row items-end gap-1">
-        {last.map((p, i) => {
-          const heightPct = 15 + ((p.value - min) / range) * 85;
-          return (
-            <View key={i} className="h-full flex-1 items-center justify-end">
-              <View
-                style={{ height: `${heightPct}%`, backgroundColor: color }}
-                className="w-full rounded"
-              />
-            </View>
-          );
-        })}
-      </View>
+      <Svg width="100%" height={CHART_HEIGHT} viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}>
+        <Polyline
+          points={coords.map((c) => `${c.x},${c.y}`).join(" ")}
+          fill="none"
+          stroke={color}
+          strokeWidth={2}
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
+        {coords.map((c, i) => (
+          <Circle key={i} cx={c.x} cy={c.y} r={2.5} fill={color} />
+        ))}
+      </Svg>
       <View className="mt-1 flex-row justify-between">
         <Text className="text-[10px] text-navy/40">{last[0]?.date}</Text>
         <Text className="text-[10px] text-navy/40">{last[last.length - 1]?.date}</Text>
@@ -230,10 +243,10 @@ export default function SaudeScreen() {
         <>
           <Text className="mb-2 text-sm font-semibold text-navy">Evolução</Text>
           <View className="mb-5 flex-row flex-wrap justify-between gap-y-3">
-            <MiniBarChart title="Peso (kg)" points={pesoPoints} color="#e63946" />
-            <MiniBarChart title="Pressão sistólica" points={sistolicaPoints} color="#e63946" />
-            <MiniBarChart title="Gordura corporal (%)" points={gorduraPoints} color="#2ec4b6" />
-            <MiniBarChart title="Glicemia (mg/dL)" points={glicemiaPoints} color="#2ec4b6" />
+            <MiniLineChart title="Peso (kg)" points={pesoPoints} color="#e63946" />
+            <MiniLineChart title="Pressão sistólica" points={sistolicaPoints} color="#e63946" />
+            <MiniLineChart title="Gordura corporal (%)" points={gorduraPoints} color="#2ec4b6" />
+            <MiniLineChart title="Glicemia (mg/dL)" points={glicemiaPoints} color="#2ec4b6" />
           </View>
         </>
       )}
