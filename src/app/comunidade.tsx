@@ -1,54 +1,40 @@
 import { useCallback, useRef, useState } from "react";
 import { useFocusEffect } from "expo-router";
-import { ActivityIndicator, FlatList, RefreshControl, Text, View } from "react-native";
+import { ActivityIndicator, FlatList, Text, View } from "react-native";
 import { apiFetch, type ApiFeedItem } from "@/lib/api";
 import { FeedCard } from "@/components/FeedCard";
 
 const PAGE_SIZE = 10;
 
-export default function FeedScreen() {
+export default function ComunidadeScreen() {
   const [items, setItems] = useState<ApiFeedItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const loadedOnce = useRef(false);
 
   const loadPage = useCallback(async (offset: number) => {
-    const res = await apiFetch(`/api/mobile/feed?offset=${offset}&limit=${PAGE_SIZE}`);
+    const res = await apiFetch(`/api/mobile/comunidade?offset=${offset}&limit=${PAGE_SIZE}`);
     if (!res.ok) return { items: [] as ApiFeedItem[], hasMore: false };
     return (await res.json()) as { items: ApiFeedItem[]; hasMore: boolean };
   }, []);
-
-  const loadInitial = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await loadPage(0);
-      setItems(data.items);
-      setHasMore(data.hasMore);
-    } finally {
-      setLoading(false);
-    }
-  }, [loadPage]);
 
   useFocusEffect(
     useCallback(() => {
       if (loadedOnce.current) return;
       loadedOnce.current = true;
-      loadInitial();
-    }, [loadInitial])
+      (async () => {
+        setLoading(true);
+        try {
+          const data = await loadPage(0);
+          setItems(data.items);
+          setHasMore(data.hasMore);
+        } finally {
+          setLoading(false);
+        }
+      })();
+    }, [loadPage])
   );
-
-  async function onRefresh() {
-    setRefreshing(true);
-    try {
-      const data = await loadPage(0);
-      setItems(data.items);
-      setHasMore(data.hasMore);
-    } finally {
-      setRefreshing(false);
-    }
-  }
 
   async function onEndReached() {
     if (loadingMore || !hasMore) return;
@@ -84,23 +70,6 @@ export default function FeedScreen() {
     }
   }
 
-  async function handleToggleShare(item: ApiFeedItem) {
-    const nextShared = item.shareState === "shared" ? "shareable" : "shared";
-    setItems((prev) =>
-      prev.map((i) => (i.itemKey === item.itemKey ? { ...i, shareState: nextShared } : i))
-    );
-    try {
-      await apiFetch("/api/mobile/feed/share", {
-        method: nextShared === "shared" ? "POST" : "DELETE",
-        body: JSON.stringify({ eventId: item.itemKey }),
-      });
-    } catch {
-      setItems((prev) =>
-        prev.map((i) => (i.itemKey === item.itemKey ? { ...i, shareState: item.shareState } : i))
-      );
-    }
-  }
-
   if (loading) {
     return (
       <View className="flex-1 items-center justify-center bg-cream">
@@ -115,13 +84,12 @@ export default function FeedScreen() {
       data={items}
       keyExtractor={(item) => item.itemKey}
       contentContainerClassName="gap-3 p-4"
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#0b1e3d" />
-      }
       onEndReachedThreshold={0.4}
       onEndReached={onEndReached}
       ListEmptyComponent={
-        <Text className="mt-8 text-center text-navy/60">Nada por aqui ainda.</Text>
+        <Text className="mt-8 text-center text-navy/60">
+          Ninguém compartilhou conquistas ainda. Seja o primeiro!
+        </Text>
       }
       ListFooterComponent={
         loadingMore ? (
@@ -130,9 +98,7 @@ export default function FeedScreen() {
           </View>
         ) : null
       }
-      renderItem={({ item }) => (
-        <FeedCard item={item} onToggleLike={handleToggleLike} onToggleShare={handleToggleShare} />
-      )}
+      renderItem={({ item }) => <FeedCard item={item} onToggleLike={handleToggleLike} />}
     />
   );
 }

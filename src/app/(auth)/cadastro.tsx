@@ -17,12 +17,13 @@ export default function CadastroScreen() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [referralCode, setReferralCode] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit() {
     setLoading(true);
     try {
-      await register(name.trim(), email.trim(), password);
+      await register(name.trim(), email.trim(), password, referralCode.trim());
     } catch (error) {
       Alert.alert("Erro ao criar conta", error instanceof Error ? error.message : undefined);
     } finally {
@@ -58,6 +59,13 @@ export default function CadastroScreen() {
           onChangeText={setPassword}
           placeholder="Senha (mín. 6 caracteres)"
           secureTextEntry
+          className="rounded-xl border border-navy/10 bg-card p-3.5"
+        />
+        <TextInput
+          value={referralCode}
+          onChangeText={setReferralCode}
+          placeholder="Código de indicação (opcional)"
+          autoCapitalize="characters"
           className="rounded-xl border border-navy/10 bg-card p-3.5"
         />
 

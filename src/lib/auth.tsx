@@ -10,7 +10,7 @@ type AuthState = {
   user: AuthUser | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string) => Promise<void>;
+  register: (name: string, email: string, password: string, referralCode?: string) => Promise<void>;
   logout: () => Promise<void>;
 };
 
@@ -58,10 +58,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await persist(data.token, data.user);
   }
 
-  async function register(name: string, email: string, password: string) {
+  async function register(name: string, email: string, password: string, referralCode?: string) {
     const res = await apiFetch("/api/mobile/auth/register", {
       method: "POST",
-      body: JSON.stringify({ name, email, password }),
+      body: JSON.stringify({ name, email, password, referralCode: referralCode || undefined }),
     });
     if (!res.ok) throw new Error(await extractError(res, "Não foi possível criar a conta"));
     const data = await res.json();

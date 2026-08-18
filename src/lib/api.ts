@@ -5,8 +5,8 @@ const API_URL = process.env.EXPO_PUBLIC_API_URL!;
 
 /**
  * Wrapper de fetch centralizado — injeta o token JWT salvo (se houver) em
- * todo request. Usado por todas as telas que falam com a API do
- * pagamentoapp (backend Next.js/Vercel).
+ * todo request. Usado por todas as telas que falam com o backend próprio
+ * do app (rotas `+api.ts` do Expo Router, em src/app/api/mobile/**).
  */
 export async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
   const token = await SecureStore.getItemAsync(TOKEN_KEY);
@@ -58,9 +58,60 @@ export type ApiFeedItem = {
   liked: boolean;
   likeCount: number;
   comments: ApiFeedComment[];
+  /** Presente no feed público (Comunidade): quem conquistou. */
+  authorName?: string;
+  /** Presente só na sua própria conquista: controla o botão de compartilhar. */
+  shareState?: "shareable" | "shared";
+  /** Presente em posts de notícia: link pra matéria original. */
+  sourceUrl?: string;
 };
 
 export type ApiFeedPage = {
   items: ApiFeedItem[];
   hasMore: boolean;
+};
+
+export type ApiProfile = {
+  id: string;
+  name: string;
+  email: string;
+  cpf: string | null;
+  phone: string | null;
+  birthDate: string | null;
+  cep: string | null;
+  estado: string | null;
+  cidade: string | null;
+  logradouro: string | null;
+  numero: string | null;
+  bairro: string | null;
+  complemento: string | null;
+  heightCm: number | null;
+  conditions: string[];
+  allergies: string[];
+};
+
+export type ProfileInput = Partial<Omit<ApiProfile, "id" | "email">>;
+
+export type ApiCareCategory =
+  | "TREINO"
+  | "ALIMENTACAO"
+  | "ESTUDOS"
+  | "MEDICACAO"
+  | "TERAPIA"
+  | "OUTRO";
+
+export type ApiChecklistItem = {
+  id: string;
+  title: string;
+  category: ApiCareCategory;
+  timeOfDay: string | null;
+  daysOfWeek: number[];
+  completedToday: boolean;
+};
+
+export type RoutineItemInput = {
+  title: string;
+  category: ApiCareCategory;
+  timeOfDay?: string | null;
+  daysOfWeek: number[];
 };

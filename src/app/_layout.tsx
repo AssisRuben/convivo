@@ -23,6 +23,26 @@ function RootNavigator() {
         name="produto/[id]"
         options={{ headerShown: true, title: "Produto", headerBackTitle: "Voltar" }}
       />
+      <Stack.Screen
+        name="saude"
+        options={{ headerShown: true, title: "Saúde", headerBackTitle: "Voltar" }}
+      />
+      <Stack.Screen
+        name="pedidos"
+        options={{ headerShown: true, title: "Meus pedidos", headerBackTitle: "Voltar" }}
+      />
+      <Stack.Screen
+        name="pedidos/[id]"
+        options={{ headerShown: true, title: "Pedido", headerBackTitle: "Voltar" }}
+      />
+      <Stack.Screen
+        name="comunidade"
+        options={{ headerShown: true, title: "Comunidade", headerBackTitle: "Voltar" }}
+      />
+      <Stack.Screen
+        name="indicacao"
+        options={{ headerShown: true, title: "Indique e Ganhe", headerBackTitle: "Voltar" }}
+      />
     </Stack>
   );
 }

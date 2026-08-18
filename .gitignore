@@ -44,3 +44,6 @@ example
 
 # Claude Code runtime state
 .claude/scheduled_tasks.lock
+
+# Prisma generated client (regenerate with `npx prisma generate`)
+/src/lib/generated/prisma

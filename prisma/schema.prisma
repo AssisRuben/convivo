@@ -1,0 +1,302 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id                 String    @id @default(cuid())
+  name               String
+  email              String    @unique
+  passwordHash       String
+  cpf                String?   @unique
+  vendedorAttributed Boolean   @default(false)
+  referralCode       String    @unique
+  referredById       String?
+  createdAt          DateTime  @default(now())
+
+  // Telefone e nascimento — exigidos pelo checkout (efetuar-venda-v1 da
+  // Trier/SGF precisa dos dois no `cliente`).
+  phone     String?
+  birthDate DateTime? @db.Date
+
+  // Endereço — mesmo formato do ClienteEcommerceIntegracaoDto da Trier,
+  // pra não precisar converter na hora do checkout.
+  cep         String?
+  estado      String?
+  cidade      String?
+  logradouro  String?
+  numero      String?
+  bairro      String?
+  complemento String?
+
+  // Saúde — usado em recomendações e alertas de segurança na hora da
+  // compra (ex: interação de medicamento com alergia/condição informada).
+  heightCm   Int?
+  conditions String[] @default([])
+  allergies  String[] @default([])
+
+  cart                 Cart?
+  orders               Order[]
+  referredBy           User?               @relation("Referrals", fields: [referredById], references: [id])
+  referrals            User[]              @relation("Referrals")
+  careLinksAsTitular   CareLink[]          @relation("TitularLinks")
+  careLinksAsCaregiver CareLink[]          @relation("CaregiverLinks")
+  healthMeasurements   HealthMeasurement[]
+  timelineEvents       TimelineEvent[]
+  careChecklistItems   CareChecklistItem[]
+  timelineReactions    TimelineReaction[]
+  timelineComments     TimelineComment[]
+  pushSubscriptions    PushSubscription[]
+}
+
+enum CareLinkStatus {
+  PENDING
+  ACTIVE
+  REVOKED
+}
+
+model CareLink {
+  id          String         @id @default(cuid())
+  titularId   String
+  caregiverId String?
+  inviteCode  String         @unique
+  status      CareLinkStatus @default(PENDING)
+  createdAt   DateTime       @default(now())
+  acceptedAt  DateTime?
+
+  titular   User  @relation("TitularLinks", fields: [titularId], references: [id])
+  caregiver User? @relation("CaregiverLinks", fields: [caregiverId], references: [id])
+}
+
+enum ProductCategory {
+  MEDICAMENTO
+  PRODUTO
+}
+
+model Product {
+  id                  String                 @id @default(cuid())
+  name                String                 @unique
+  description         String
+  priceCents          Int
+  imageUrl            String
+  stock               Int                    @default(0)
+  codigoProduto       Int?                   @unique
+  category            ProductCategory        @default(PRODUTO)
+  usoContinuo         Boolean                @default(false)
+  duracaoEstimadaDias Int?
+  healthCheckType     HealthMeasurementType?
+  createdAt           DateTime               @default(now())
+
+  cartItems  CartItem[]
+  orderItems OrderItem[]
+}
+
+model Cart {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  createdAt DateTime @default(now())
+
+  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items CartItem[]
+}
+
+model CartItem {
+  id        String @id @default(cuid())
+  cartId    String
+  productId String
+  quantity  Int    @default(1)
+
+  cart    Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([cartId, productId])
+}
+
+enum OrderStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum FulfillmentType {
+  DELIVERY
+  PICKUP
+}
+
+model Order {
+  id                String          @id @default(cuid())
+  userId            String
+  status            OrderStatus     @default(PENDING)
+  totalCents        Int
+  mpPaymentId       String?
+  fulfillmentType   FulfillmentType @default(PICKUP)
+  addressCep        String?
+  addressLogradouro String?
+  addressNumero     String?
+  addressBairro     String?
+  addressCidade     String?
+  addressEstado     String?
+  trierNumeroNota   Int?
+  trierSyncedAt     DateTime?
+  trierError        String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  user               User                @relation(fields: [userId], references: [id])
+  items              OrderItem[]
+  healthMeasurements HealthMeasurement[]
+}
+
+enum HealthMeasurementType {
+  PRESSAO
+  PESO
+  GORDURA
+  GLICEMIA
+}
+
+model HealthMeasurement {
+  id                String                @id @default(cuid())
+  userId            String
+  type              HealthMeasurementType
+  pressaoSistolica  Int?
+  pressaoDiastolica Int?
+  pesoKg            Float?
+  percentualGordura Float?
+  glicemiaMgDl      Int?
+  local             String
+  measuredAt        DateTime
+  orderId           String?
+  createdAt         DateTime              @default(now())
+
+  user  User   @relation(fields: [userId], references: [id])
+  order Order? @relation(fields: [orderId], references: [id])
+}
+
+model OrderItem {
+  id             String @id @default(cuid())
+  orderId        String
+  productId      String
+  quantity       Int
+  unitPriceCents Int
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+}
+
+enum TimelineEventType {
+  ACHIEVEMENT_WEIGHT
+  ACHIEVEMENT_PRESSURE
+  ACHIEVEMENT_CARE_COMPLETE
+}
+
+model TimelineEvent {
+  id         String            @id @default(cuid())
+  userId     String
+  type       TimelineEventType
+  title      String
+  message    String
+  occurredAt DateTime          @default(now())
+  createdAt  DateTime          @default(now())
+  // null = privada (só o dono vê). Preenchida quando o dono clica em
+  // "Compartilhar" — consentimento explícito exigido pela LGPD pra dado de
+  // saúde (dado sensível). Também usada pra ordenar o feed público.
+  sharedAt   DateTime?
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, occurredAt])
+  @@index([sharedAt])
+}
+
+enum CareCategory {
+  TREINO
+  ALIMENTACAO
+  ESTUDOS
+  MEDICACAO
+  TERAPIA
+  OUTRO
+}
+
+model CareChecklistItem {
+  id         String       @id @default(cuid())
+  userId     String
+  title      String
+  category   CareCategory @default(OUTRO)
+  // "HH:mm" em horário de Brasília; null = sem lembrete/horário fixo.
+  timeOfDay  String?
+  // 0=domingo..6=sábado; lista vazia = todo dia.
+  daysOfWeek Int[]        @default([])
+  active     Boolean      @default(true)
+  createdAt  DateTime     @default(now())
+
+  user               User                      @relation(fields: [userId], references: [id])
+  completions        CareChecklistCompletion[]
+  reminderDispatches CareReminderDispatch[]
+}
+
+model CareChecklistCompletion {
+  id          String   @id @default(cuid())
+  itemId      String
+  date        DateTime @db.Date
+  completedAt DateTime @default(now())
+
+  item CareChecklistItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([itemId, date])
+}
+
+// Evita reenviar o mesmo lembrete duas vezes no dia (idempotência, igual
+// já fazemos em CareChecklistCompletion e syncOrderStatus).
+model CareReminderDispatch {
+  id     String   @id @default(cuid())
+  itemId String
+  date   DateTime @db.Date
+  sentAt DateTime @default(now())
+
+  item CareChecklistItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([itemId, date])
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+// Curtir/comentar na timeline é pessoal (só o próprio dono vê e reage ao seu
+// feed, não é social entre usuários) — por isso não há relação com outros
+// usuários, só o dono. `itemKey` identifica tanto conquistas reais
+// (usa o id do TimelineEvent) quanto cards de conteúdo do dia, que não são
+// linhas no banco (usa uma chave sintética tipo "fact-2026-08-17").
+model TimelineReaction {
+  id        String   @id @default(cuid())
+  userId    String
+  itemKey   String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, itemKey])
+}
+
+model TimelineComment {
+  id        String   @id @default(cuid())
+  userId    String
+  itemKey   String
+  text      String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, itemKey])
+}
