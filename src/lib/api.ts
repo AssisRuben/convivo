@@ -1,4 +1,4 @@
-import * as SecureStore from "expo-secure-store";
+import { getItemAsync } from "@/lib/storage";
 import { TOKEN_KEY } from "@/lib/storageKeys";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL!;
@@ -9,7 +9,7 @@ const API_URL = process.env.EXPO_PUBLIC_API_URL!;
  * do app (rotas `+api.ts` do Expo Router, em src/app/api/mobile/**).
  */
 export async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
-  const token = await SecureStore.getItemAsync(TOKEN_KEY);
+  const token = await getItemAsync(TOKEN_KEY);
 
   const headers = new Headers(options.headers);
   headers.set("Content-Type", "application/json");
