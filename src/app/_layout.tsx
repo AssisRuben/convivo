@@ -24,6 +24,10 @@ function RootNavigator() {
         options={{ headerShown: true, title: "Produto", headerBackTitle: "Voltar" }}
       />
       <Stack.Screen
+        name="meus-dados"
+        options={{ headerShown: true, title: "Meus dados", headerBackTitle: "Voltar" }}
+      />
+      <Stack.Screen
         name="saude"
         options={{ headerShown: true, title: "Saúde", headerBackTitle: "Voltar" }}
       />

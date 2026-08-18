@@ -10,14 +10,15 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerTintColor: "#0b1e3d",
-        tabBarActiveTintColor: "#2ec4b6",
+        tabBarActiveTintColor: "#e63946",
         tabBarInactiveTintColor: "#0b1e3d99",
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          title: "Feed",
+          title: "Farmácia Conviva Parquelândia",
+          tabBarLabel: "Início",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="newspaper-outline" size={size} color={color} />
           ),

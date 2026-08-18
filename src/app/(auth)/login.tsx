@@ -67,7 +67,7 @@ export default function LoginScreen() {
         </Pressable>
       </View>
 
-      <Link href="/cadastro" className="mt-6 text-center text-mint">
+      <Link href="/cadastro" className="mt-6 text-center text-coral">
         Não tem conta? Criar conta
       </Link>
     </KeyboardAvoidingView>

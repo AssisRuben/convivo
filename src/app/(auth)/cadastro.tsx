@@ -82,7 +82,7 @@ export default function CadastroScreen() {
         </Pressable>
       </View>
 
-      <Link href="/login" className="mt-6 text-center text-mint">
+      <Link href="/login" className="mt-6 text-center text-coral">
         Já tem conta? Entrar
       </Link>
     </KeyboardAvoidingView>
