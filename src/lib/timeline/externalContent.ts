@@ -1,5 +1,6 @@
 import { pickWellnessFacts } from "./wellnessFacts";
 import { cached } from "./memoCache";
+import { todayDateString } from "./format";
 
 const UNSPLASH_ACCESS_KEY = process.env.UNSPLASH_ACCESS_KEY;
 const NINJA_API_KEY = process.env.NINJA_API_KEY;
@@ -197,7 +198,11 @@ export async function fetchFinanceSnippet(): Promise<FinanceSnippet | null> {
  * prático). Mesma frase pra todo mundo no mesmo dia.
  */
 export async function fetchFunQuote(): Promise<FunQuote | null> {
-  return cached("quote", 86400, async () => {
+  // Chave presa ao dia (não só um TTL de 24h corridas): sem isso, se o
+  // servidor ficar no ar de um dia pro outro sem reiniciar, o cache
+  // "rolante" segue servindo a frase de ontem até completar 24h desde a
+  // última busca, em vez de virar exatamente na virada do dia.
+  return cached(`quote:${todayDateString()}`, 86400, async () => {
     try {
       const res = await fetch(FRASES_JSON_URL);
       if (!res.ok) return null;
@@ -232,7 +237,9 @@ export async function fetchCoverImage(query: string): Promise<string | null> {
  */
 export async function fetchCoverImages(query: string, count: number): Promise<string[]> {
   if (!UNSPLASH_ACCESS_KEY || count <= 0) return [];
-  return cached(`unsplash:${query}:${count}`, 86400, async () => {
+  // Mesmo motivo do cache da frase: chave presa ao dia, não só TTL de 24h
+  // corridas a partir da última busca.
+  return cached(`unsplash:${query}:${count}:${todayDateString()}`, 86400, async () => {
     try {
       const url = new URL("https://api.unsplash.com/search/photos");
       url.searchParams.set("query", query);
