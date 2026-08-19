@@ -2,7 +2,6 @@ import { useCallback, useRef, useState } from "react";
 import { useFocusEffect } from "expo-router";
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   Text,
@@ -12,6 +11,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import Svg, { Circle, Polyline } from "react-native-svg";
 import { apiFetch } from "@/lib/api";
+import { showAlert } from "@/lib/alert";
 
 const CHART_WIDTH = 140;
 const CHART_HEIGHT = 80;
@@ -170,7 +170,7 @@ export default function SaudeScreen() {
     }
 
     if (entries.length === 0) {
-      Alert.alert("Nada pra registrar", "Preencha ao menos uma medida.");
+      showAlert("Nada pra registrar", "Preencha ao menos uma medida.");
       return;
     }
 
@@ -189,7 +189,7 @@ export default function SaudeScreen() {
       setGordura("");
       setGlicemia("");
     } catch (error) {
-      Alert.alert("Erro ao salvar", error instanceof Error ? error.message : undefined);
+      showAlert("Erro ao salvar", error instanceof Error ? error.message : undefined);
     } finally {
       setSaving(false);
     }
@@ -202,7 +202,7 @@ export default function SaudeScreen() {
   }
 
   function confirmDelete(id: string) {
-    Alert.alert("Remover registro", "Tem certeza?", [
+    showAlert("Remover registro", "Tem certeza?", [
       { text: "Cancelar", style: "cancel" },
       { text: "Remover", style: "destructive", onPress: () => handleDelete(id) },
     ]);

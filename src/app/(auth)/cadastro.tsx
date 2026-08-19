@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Link } from "expo-router";
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -11,6 +10,7 @@ import {
   View,
 } from "react-native";
 import { useAuth } from "@/lib/auth";
+import { showAlert } from "@/lib/alert";
 
 export default function CadastroScreen() {
   const { register } = useAuth();
@@ -25,7 +25,7 @@ export default function CadastroScreen() {
     try {
       await register(name.trim(), email.trim(), password, referralCode.trim());
     } catch (error) {
-      Alert.alert("Erro ao criar conta", error instanceof Error ? error.message : undefined);
+      showAlert("Erro ao criar conta", error instanceof Error ? error.message : undefined);
     } finally {
       setLoading(false);
     }

@@ -1,5 +1,9 @@
 import { prisma } from "@/lib/prisma";
-import { checkPressureAchievement, checkWeightAchievement } from "@/lib/timeline/achievements";
+import {
+  checkGlicemiaAchievement,
+  checkPressureAchievement,
+  checkWeightMilestones,
+} from "@/lib/timeline/achievements";
 import type { HealthMeasurement, HealthMeasurementType } from "@/lib/generated/prisma/client";
 
 export type HealthMeasurementValues = {
@@ -14,8 +18,9 @@ export type HealthMeasurementValues = {
 };
 
 async function checkAchievementsForTypes(userId: string, types: HealthMeasurementType[]) {
-  if (types.includes("PESO")) await checkWeightAchievement(userId);
+  if (types.includes("PESO")) await checkWeightMilestones(userId);
   if (types.includes("PRESSAO")) await checkPressureAchievement(userId);
+  if (types.includes("GLICEMIA")) await checkGlicemiaAchievement(userId);
 }
 
 export async function listMeasurementsForUser(userId: string): Promise<HealthMeasurement[]> {

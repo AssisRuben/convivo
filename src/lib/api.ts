@@ -58,12 +58,14 @@ export type ApiFeedItem = {
   liked: boolean;
   likeCount: number;
   comments: ApiFeedComment[];
-  /** Presente no feed público (Comunidade): quem conquistou. */
   authorName?: string;
-  /** Presente só na sua própria conquista: controla o botão de compartilhar. */
   shareState?: "shareable" | "shared";
   /** Presente em posts de notícia: link pra matéria original. */
   sourceUrl?: string;
+  /** Presentes só em conquistas de meta em escada (peso/rotina). */
+  goalType?: "PESO" | "ROTINA";
+  milestoneValue?: number;
+  stage?: number;
 };
 
 export type ApiFeedPage = {

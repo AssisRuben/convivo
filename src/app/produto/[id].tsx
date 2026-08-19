@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   ActivityIndicator,
-  Alert,
   Image,
   Pressable,
   ScrollView,
@@ -10,6 +9,7 @@ import {
   View,
 } from "react-native";
 import { apiFetch, type ApiProduct } from "@/lib/api";
+import { showAlert } from "@/lib/alert";
 
 function formatPrice(cents: number): string {
   return (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -35,12 +35,12 @@ export default function ProdutoScreen() {
         body: JSON.stringify({ productId: id, quantity: 1 }),
       });
       if (!res.ok) throw new Error();
-      Alert.alert("Adicionado!", "Produto adicionado ao carrinho.", [
+      showAlert("Adicionado!", "Produto adicionado ao carrinho.", [
         { text: "Continuar comprando", style: "cancel" },
         { text: "Ver carrinho", onPress: () => router.push("/carrinho") },
       ]);
     } catch {
-      Alert.alert("Erro", "Não foi possível adicionar ao carrinho.");
+      showAlert("Erro", "Não foi possível adicionar ao carrinho.");
     } finally {
       setAdding(false);
     }

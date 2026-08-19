@@ -2,7 +2,6 @@ import { useCallback, useRef, useState } from "react";
 import { useFocusEffect } from "expo-router";
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   Text,
@@ -10,6 +9,7 @@ import {
   View,
 } from "react-native";
 import { apiFetch, type ApiProfile, type ProfileInput } from "@/lib/api";
+import { showAlert } from "@/lib/alert";
 
 type FormState = {
   name: string;
@@ -148,9 +148,9 @@ export default function MeusDadosScreen() {
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error ?? "Não foi possível salvar");
       setForm(toFormState(data.profile));
-      Alert.alert("Pronto", "Dados atualizados.");
+      showAlert("Pronto", "Dados atualizados.");
     } catch (error) {
-      Alert.alert("Erro ao salvar", error instanceof Error ? error.message : undefined);
+      showAlert("Erro ao salvar", error instanceof Error ? error.message : undefined);
     } finally {
       setSaving(false);
     }

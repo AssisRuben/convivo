@@ -1,7 +1,16 @@
 import { useState } from "react";
 import { Image, Linking, Pressable, Text, View } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import type { ApiFeedItem } from "@/lib/api";
+import { LADDER_LENGTHS, petProgressLabelFor } from "@/constants/petStages";
+import { PetAnimation } from "@/components/PetAnimation";
+
+const CONFETTI = [
+  { emoji: "🎉", top: -6, left: -10, rotate: "-15deg" },
+  { emoji: "✨", top: -10, right: 4, rotate: "10deg" },
+  { emoji: "🎊", bottom: 8, left: -16, rotate: "8deg" },
+];
 
 export function FeedCard({
   item,
@@ -13,23 +22,86 @@ export function FeedCard({
   onToggleShare?: (item: ApiFeedItem) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const hasPet = item.goalType != null && item.stage != null;
 
   return (
     <View className="overflow-hidden rounded-2xl bg-card shadow-sm">
-      {Boolean(item.imageUrl) && (
-        <Image source={{ uri: item.imageUrl! }} className="h-56 w-full" resizeMode="cover" />
+      {hasPet ? (
+        <LinearGradient
+          colors={["#0f3d3e", "#f5a623"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          className="items-center gap-2 px-4 py-8"
+        >
+          <View className="w-full flex-row justify-end">
+            <View className="h-9 w-9 items-center justify-center rounded-full bg-[#ffd76a]">
+              <Ionicons name="trophy" size={18} color="#8a5a00" />
+            </View>
+          </View>
+
+          <View className="w-full items-center justify-center" style={{ height: 200 }}>
+            {CONFETTI.map((c, i) => (
+              <Text
+                key={i}
+                className="absolute text-lg"
+                style={{
+                  top: c.top,
+                  left: c.left,
+                  right: c.right,
+                  bottom: c.bottom,
+                  transform: [{ rotate: c.rotate }],
+                }}
+              >
+                {c.emoji}
+              </Text>
+            ))}
+            <PetAnimation goalType={item.goalType!} stage={item.stage!} />
+          </View>
+
+          <Text
+            className="text-3xl font-extrabold text-white"
+            style={{
+              textShadowColor: "rgba(0,0,0,0.25)",
+              textShadowOffset: { width: 0, height: 1 },
+              textShadowRadius: 3,
+            }}
+          >
+            {item.title}
+          </Text>
+          <Text className="-mt-1 text-xs font-semibold uppercase tracking-wide text-white/80">
+            {petProgressLabelFor(item.goalType!)}
+          </Text>
+
+          <View className="mt-1 w-full gap-1">
+            <View className="h-2 w-full overflow-hidden rounded-full bg-white/25">
+              <View
+                className="h-full rounded-full bg-[#ffd76a]"
+                style={{
+                  width: `${Math.round(((item.stage! + 1) / LADDER_LENGTHS[item.goalType!]) * 100)}%`,
+                }}
+              />
+            </View>
+            <Text className="self-end text-[10px] font-medium text-white/70">
+              Degrau {item.stage! + 1} de {LADDER_LENGTHS[item.goalType!]}
+            </Text>
+          </View>
+        </LinearGradient>
+      ) : (
+        Boolean(item.imageUrl) && (
+          <Image source={{ uri: item.imageUrl! }} className="h-56 w-full" resizeMode="cover" />
+        )
       )}
       <View className="gap-1 p-4">
-        {Boolean(item.authorName) && (
+        {!hasPet && Boolean(item.authorName) && (
           <Text className="mb-0.5 text-xs font-medium text-mint">
             🎉 {item.authorName} conquistou algo!
           </Text>
         )}
-        {!item.authorName && item.kind === "achievement" && (
+        {!hasPet && !item.authorName && item.kind === "achievement" && (
           <Text className="mb-0.5 text-xs font-medium text-mint">Sua conquista</Text>
         )}
 
-        <Text className="font-semibold text-navy">{item.title}</Text>
+        {!hasPet && <Text className="font-semibold text-navy">{item.title}</Text>}
         <Text className="text-sm text-navy/70">{item.message}</Text>
 
         {Boolean(item.sourceUrl) && (

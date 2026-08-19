@@ -1,7 +1,8 @@
 import { Link } from "expo-router";
-import { Alert, Pressable, ScrollView, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/lib/auth";
+import { showAlert } from "@/lib/alert";
 
 function MenuLink({
   href,
@@ -31,7 +32,7 @@ export default function PerfilScreen() {
   const { user, logout } = useAuth();
 
   function handleLogout() {
-    Alert.alert("Sair da conta", "Tem certeza que deseja sair?", [
+    showAlert("Sair da conta", "Tem certeza que deseja sair?", [
       { text: "Cancelar", style: "cancel" },
       { text: "Sair", style: "destructive", onPress: logout },
     ]);
@@ -52,7 +53,7 @@ export default function PerfilScreen() {
       <View className="mt-4 overflow-hidden rounded-2xl bg-card shadow-sm">
         <MenuLink href="/perfil/meus-dados" icon="person-circle-outline" label="Meus dados" />
         <MenuLink href="/perfil/pedidos" icon="receipt-outline" label="Meus pedidos" />
-        <MenuLink href="/perfil/comunidade" icon="people-outline" label="Comunidade" />
+        <MenuLink href="/perfil/minhas-postagens" icon="ribbon-outline" label="Minhas postagens" />
         <MenuLink href="/perfil/indicacao" icon="gift-outline" label="Indique e ganhe" last />
       </View>
 

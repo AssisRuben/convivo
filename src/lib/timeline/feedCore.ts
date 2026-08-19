@@ -14,8 +14,8 @@ import type { TimelineFeedItem } from "@/lib/timeline/types";
 
 /**
  * Lógica de feed usada pelas rotas mobile (`app/api/mobile/feed/**`,
- * `app/api/mobile/comunidade`) — cada rota só resolve o `userId` (JWT
- * Bearer) e delega pra cá.
+ * `app/api/mobile/minhas-postagens`) — cada rota só resolve o `userId`
+ * (JWT Bearer) e delega pra cá.
  */
 
 const CONTENT_PREFIXES = ["fact-", "finance-", "quote-", "news-"];
@@ -65,8 +65,9 @@ export async function toggleLikeForUser(userId: string, itemKey: string): Promis
 
 /**
  * Torna uma conquista pública — consentimento explícito do dono, exigido
- * pela LGPD já que é dado de saúde. Sem isso, a conquista nunca aparece
- * pra outros usuários em /comunidade.
+ * pela LGPD já que é dado de saúde. Sem uma rota de feed público ativa no
+ * momento (removida em favor de "Minhas postagens"), isso só marca
+ * `sharedAt`; mantido pra quando um feed público voltar a existir.
  */
 export async function shareAchievementForUser(userId: string, eventId: string): Promise<void> {
   const event = await prisma.timelineEvent.findUnique({ where: { id: eventId } });
@@ -151,6 +152,9 @@ export async function getAchievementsPage(
       likeCount: state.likeCount,
       comments: state.comments,
       shareState: event.sharedAt ? "shared" : "shareable",
+      goalType: event.goalType ?? undefined,
+      milestoneValue: event.milestoneValue ?? undefined,
+      stage: event.stage ?? undefined,
     };
   });
 

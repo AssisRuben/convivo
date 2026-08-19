@@ -35,7 +35,8 @@
           "imageWidth": 76
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      "@lottiefiles/dotlottie-react-native/plugin"
     ],
     "experiments": {
       "typedRoutes": true,

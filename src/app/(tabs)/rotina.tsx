@@ -2,7 +2,6 @@ import { useCallback, useRef, useState } from "react";
 import { useFocusEffect } from "expo-router";
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   Text,
@@ -17,6 +16,7 @@ import {
   type RoutineItemInput,
 } from "@/lib/api";
 import { CARE_CATEGORIES, CARE_CATEGORY_META, WEEKDAY_LABELS } from "@/constants/careCategories";
+import { showAlert } from "@/lib/alert";
 
 type FormState = {
   id: string | null;
@@ -108,14 +108,14 @@ export default function RotinaScreen() {
       setItems(data.items ?? []);
       setForm(null);
     } catch (error) {
-      Alert.alert("Erro ao salvar", error instanceof Error ? error.message : undefined);
+      showAlert("Erro ao salvar", error instanceof Error ? error.message : undefined);
     } finally {
       setSaving(false);
     }
   }
 
   function handleRemove(item: ApiChecklistItem) {
-    Alert.alert("Remover cuidado", `Remover "${item.title}" da sua rotina?`, [
+    showAlert("Remover cuidado", `Remover "${item.title}" da sua rotina?`, [
       { text: "Cancelar", style: "cancel" },
       {
         text: "Remover",

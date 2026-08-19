@@ -1,5 +1,8 @@
 import { prisma } from "@/lib/prisma";
-import { checkCareCompletionAchievement } from "@/lib/timeline/achievements";
+import {
+  checkCareCompletionAchievement,
+  checkRoutineStreakMilestones,
+} from "@/lib/timeline/achievements";
 import { todayDate } from "@/lib/timeline/format";
 import type { CareCategory } from "@/lib/generated/prisma/client";
 
@@ -119,6 +122,7 @@ export async function completeChecklistItemForUser(userId: string, itemId: strin
   });
 
   await checkCareCompletionAchievement(userId, date);
+  await checkRoutineStreakMilestones(userId, date);
 }
 
 export async function uncompleteChecklistItemForUser(userId: string, itemId: string): Promise<void> {

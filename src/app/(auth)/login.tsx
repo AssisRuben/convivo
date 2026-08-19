@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Link } from "expo-router";
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -11,6 +10,7 @@ import {
   View,
 } from "react-native";
 import { useAuth } from "@/lib/auth";
+import { showAlert } from "@/lib/alert";
 
 export default function LoginScreen() {
   const { login } = useAuth();
@@ -23,7 +23,7 @@ export default function LoginScreen() {
     try {
       await login(email.trim(), password);
     } catch (error) {
-      Alert.alert("Erro ao entrar", error instanceof Error ? error.message : undefined);
+      showAlert("Erro ao entrar", error instanceof Error ? error.message : undefined);
     } finally {
       setLoading(false);
     }

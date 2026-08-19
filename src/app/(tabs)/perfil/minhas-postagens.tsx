@@ -6,7 +6,7 @@ import { FeedCard } from "@/components/FeedCard";
 
 const PAGE_SIZE = 10;
 
-export default function ComunidadeScreen() {
+export default function MinhasPostagensScreen() {
   const [items, setItems] = useState<ApiFeedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -14,7 +14,7 @@ export default function ComunidadeScreen() {
   const loadedOnce = useRef(false);
 
   const loadPage = useCallback(async (offset: number) => {
-    const res = await apiFetch(`/api/mobile/comunidade?offset=${offset}&limit=${PAGE_SIZE}`);
+    const res = await apiFetch(`/api/mobile/minhas-postagens?offset=${offset}&limit=${PAGE_SIZE}`);
     if (!res.ok) return { items: [] as ApiFeedItem[], hasMore: false };
     return (await res.json()) as { items: ApiFeedItem[]; hasMore: boolean };
   }, []);
@@ -88,7 +88,8 @@ export default function ComunidadeScreen() {
       onEndReached={onEndReached}
       ListEmptyComponent={
         <Text className="mt-8 text-center text-navy/60">
-          Ninguém compartilhou conquistas ainda. Seja o primeiro!
+          Nenhuma conquista ainda — continue registrando peso e rotina que as postagens aparecem
+          aqui.
         </Text>
       }
       ListFooterComponent={

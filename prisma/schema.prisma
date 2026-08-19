@@ -191,6 +191,17 @@ enum TimelineEventType {
   ACHIEVEMENT_WEIGHT
   ACHIEVEMENT_PRESSURE
   ACHIEVEMENT_CARE_COMPLETE
+  ACHIEVEMENT_WEIGHT_MILESTONE
+  ACHIEVEMENT_GLICEMIA
+  ACHIEVEMENT_ROUTINE_STREAK
+}
+
+// Corresponde a uma meta em escada (peso perdido, dias seguidos de
+// rotina): cada degrau batido é único por usuário+tipo+degrau, pra não
+// gerar a mesma conquista duas vezes.
+enum GoalType {
+  PESO
+  ROTINA
 }
 
 model TimelineEvent {
@@ -206,8 +217,16 @@ model TimelineEvent {
   // saúde (dado sensível). Também usada pra ordenar o feed público.
   sharedAt   DateTime?
 
+  // Presentes só nas conquistas de meta em escada (peso/rotina) — dado bruto
+  // do degrau (ex: 5kg, 60 dias) e o índice do estágio do bichinho, pra não
+  // recalcular a partir do histórico toda vez que a postagem é exibida.
+  goalType       GoalType?
+  milestoneValue Float?
+  stage          Int?
+
   user User @relation(fields: [userId], references: [id])
 
+  @@unique([userId, goalType, milestoneValue])
   @@index([userId, occurredAt])
   @@index([sharedAt])
 }

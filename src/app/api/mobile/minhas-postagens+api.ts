@@ -1,5 +1,5 @@
 import { getApiUserId } from "@/lib/apiAuth";
-import { getPublicFeedPage } from "@/lib/timeline/feedCore";
+import { getAchievementsPage } from "@/lib/timeline/feedCore";
 
 export async function GET(request: Request) {
   const userId = await getApiUserId(request);
@@ -11,7 +11,7 @@ export async function GET(request: Request) {
   const offset = Number(searchParams.get("offset") ?? 0);
   const limit = Number(searchParams.get("limit") ?? 10);
 
-  const result = await getPublicFeedPage(
+  const result = await getAchievementsPage(
     userId,
     Number.isFinite(offset) && offset >= 0 ? offset : 0,
     Number.isFinite(limit) && limit > 0 ? limit : 10

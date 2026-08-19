@@ -28,14 +28,19 @@ function decodeXmlEntities(text: string): string {
     .trim();
 }
 
-async function fetchNewsDataArticles(limit: number): Promise<NewsItem[]> {
-  if (!NEWSDATA_API_KEY) return [];
-  return cached(`newsdata:${limit}`, 3600, async () => {
+// Categorias diferentes em vez de um /latest genérico só — sem isso, um
+// assunto grande do dia (eleição, tragédia etc.) domina as 10 vagas
+// inteiras com matérias repetidas sobre a mesma pauta.
+const NEWS_CATEGORIES = ["top", "health", "business", "entertainment", "sports", "technology"];
+
+async function fetchNewsDataByCategory(category: string, limit: number): Promise<NewsItem[]> {
+  return cached(`newsdata:${category}:${limit}`, 3600, async () => {
     try {
       const url = new URL("https://newsdata.io/api/1/latest");
-      url.searchParams.set("apikey", NEWSDATA_API_KEY);
+      url.searchParams.set("apikey", NEWSDATA_API_KEY!);
       url.searchParams.set("country", "br");
       url.searchParams.set("language", "pt");
+      url.searchParams.set("category", category);
       const res = await fetch(url);
       if (!res.ok) return [];
       const data = await res.json();
@@ -59,6 +64,33 @@ async function fetchNewsDataArticles(limit: number): Promise<NewsItem[]> {
       return [];
     }
   });
+}
+
+async function fetchNewsDataArticles(limit: number): Promise<NewsItem[]> {
+  if (!NEWSDATA_API_KEY) return [];
+  const perCategory = Math.max(1, Math.ceil(limit / NEWS_CATEGORIES.length));
+  const batches = await Promise.all(
+    NEWS_CATEGORIES.map((category) => fetchNewsDataByCategory(category, perCategory))
+  );
+
+  // Rodízio (1 de cada categoria por vez) em vez de emendar as listas —
+  // assim mesmo os primeiros posts do feed já vêm de assuntos variados.
+  // Com dedupe: a mesma matéria pode vir marcada em mais de uma categoria
+  // (ex: "entretenimento" e "destaques"), então sem isso ela repetia.
+  const seen = new Set<string>();
+  const combined: NewsItem[] = [];
+  const maxLen = Math.max(0, ...batches.map((b) => b.length));
+  for (let i = 0; i < maxLen; i++) {
+    for (const batch of batches) {
+      const item = batch[i];
+      if (!item) continue;
+      const key = item.sourceUrl || item.title;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      combined.push(item);
+    }
+  }
+  return combined.slice(0, limit);
 }
 
 /**
