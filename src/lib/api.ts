@@ -94,6 +94,15 @@ export type ApiProfile = {
 
 export type ProfileInput = Partial<Omit<ApiProfile, "id" | "email">>;
 
+export type ApiLoyaltyProgress = {
+  stampsFilled: number;
+  stampsTotal: number;
+  completedCycles: number;
+  totalRewardCents: number;
+  minOrderCents: number;
+  rewardPerCycleCents: number;
+};
+
 export type ApiCareCategory =
   | "TREINO"
   | "ALIMENTACAO"

@@ -16,6 +16,7 @@ export default function PerfilLayout() {
       <Stack.Screen name="pedidos" />
       <Stack.Screen name="pedidos/[id]" />
       <Stack.Screen name="minhas-postagens" />
+      <Stack.Screen name="fidelidade" />
       <Stack.Screen name="indicacao" />
     </Stack>
   );

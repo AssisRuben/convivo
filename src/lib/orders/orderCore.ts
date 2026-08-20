@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getOrCreateCart } from "@/lib/cart";
 import { efetuarVendaTrier, getPharmacyEndereco, isTrierConfigured } from "@/lib/orders/trier";
+import { checkLoyaltyStampReward } from "@/lib/loyalty/loyaltyCore";
 import type {
   FulfillmentType,
   Order,
@@ -171,4 +172,5 @@ export async function approveOrder(orderId: string): Promise<void> {
 
   await syncOrderToTrier(order);
   await creditReferralCommission(order);
+  await checkLoyaltyStampReward(order.userId);
 }

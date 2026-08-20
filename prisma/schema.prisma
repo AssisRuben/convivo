@@ -52,6 +52,7 @@ model User {
   timelineComments     TimelineComment[]
   pushSubscriptions    PushSubscription[]
   walletEntries        WalletEntry[]
+  loyaltyStampCycles   LoyaltyStampCycle[]
 }
 
 enum WalletEntrySource {
@@ -60,6 +61,7 @@ enum WalletEntrySource {
   // valor exige recriar o tipo no Postgres; não vale o risco só por isso.
   REFERRAL_SIGNUP
   REFERRAL_PURCHASE_COMMISSION
+  LOYALTY_STAMP_REWARD
 }
 
 // Extrato de crédito do usuário (hoje só bônus de indicação; comissão por
@@ -74,6 +76,22 @@ model WalletEntry {
   createdAt   DateTime          @default(now())
 
   user User @relation(fields: [userId], references: [id])
+}
+
+// Cartão fidelidade: 1 selo por pedido aprovado >= LOYALTY_MIN_ORDER_CENTS
+// (ver lib/loyalty/loyaltyCore.ts). Uma linha aqui = 1 ciclo de 10 selos já
+// premiado — existe só pra idempotência (igual CareChecklistCompletion):
+// sem isso, um retry de aprovação de pedido creditaria o prêmio duas vezes.
+model LoyaltyStampCycle {
+  id          String   @id @default(cuid())
+  userId      String
+  cycleNumber Int
+  rewardCents Int
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, cycleNumber])
 }
 
 enum CareLinkStatus {
