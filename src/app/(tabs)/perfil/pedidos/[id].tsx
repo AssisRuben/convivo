@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useLocalSearchParams } from "expo-router";
-import { ActivityIndicator, ScrollView, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
 import { apiFetch } from "@/lib/api";
 
 type ApiOrderItem = {
@@ -36,12 +36,29 @@ function formatPrice(cents: number): string {
 export default function PedidoDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [order, setOrder] = useState<ApiOrderDetail | null>(null);
+  const [simulating, setSimulating] = useState(false);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     apiFetch(`/api/mobile/pedidos/${id}`)
       .then((res) => res.json())
       .then((data) => setOrder(data.order ?? null));
   }, [id]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  async function simulatePayment() {
+    setSimulating(true);
+    try {
+      const res = await apiFetch(`/api/mobile/pedidos/${id}/simular-pagamento`, {
+        method: "POST",
+      });
+      if (res.ok) load();
+    } finally {
+      setSimulating(false);
+    }
+  }
 
   if (!order) {
     return (
@@ -76,10 +93,25 @@ export default function PedidoDetailScreen() {
       </View>
 
       {order.status === "PENDING" && (
-        <Text className="mt-4 text-sm text-navy/60">
-          Assim que o pagamento for confirmado, o status deste pedido é atualizado
-          automaticamente.
-        </Text>
+        <>
+          <Text className="mt-4 text-sm text-navy/60">
+            Assim que o pagamento for confirmado, o status deste pedido é atualizado
+            automaticamente.
+          </Text>
+          <Pressable
+            disabled={simulating}
+            onPress={simulatePayment}
+            className="mt-4 items-center rounded-full bg-amber-500 py-3.5"
+          >
+            {simulating ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text className="font-semibold text-white">
+                Simular pagamento aprovado (modo de teste)
+              </Text>
+            )}
+          </Pressable>
+        </>
       )}
     </ScrollView>
   );

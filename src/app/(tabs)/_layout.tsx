@@ -60,6 +60,16 @@ export default function TabsLayout() {
             <Ionicons name="person-outline" size={size} color={color} />
           ),
         }}
+        listeners={({ navigation }) => ({
+          // Tocar no ícone de Perfil sempre volta pro menu — mesmo depois
+          // de um push vindo de outra aba (ex: Carrinho → Pedido) ter
+          // deixado essa aba "fundo" numa tela aninhada. Sem isso, o reset
+          // padrão só acontece tocando duas vezes (aba já em foco).
+          tabPress: (e) => {
+            e.preventDefault();
+            navigation.navigate("perfil", { screen: "index" });
+          },
+        })}
       />
       <Tabs.Screen
         name="carrinho"

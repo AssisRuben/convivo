@@ -3,13 +3,16 @@ import { Image, Linking, Pressable, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import type { ApiFeedItem } from "@/lib/api";
-import { LADDER_LENGTHS, petProgressLabelFor } from "@/constants/petStages";
+import { LADDER_LENGTHS, getBearTier, petProgressLabelFor } from "@/constants/petStages";
 import { PetAnimation } from "@/components/PetAnimation";
 
+// Offsets sempre positivos, dentro da área visível do banner — o card
+// tem overflow-hidden (pras pontas arredondadas), então qualquer coisa
+// posicionada com offset negativo perto da borda fica cortada.
 const CONFETTI = [
-  { emoji: "🎉", top: -6, left: -10, rotate: "-15deg" },
-  { emoji: "✨", top: -10, right: 4, rotate: "10deg" },
-  { emoji: "🎊", bottom: 8, left: -16, rotate: "8deg" },
+  { emoji: "🎉", top: 4, left: 10, rotate: "-15deg" },
+  { emoji: "✨", top: 8, right: 14, rotate: "10deg" },
+  { emoji: "🎊", bottom: 16, left: 18, rotate: "8deg" },
 ];
 
 export function FeedCard({
@@ -22,20 +25,30 @@ export function FeedCard({
   onToggleShare?: (item: ApiFeedItem) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const hasPet = item.goalType != null && item.stage != null;
+  const hasPet = item.goalType != null && item.stage != null && item.milestoneValue != null;
+  const bearTier = hasPet ? getBearTier(item.goalType!, item.milestoneValue!) : null;
+  const progressPercent = hasPet
+    ? Math.round(((item.stage! + 1) / LADDER_LENGTHS[item.goalType!]) * 100)
+    : 0;
 
   return (
-    <View className="overflow-hidden rounded-2xl bg-card shadow-sm">
+    <View
+      className={
+        hasPet
+          ? "overflow-hidden rounded-3xl border-4 border-black bg-card shadow-sm"
+          : "overflow-hidden rounded-2xl bg-card shadow-sm"
+      }
+    >
       {hasPet ? (
         <LinearGradient
-          colors={["#0f3d3e", "#f5a623"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
+          colors={["#134e4a", "#042f2e", "#020617"]}
+          start={{ x: 0.5, y: 0 }}
+          end={{ x: 0.5, y: 1 }}
           className="items-center gap-2 px-4 py-8"
         >
           <View className="w-full flex-row justify-end">
-            <View className="h-9 w-9 items-center justify-center rounded-full bg-[#ffd76a]">
-              <Ionicons name="trophy" size={18} color="#8a5a00" />
+            <View className="h-9 w-9 items-center justify-center rounded-full bg-white/10">
+              <Text className="text-base">{bearTier!.badge}</Text>
             </View>
           </View>
 
@@ -55,34 +68,32 @@ export function FeedCard({
                 {c.emoji}
               </Text>
             ))}
-            <PetAnimation goalType={item.goalType!} stage={item.stage!} />
+            <PetAnimation goalType={item.goalType!} milestoneValue={item.milestoneValue!} />
           </View>
 
           <Text
-            className="text-3xl font-extrabold text-white"
+            className="mt-2 text-4xl font-extrabold text-white"
             style={{
-              textShadowColor: "rgba(0,0,0,0.25)",
+              textShadowColor: "rgba(0,0,0,0.35)",
               textShadowOffset: { width: 0, height: 1 },
               textShadowRadius: 3,
             }}
           >
             {item.title}
           </Text>
-          <Text className="-mt-1 text-xs font-semibold uppercase tracking-wide text-white/80">
+          <Text className="mt-1.5 text-xs font-semibold uppercase tracking-wide text-[#94a3b8]">
             {petProgressLabelFor(item.goalType!)}
           </Text>
 
-          <View className="mt-1 w-full gap-1">
-            <View className="h-2 w-full overflow-hidden rounded-full bg-white/25">
+          <View className="mt-3 w-full gap-1">
+            <View className="h-2 w-full overflow-hidden rounded-full bg-white/10">
               <View
-                className="h-full rounded-full bg-[#ffd76a]"
-                style={{
-                  width: `${Math.round(((item.stage! + 1) / LADDER_LENGTHS[item.goalType!]) * 100)}%`,
-                }}
+                className="h-full rounded-full bg-[#f59e0b]"
+                style={{ width: `${progressPercent}%` }}
               />
             </View>
-            <Text className="self-end text-[10px] font-medium text-white/70">
-              Degrau {item.stage! + 1} de {LADDER_LENGTHS[item.goalType!]}
+            <Text className="self-end text-[10px] font-medium text-[#cbd5e1]">
+              Fase {bearTier!.label} · {progressPercent}% do objetivo
             </Text>
           </View>
         </LinearGradient>

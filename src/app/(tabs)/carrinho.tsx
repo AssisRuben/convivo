@@ -1,16 +1,19 @@
 import { useCallback, useState } from "react";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { ActivityIndicator, FlatList, Image, Pressable, Text, View } from "react-native";
 import { apiFetch, type ApiCart } from "@/lib/api";
+import { showAlert } from "@/lib/alert";
 
 function formatPrice(cents: number): string {
   return (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
 export default function CarrinhoScreen() {
+  const router = useRouter();
   const [cart, setCart] = useState<ApiCart | null>(null);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [finishing, setFinishing] = useState(false);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -40,6 +43,21 @@ export default function CarrinhoScreen() {
       load();
     } finally {
       setUpdatingId(null);
+    }
+  }
+
+  async function finishOrder() {
+    setFinishing(true);
+    try {
+      const res = await apiFetch("/api/mobile/pedidos", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        showAlert("Não foi possível fechar o pedido", data.error ?? "Tente novamente");
+        return;
+      }
+      router.push({ pathname: "/perfil/pedidos/[id]", params: { id: data.order.id } });
+    } finally {
+      setFinishing(false);
     }
   }
 
@@ -90,10 +108,21 @@ export default function CarrinhoScreen() {
       />
       {items.length > 0 && (
         <View className="border-t border-navy/10 bg-card p-4">
-          <View className="flex-row justify-between">
+          <View className="mb-3 flex-row justify-between">
             <Text className="text-lg font-semibold text-navy">Total</Text>
             <Text className="text-lg font-semibold text-navy">{formatPrice(total)}</Text>
           </View>
+          <Pressable
+            disabled={finishing}
+            onPress={finishOrder}
+            className="items-center rounded-full bg-navy py-3.5"
+          >
+            {finishing ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text className="font-semibold text-white">Finalizar pedido (retirada)</Text>
+            )}
+          </Pressable>
         </View>
       )}
     </View>

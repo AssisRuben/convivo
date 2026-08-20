@@ -51,6 +51,29 @@ model User {
   timelineReactions    TimelineReaction[]
   timelineComments     TimelineComment[]
   pushSubscriptions    PushSubscription[]
+  walletEntries        WalletEntry[]
+}
+
+enum WalletEntrySource {
+  // Sem uso — o modelo mudou pra comissão por compra antes de este bônus
+  // fixo entrar em produção de verdade. Mantido no enum porque remover um
+  // valor exige recriar o tipo no Postgres; não vale o risco só por isso.
+  REFERRAL_SIGNUP
+  REFERRAL_PURCHASE_COMMISSION
+}
+
+// Extrato de crédito do usuário (hoje só bônus de indicação; comissão por
+// compra do indicado entra aqui também assim que o checkout existir) — sem
+// saque/pagamento automático ainda, só acúmulo visível.
+model WalletEntry {
+  id          String            @id @default(cuid())
+  userId      String
+  amountCents Int
+  source      WalletEntrySource
+  description String
+  createdAt   DateTime          @default(now())
+
+  user User @relation(fields: [userId], references: [id])
 }
 
 enum CareLinkStatus {
@@ -82,6 +105,10 @@ model Product {
   name                String                 @unique
   description         String
   priceCents          Int
+  // Custo do produto — usado só server-side pra calcular comissão de
+  // indicação (2% da margem bruta). Nullable: sem custo definido, a
+  // comissão daquele item é pulada, nunca estimada.
+  costCents           Int?
   imageUrl            String
   stock               Int                    @default(0)
   codigoProduto       Int?                   @unique
@@ -194,14 +221,16 @@ enum TimelineEventType {
   ACHIEVEMENT_WEIGHT_MILESTONE
   ACHIEVEMENT_GLICEMIA
   ACHIEVEMENT_ROUTINE_STREAK
+  ACHIEVEMENT_REFERRAL_MILESTONE
 }
 
-// Corresponde a uma meta em escada (peso perdido, dias seguidos de
-// rotina): cada degrau batido é único por usuário+tipo+degrau, pra não
-// gerar a mesma conquista duas vezes.
+// Corresponde a uma meta em escada (peso perdido, dias seguidos de rotina,
+// amigos indicados): cada degrau batido é único por usuário+tipo+degrau,
+// pra não gerar a mesma conquista duas vezes.
 enum GoalType {
   PESO
   ROTINA
+  INDICACAO
 }
 
 model TimelineEvent {

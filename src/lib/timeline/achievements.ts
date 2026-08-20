@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import type { GoalType } from "@/lib/generated/prisma/client";
+import type { GoalType, TimelineEventType } from "@/lib/generated/prisma/client";
 
 function daysBefore(date: Date, days: number): Date {
   const result = new Date(date);
@@ -16,6 +16,13 @@ function startOfDay(date: Date): Date {
 export const GOAL_LADDERS: Record<GoalType, number[]> = {
   PESO: [2, 5, 8, 10, 12, 15, 18, 20, 25, 30],
   ROTINA: [30, 60, 90, 120],
+  INDICACAO: [1, 3, 5, 10, 20],
+};
+
+const MILESTONE_EVENT_TYPE: Record<GoalType, TimelineEventType> = {
+  PESO: "ACHIEVEMENT_WEIGHT_MILESTONE",
+  ROTINA: "ACHIEVEMENT_ROUTINE_STREAK",
+  INDICACAO: "ACHIEVEMENT_REFERRAL_MILESTONE",
 };
 
 /**
@@ -38,7 +45,7 @@ async function recordMilestone(
     await prisma.timelineEvent.create({
       data: {
         userId,
-        type: goalType === "PESO" ? "ACHIEVEMENT_WEIGHT_MILESTONE" : "ACHIEVEMENT_ROUTINE_STREAK",
+        type: MILESTONE_EVENT_TYPE[goalType],
         title,
         message,
         occurredAt,
@@ -145,6 +152,29 @@ export async function checkRoutineStreakMilestones(userId: string, date: Date): 
       `${threshold} dias seguidos! 🔥`,
       `Você completou sua rotina de cuidados por ${threshold} dias seguidos. Seu bichinho está crescendo!`,
       date
+    );
+  }
+}
+
+/**
+ * Checa o total de amigos indicados contra a escada (1/3/5/10/20) e
+ * dispara a postagem do degrau mais alto ainda não registrado — chamada
+ * depois que um indicado se cadastra com sucesso.
+ */
+export async function checkReferralMilestones(userId: string): Promise<void> {
+  const referralCount = await prisma.user.count({ where: { referredById: userId } });
+  if (referralCount === 0) return;
+
+  for (const threshold of GOAL_LADDERS.INDICACAO) {
+    if (referralCount < threshold) break;
+    const friendWord = threshold === 1 ? "amigo indicado" : "amigos indicados";
+    await recordMilestone(
+      userId,
+      "INDICACAO",
+      threshold,
+      `${threshold} ${friendWord}! 🎉`,
+      `Você já tem ${threshold} ${friendWord} usando o Convivo. Seu bichinho está crescendo!`,
+      new Date()
     );
   }
 }

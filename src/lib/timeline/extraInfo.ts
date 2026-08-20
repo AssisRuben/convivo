@@ -7,6 +7,8 @@ const EXTRA_INFO: Record<string, string> = {
     "Manter a pressão sob controle é um dos cuidados mais importantes pra saúde do coração a longo prazo. Meça regularmente, mesmo quando estiver tudo bem.",
   ACHIEVEMENT_CARE_COMPLETE:
     "Manter uma rotina de cuidados em dia — medicação, treino, hábitos — é o que mais impacta resultados de saúde a longo prazo.",
+  ACHIEVEMENT_REFERRAL_MILESTONE:
+    "Cada amigo indicado que se cadastra vira um crédito na sua carteira. Compartilhe seu código em Indicação pra continuar acumulando.",
   "content-finance":
     "Acompanhar indicadores econômicos como câmbio, Selic e IPCA ajuda no planejamento financeiro do dia a dia — desde decidir uma compra parcelada até avaliar se vale mais guardar dinheiro rendendo perto da Selic ou investir em algo com mais risco. São números que mudam todos os dias, então vale o hábito de dar uma olhada com frequência.",
   "content-quote":

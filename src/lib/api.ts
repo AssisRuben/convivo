@@ -62,8 +62,8 @@ export type ApiFeedItem = {
   shareState?: "shareable" | "shared";
   /** Presente em posts de notícia: link pra matéria original. */
   sourceUrl?: string;
-  /** Presentes só em conquistas de meta em escada (peso/rotina). */
-  goalType?: "PESO" | "ROTINA";
+  /** Presentes só em conquistas de meta em escada (peso/rotina/indicação). */
+  goalType?: "PESO" | "ROTINA" | "INDICACAO";
   milestoneValue?: number;
   stage?: number;
 };

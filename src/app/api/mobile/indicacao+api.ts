@@ -7,13 +7,20 @@ export async function GET(request: Request) {
     return Response.json({ error: "Não autenticado" }, { status: 401 });
   }
 
-  const user = await prisma.user.findUniqueOrThrow({
-    where: { id: userId },
-    select: { referralCode: true, _count: { select: { referrals: true } } },
-  });
+  const [user, saldo] = await Promise.all([
+    prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { referralCode: true, _count: { select: { referrals: true } } },
+    }),
+    prisma.walletEntry.aggregate({
+      where: { userId },
+      _sum: { amountCents: true },
+    }),
+  ]);
 
   return Response.json({
     referralCode: user.referralCode,
     referralCount: user._count.referrals,
+    saldoCents: saldo._sum.amountCents ?? 0,
   });
 }

@@ -4,9 +4,14 @@ import { ActivityIndicator, Pressable, Share, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { apiFetch } from "@/lib/api";
 
+function formatPrice(cents: number): string {
+  return (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
 export default function IndicacaoScreen() {
   const [referralCode, setReferralCode] = useState<string | null>(null);
   const [referralCount, setReferralCount] = useState(0);
+  const [saldoCents, setSaldoCents] = useState(0);
   const [loading, setLoading] = useState(true);
   const loadedOnce = useRef(false);
 
@@ -18,6 +23,7 @@ export default function IndicacaoScreen() {
         const data = await res.json();
         setReferralCode(data.referralCode);
         setReferralCount(data.referralCount ?? 0);
+        setSaldoCents(data.saldoCents ?? 0);
       }
     } finally {
       setLoading(false);
@@ -78,14 +84,14 @@ export default function IndicacaoScreen() {
         </View>
         <View className="flex-1 items-center gap-1 rounded-2xl bg-card p-5 shadow-sm">
           <Ionicons name="sparkles-outline" size={22} color="#e63946" />
-          <Text className="text-2xl font-bold text-navy">Em breve</Text>
+          <Text className="text-2xl font-bold text-navy">{formatPrice(saldoCents)}</Text>
           <Text className="text-center text-xs text-navy/60">seu saldo de créditos</Text>
         </View>
       </View>
 
       <Text className="mt-6 text-center text-xs text-navy/50">
-        O crédito por indicação ainda está sendo configurado — em breve você vai poder
-        acompanhar e usar seu saldo aqui.
+        Você ganha 2% da margem toda vez que um amigo indicado compra — não só na primeira
+        compra. O uso desse saldo nas suas próprias compras ainda está sendo configurado.
       </Text>
     </View>
   );

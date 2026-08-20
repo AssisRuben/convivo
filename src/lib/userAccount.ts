@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { generateCode } from "@/lib/codes";
+import { checkReferralMilestones } from "@/lib/timeline/achievements";
 import type { User } from "@/lib/generated/prisma/client";
 
 export type CreateUserAccountInput = {
@@ -39,6 +40,15 @@ export async function createUserAccount(
           cart: { create: {} },
         },
       });
+
+      if (referrer) {
+        // Sem crédito em dinheiro aqui — o modelo é comissão por compra do
+        // indicado (ver lib/orders/orderCore.ts), não bônus de cadastro.
+        // A meta em escada de "amigos indicados" continua contando
+        // cadastro, é só o bichinho/badge, não afeta a carteira.
+        await checkReferralMilestones(referrer.id);
+      }
+
       return { ok: true, user };
     } catch (error) {
       const isUniqueReferralCollision =
