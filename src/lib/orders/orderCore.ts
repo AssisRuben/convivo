@@ -12,6 +12,68 @@ import type {
 
 const REFERRAL_COMMISSION_RATE = 0.02;
 
+export type OrderItemInput = { productId: string; quantity: number; unitPriceCents: number };
+
+export type OrderAddressInput = {
+  cep?: string | null;
+  logradouro?: string | null;
+  numero?: string | null;
+  bairro?: string | null;
+  cidade?: string | null;
+  estado?: string | null;
+};
+
+/**
+ * Cria o pedido a partir de uma lista explícita de itens (não do carrinho
+ * ao vivo) — usado tanto pelo checkout normal (`createOrderFromCart`,
+ * abaixo) quanto pela recompra de 1 clique de medicamento, que não deve
+ * mexer no carrinho de compras do usuário.
+ */
+export async function createOrderForItems(
+  userId: string,
+  items: OrderItemInput[],
+  fulfillmentType: FulfillmentType = "PICKUP",
+  address?: OrderAddressInput
+): Promise<Order> {
+  if (items.length === 0) {
+    throw new Error("Nenhum item pra criar o pedido");
+  }
+
+  const totalCents = items.reduce((sum, item) => sum + item.unitPriceCents * item.quantity, 0);
+
+  return prisma.$transaction(async (tx) => {
+    const order = await tx.order.create({
+      data: {
+        userId,
+        totalCents,
+        fulfillmentType,
+        addressCep: address?.cep ?? null,
+        addressLogradouro: address?.logradouro ?? null,
+        addressNumero: address?.numero ?? null,
+        addressBairro: address?.bairro ?? null,
+        addressCidade: address?.cidade ?? null,
+        addressEstado: address?.estado ?? null,
+        items: {
+          create: items.map((item) => ({
+            productId: item.productId,
+            quantity: item.quantity,
+            unitPriceCents: item.unitPriceCents,
+          })),
+        },
+      },
+    });
+
+    for (const item of items) {
+      await tx.product.update({
+        where: { id: item.productId },
+        data: { stock: { decrement: item.quantity } },
+      });
+    }
+
+    return order;
+  });
+}
+
 export async function createOrderFromCart(
   userId: string,
   fulfillmentType: FulfillmentType = "PICKUP"
@@ -21,38 +83,19 @@ export async function createOrderFromCart(
     throw new Error("Carrinho vazio");
   }
 
-  const totalCents = cart.items.reduce(
-    (sum, item) => sum + item.product.priceCents * item.quantity,
-    0
+  const order = await createOrderForItems(
+    userId,
+    cart.items.map((item) => ({
+      productId: item.productId,
+      quantity: item.quantity,
+      unitPriceCents: item.product.priceCents,
+    })),
+    fulfillmentType
   );
 
-  return prisma.$transaction(async (tx) => {
-    const order = await tx.order.create({
-      data: {
-        userId,
-        totalCents,
-        fulfillmentType,
-        items: {
-          create: cart.items.map((item) => ({
-            productId: item.productId,
-            quantity: item.quantity,
-            unitPriceCents: item.product.priceCents,
-          })),
-        },
-      },
-    });
+  await prisma.cartItem.deleteMany({ where: { cartId: cart.id } });
 
-    for (const item of cart.items) {
-      await tx.product.update({
-        where: { id: item.productId },
-        data: { stock: { decrement: item.quantity } },
-      });
-    }
-
-    await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
-
-    return order;
-  });
+  return order;
 }
 
 type OrderWithRelations = Order & {

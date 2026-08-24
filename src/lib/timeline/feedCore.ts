@@ -179,6 +179,35 @@ function interleave<T>(lists: T[][]): T[] {
   return result;
 }
 
+// PRNG determinístico (mulberry32) — o embaralhado precisa ser igual em
+// toda página do mesmo scroll (offset crescente), senão item repete ou
+// some conforme o usuário rola. Por isso não é Math.random(): é semeado
+// por usuário+hora, então o resultado é estável durante uma sessão de
+// scroll mas muda de hora em hora (e de usuário pra usuário).
+function hashSeed(input: string): number {
+  let hash = 0;
+  for (let i = 0; i < input.length; i++) {
+    hash = (Math.imul(31, hash) + input.charCodeAt(i)) | 0;
+  }
+  return hash;
+}
+
+function seededShuffle<T>(items: T[], seed: number): T[] {
+  const result = [...items];
+  let state = seed | 0;
+  const next = () => {
+    state = (state + 0x6d2b79f5) | 0;
+    let t = Math.imul(state ^ (state >>> 15), 1 | state);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(next() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
+
 type PoolEntry = Omit<TimelineFeedItem, "liked" | "likeCount" | "comments">;
 
 /**
@@ -212,8 +241,9 @@ export async function getFeedPage(
     ]);
 
   // Mercado/frase são fixos no dia (uma leitura só, não tem por que
-  // paginar) — sempre no topo do pool, antes de curiosidade/notícia/
-  // conquista intercaladas.
+  // paginar) — viram só mais uma fonte no rodízio abaixo, em vez de
+  // grudados sempre na posição 0/1 (era isso que fazia o topo do feed
+  // parecer sempre igual a cada abertura do app).
   const pinnedItems: PoolEntry[] = [];
   if (finance) {
     pinnedItems.push({
@@ -285,7 +315,19 @@ export async function getFeedPage(
     shareState: event.sharedAt ? "shared" : "shareable",
   }));
 
-  const pool = [...pinnedItems, ...interleave([factItems, newsItems, achievementItems])];
+  // Semente por usuário+hora: mesma ordem durante uma sessão de scroll
+  // (paginação por offset continua consistente), mas muda a cada hora e
+  // por pessoa — reabrir o app mais tarde não repete sempre a mesma
+  // sequência do topo.
+  const hourBucket = Math.floor(Date.now() / (1000 * 60 * 60));
+  const seed = hashSeed(`${userId}-${hourBucket}`);
+
+  const sourceLists = seededShuffle(
+    [pinnedItems, factItems, newsItems, achievementItems].filter((list) => list.length > 0),
+    seed
+  ).map((list, i) => seededShuffle(list, seed + i + 1));
+
+  const pool = interleave(sourceLists);
   const pageEntries = pool.slice(offset, offset + limit);
 
   const reactionStates = await getReactionStates(userId, pageEntries.map((e) => e.itemKey));

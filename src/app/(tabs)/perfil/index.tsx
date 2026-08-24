@@ -53,6 +53,12 @@ export default function PerfilScreen() {
       <View className="mt-4 overflow-hidden rounded-2xl bg-card shadow-sm">
         <MenuLink href="/perfil/meus-dados" icon="person-circle-outline" label="Meus dados" />
         <MenuLink href="/perfil/pedidos" icon="receipt-outline" label="Meus pedidos" />
+        <MenuLink
+          href="/perfil/historico-compras"
+          icon="time-outline"
+          label="Histórico de compras"
+        />
+        <MenuLink href="/perfil/medicamentos" icon="medkit-outline" label="Medicamentos" />
         <MenuLink href="/perfil/minhas-postagens" icon="ribbon-outline" label="Minhas postagens" />
         <MenuLink href="/perfil/fidelidade" icon="medal-outline" label="Cartão fidelidade" />
         <MenuLink href="/perfil/indicacao" icon="gift-outline" label="Indique e ganhe" last />

@@ -18,6 +18,10 @@ export default function PerfilLayout() {
       <Stack.Screen name="minhas-postagens" />
       <Stack.Screen name="fidelidade" />
       <Stack.Screen name="indicacao" />
+      <Stack.Screen name="historico-compras" />
+      <Stack.Screen name="medicamentos/index" />
+      <Stack.Screen name="medicamentos/configurar" />
+      <Stack.Screen name="medicamentos/[id]/recomprar" />
     </Stack>
   );
 }

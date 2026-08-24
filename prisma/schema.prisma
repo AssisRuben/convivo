@@ -8,15 +8,15 @@ datasource db {
 }
 
 model User {
-  id                 String    @id @default(cuid())
+  id                 String   @id @default(cuid())
   name               String
-  email              String    @unique
+  email              String   @unique
   passwordHash       String
-  cpf                String?   @unique
-  vendedorAttributed Boolean   @default(false)
-  referralCode       String    @unique
+  cpf                String?  @unique
+  vendedorAttributed Boolean  @default(false)
+  referralCode       String   @unique
   referredById       String?
-  createdAt          DateTime  @default(now())
+  createdAt          DateTime @default(now())
 
   // Telefone e nascimento — exigidos pelo checkout (efetuar-venda-v1 da
   // Trier/SGF precisa dos dois no `cliente`).
@@ -41,10 +41,10 @@ model User {
 
   cart                 Cart?
   orders               Order[]
-  referredBy           User?               @relation("Referrals", fields: [referredById], references: [id])
-  referrals            User[]              @relation("Referrals")
-  careLinksAsTitular   CareLink[]          @relation("TitularLinks")
-  careLinksAsCaregiver CareLink[]          @relation("CaregiverLinks")
+  referredBy           User?                @relation("Referrals", fields: [referredById], references: [id])
+  referrals            User[]               @relation("Referrals")
+  careLinksAsTitular   CareLink[]           @relation("TitularLinks")
+  careLinksAsCaregiver CareLink[]           @relation("CaregiverLinks")
   healthMeasurements   HealthMeasurement[]
   timelineEvents       TimelineEvent[]
   careChecklistItems   CareChecklistItem[]
@@ -53,6 +53,8 @@ model User {
   pushSubscriptions    PushSubscription[]
   walletEntries        WalletEntry[]
   loyaltyStampCycles   LoyaltyStampCycle[]
+  medicationTrackings  MedicationTracking[]
+  expoPushTokens       ExpoPushToken[]
 }
 
 enum WalletEntrySource {
@@ -299,9 +301,57 @@ model CareChecklistItem {
   active     Boolean      @default(true)
   createdAt  DateTime     @default(now())
 
+  // Presente quando esse item é uma dose de medicamento controlado (ver
+  // MedicationTracking) — um item por horário de dose, todos ligados à
+  // mesma ficha. Null pros itens de rotina normais (treino, estudo, etc).
+  medicationTrackingId String?
+
   user               User                      @relation(fields: [userId], references: [id])
+  medicationTracking MedicationTracking?       @relation(fields: [medicationTrackingId], references: [id])
   completions        CareChecklistCompletion[]
   reminderDispatches CareReminderDispatch[]
+}
+
+// Ficha de acompanhamento de um medicamento comprado — quantidade total,
+// posologia e a data da compra de origem, pra estimar quando acaba. Cada
+// horário de dose vira um CareChecklistItem próprio (linkado aqui), o que
+// reaproveita toda a engine de checklist/streak/lembrete já existente sem
+// precisar dar suporte a múltiplos horários por item.
+model MedicationTracking {
+  id            String   @id @default(cuid())
+  userId        String
+  productName   String
+  codigoProduto Int?
+  purchaseDate  DateTime
+  totalUnits    Int
+  unitsPerDose  Int
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+
+  user           User                        @relation(fields: [userId], references: [id])
+  checklistItems CareChecklistItem[]
+  alerts         MedicationRepurchaseAlert[]
+}
+
+// Idempotência do aviso "vai acabar amanhã" — um por ficha (não por dia,
+// já que é um evento único no ciclo de vida daquela compra).
+model MedicationRepurchaseAlert {
+  id                   String   @id @default(cuid())
+  medicationTrackingId String
+  sentAt               DateTime @default(now())
+
+  tracking MedicationTracking @relation(fields: [medicationTrackingId], references: [id])
+
+  @@unique([medicationTrackingId])
+}
+
+model ExpoPushToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
 }
 
 model CareChecklistCompletion {

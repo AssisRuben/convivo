@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import { deleteItemAsync, getItemAsync, setItemAsync } from "@/lib/storage";
 import { apiFetch } from "@/lib/api";
 import { TOKEN_KEY, USER_KEY } from "@/lib/storageKeys";
+import { registerPushToken } from "@/lib/push/registerPushToken";
 
 export type AuthUser = { id: string; name: string; email: string };
 
@@ -32,7 +33,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         getItemAsync(TOKEN_KEY),
         getItemAsync(USER_KEY),
       ]);
-      if (storedToken) setToken(storedToken);
+      if (storedToken) {
+        setToken(storedToken);
+        registerPushToken();
+      }
       if (storedUser) setUser(JSON.parse(storedUser));
       setIsLoading(false);
     }
@@ -46,6 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     ]);
     setToken(newToken);
     setUser(newUser);
+    registerPushToken();
   }
 
   async function login(email: string, password: string) {
