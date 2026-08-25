@@ -117,3 +117,52 @@ export async function getPurchaseHistoryForUser(
     nomeVendedor: row.nome_vendedor,
   }));
 }
+
+export type PharmacyCustomerAddress = {
+  cep: string | null;
+  logradouro: string | null;
+  numero: string | null;
+  bairro: string | null;
+  estado: string | null;
+};
+
+/**
+ * Endereço já cadastrado na farmácia, pra pré-preencher o checkout na
+ * primeira entrega em vez do cliente digitar tudo de novo — ele continua
+ * livre pra editar/confirmar, isso nunca é salvo sozinho em lugar nenhum.
+ * `clientes` não tem nome de cidade (só `codigo_cidade`, um código sem
+ * tabela de apoio confirmada) — quem chama resolve a cidade a partir do
+ * `cep` devolvido aqui via ViaCEP, mesmo caminho já usado pro CEP manual.
+ */
+export async function getCustomerAddressFromPharmacy(
+  cpf: string | null,
+  phone: string | null
+): Promise<PharmacyCustomerAddress | null> {
+  const pool = getPool();
+  if (!pool) return null;
+
+  const codigoCliente = await findCodigoCliente(pool, cpf, phone);
+  if (codigoCliente == null) return null;
+
+  const res = await pool.query<{
+    cep: string | null;
+    logradouro: string | null;
+    numero_endereco: string | null;
+    bairro: string | null;
+    estado: string | null;
+  }>(
+    `SELECT cep, logradouro, numero_endereco, bairro, estado FROM clientes WHERE codigo = $1`,
+    [codigoCliente]
+  );
+
+  const row = res.rows[0];
+  if (!row || !row.cep) return null;
+
+  return {
+    cep: row.cep,
+    logradouro: row.logradouro,
+    numero: row.numero_endereco,
+    bairro: row.bairro,
+    estado: row.estado,
+  };
+}

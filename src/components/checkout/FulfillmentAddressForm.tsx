@@ -1,4 +1,5 @@
 import { ActivityIndicator, Pressable, Text, TextInput, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import type { CheckoutFormState } from "@/hooks/useCheckoutForm";
 
 /**
@@ -39,6 +40,16 @@ export function FulfillmentAddressForm({ form }: { form: CheckoutFormState }) {
       {form.fulfillmentType === "DELIVERY" && (
         <View className="gap-2 rounded-2xl bg-card p-4 shadow-sm">
           <Text className="text-sm font-medium text-navy">Endereço de entrega</Text>
+
+          {form.pharmacyAddressNotice && (
+            <View className="flex-row items-start gap-2 rounded-xl bg-mint/10 p-3">
+              <Ionicons name="information-circle-outline" size={16} color="#2ec4b6" />
+              <Text className="flex-1 text-xs text-navy/70">
+                Preenchemos com o endereço do seu cadastro na farmácia — confira se está certo.
+              </Text>
+            </View>
+          )}
+
           <View className="flex-row items-center gap-2">
             <TextInput
               value={form.cep}
