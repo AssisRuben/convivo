@@ -10,6 +10,7 @@ import {
   incrementCatalogStock,
 } from "@/lib/catalog/catalogDb";
 import { mirrorCatalogProduct } from "@/lib/catalog/catalogMirror";
+import { updateProfileForUser } from "@/lib/profile/profileCore";
 import type {
   FulfillmentType,
   Order,
@@ -206,6 +207,21 @@ export async function createOrderForItems(
     // decrementado lá fora — devolve tudo, best-effort.
     for (const item of resolved) await incrementCatalogStock(item.codigoProduto, item.quantity);
     throw error;
+  }
+
+  // Endereço confirmado nesse pedido vira o padrão do perfil pras próximas
+  // compras — o cliente já viu e editou os campos antes de enviar, então
+  // enviar o pedido já É a confirmação. Best-effort: nunca derruba o
+  // pedido (já criado e pago) por causa disso.
+  if (fulfillmentType === "DELIVERY" && address?.cep) {
+    await updateProfileForUser(userId, {
+      cep: address.cep,
+      logradouro: address.logradouro,
+      numero: address.numero,
+      bairro: address.bairro,
+      cidade: address.cidade,
+      estado: address.estado,
+    }).catch(() => {});
   }
 
   if (paymentMethod === "CARTAO_PRESENCIAL" || paymentMethod === "DINHEIRO") {

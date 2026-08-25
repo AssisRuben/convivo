@@ -124,15 +124,19 @@ export type PharmacyCustomerAddress = {
   numero: string | null;
   bairro: string | null;
   estado: string | null;
+  telefone: string | null;
 };
 
 /**
- * Endereço já cadastrado na farmácia, pra pré-preencher o checkout na
- * primeira entrega em vez do cliente digitar tudo de novo — ele continua
- * livre pra editar/confirmar, isso nunca é salvo sozinho em lugar nenhum.
- * `clientes` não tem nome de cidade (só `codigo_cidade`, um código sem
- * tabela de apoio confirmada) — quem chama resolve a cidade a partir do
- * `cep` devolvido aqui via ViaCEP, mesmo caminho já usado pro CEP manual.
+ * Endereço (e telefone) já cadastrados na farmácia, pra pré-preencher o
+ * checkout na primeira entrega em vez do cliente digitar tudo de novo —
+ * ele continua livre pra editar/confirmar, isso nunca é salvo sozinho em
+ * lugar nenhum por conta própria (quem decide salvar é o chamador, ver
+ * app/api/mobile/profile/pharmacy-address+api.ts). `clientes` não tem
+ * nome de cidade (só `codigo_cidade`, um código sem tabela de apoio
+ * confirmada) — quem chama resolve a cidade a partir do `cep` devolvido
+ * aqui via ViaCEP, mesmo caminho já usado pro CEP manual. `telefone`
+ * prefere celular a fixo (mais provável de bater com WhatsApp/contato).
  */
 export async function getCustomerAddressFromPharmacy(
   cpf: string | null,
@@ -150,8 +154,10 @@ export async function getCustomerAddressFromPharmacy(
     numero_endereco: string | null;
     bairro: string | null;
     estado: string | null;
+    celular: string | null;
+    fone: string | null;
   }>(
-    `SELECT cep, logradouro, numero_endereco, bairro, estado FROM clientes WHERE codigo = $1`,
+    `SELECT cep, logradouro, numero_endereco, bairro, estado, celular, fone FROM clientes WHERE codigo = $1`,
     [codigoCliente]
   );
 
@@ -162,6 +168,7 @@ export async function getCustomerAddressFromPharmacy(
     cep: row.cep,
     logradouro: row.logradouro,
     numero: row.numero_endereco,
+    telefone: row.celular || row.fone || null,
     bairro: row.bairro,
     estado: row.estado,
   };
