@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useCallback, useState } from "react";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { apiFetch, type ApiGoalDetail, type ApiGoalStatus } from "@/lib/api";
@@ -26,18 +26,22 @@ export default function MetaDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [goal, setGoal] = useState<ApiGoalDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [removing, setRemoving] = useState(false);
 
   const load = useCallback(() => {
+    setLoadError(false);
     apiFetch(`/api/mobile/metas/${id}`)
       .then((res) => res.json())
-      .then((data) => setGoal(data.goal ?? null))
+      .then((data) => {
+        if (data.goal) setGoal(data.goal);
+        else setLoadError(true);
+      })
+      .catch(() => setLoadError(true))
       .finally(() => setLoading(false));
   }, [id]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  useFocusEffect(load);
 
   function handleDelete() {
     if (!goal) return;
@@ -59,10 +63,21 @@ export default function MetaDetailScreen() {
     ]);
   }
 
-  if (loading || !goal) {
+  if (loading) {
     return (
       <View className="flex-1 items-center justify-center bg-cream">
         <ActivityIndicator color="#0b1e3d" />
+      </View>
+    );
+  }
+
+  if (loadError || !goal) {
+    return (
+      <View className="flex-1 items-center justify-center bg-cream p-4">
+        <Text className="text-center text-navy/60">Não foi possível carregar essa meta.</Text>
+        <Pressable onPress={load} className="mt-4 rounded-full bg-navy px-5 py-2.5">
+          <Text className="text-sm font-medium text-white">Tentar de novo</Text>
+        </Pressable>
       </View>
     );
   }

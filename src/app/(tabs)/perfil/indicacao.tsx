@@ -98,7 +98,7 @@ export default function IndicacaoScreen() {
   return (
     <ScrollView className="flex-1 bg-cream" contentContainerClassName="p-4 pb-24">
       <View className="items-center rounded-2xl bg-navy px-6 py-6">
-        <Ionicons name="gift-outline" size={26} color="#e63946" />
+        <Ionicons name="gift-outline" size={26} color="#fff" />
         <Text className="mt-1 text-lg font-semibold text-white">Indique e Ganhe</Text>
         <Text className="mt-1 text-center text-xs text-white/70">
           Compartilhe seu código. Quando um amigo se cadastrar com ele, você acumula crédito
@@ -125,7 +125,7 @@ export default function IndicacaoScreen() {
           <Text className="text-center text-xs text-navy/60">amigo(s) indicado(s)</Text>
         </View>
         <View className="flex-1 items-center gap-1 rounded-2xl bg-card p-5 shadow-sm">
-          <Ionicons name="sparkles-outline" size={22} color="#e63946" />
+          <Ionicons name="sparkles-outline" size={22} color="#2ec4b6" />
           <Text className="text-2xl font-bold text-navy">{formatPrice(saldoCents)}</Text>
           <Text className="text-center text-xs text-navy/60">seu saldo de créditos</Text>
         </View>

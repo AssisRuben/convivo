@@ -291,11 +291,18 @@ export default function RotinaScreen() {
                         daysOfWeek: item.daysOfWeek,
                       })
                     }
-                    className="p-1.5"
+                    accessibilityLabel="Editar rotina"
+                    hitSlop={10}
+                    className="p-2.5"
                   >
                     <Ionicons name="pencil-outline" size={16} color="#0b1e3d80" />
                   </Pressable>
-                  <Pressable onPress={() => handleRemove(item)} className="p-1.5">
+                  <Pressable
+                    onPress={() => handleRemove(item)}
+                    accessibilityLabel="Remover rotina"
+                    hitSlop={10}
+                    className="p-2.5"
+                  >
                     <Ionicons name="trash-outline" size={16} color="#e63946" />
                   </Pressable>
                 </View>

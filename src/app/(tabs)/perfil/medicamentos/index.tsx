@@ -103,7 +103,13 @@ export default function MedicamentosScreen() {
                   {item.horarios.join(" · ")} — {item.unitsPerDose}un/dose
                 </Text>
               </View>
-              <Pressable onPress={() => handleRemove(item)} disabled={busyId === item.id} className="p-1">
+              <Pressable
+                onPress={() => handleRemove(item)}
+                disabled={busyId === item.id}
+                accessibilityLabel="Remover medicamento"
+                hitSlop={12}
+                className="p-2.5"
+              >
                 <Ionicons name="trash-outline" size={16} color="#e63946" />
               </Pressable>
             </View>

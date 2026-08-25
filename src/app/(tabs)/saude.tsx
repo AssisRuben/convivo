@@ -336,7 +336,12 @@ export default function SaudeScreen() {
                     {TYPE_LABELS[m.type]}: {formatMeasurement(m)}{" "}
                     <Text className="text-xs text-navy/40">· {m.local}</Text>
                   </Text>
-                  <Pressable onPress={() => confirmDelete(m.id)} className="p-1">
+                  <Pressable
+                    onPress={() => confirmDelete(m.id)}
+                    accessibilityLabel="Remover medição"
+                    hitSlop={12}
+                    className="p-2.5"
+                  >
                     <Ionicons name="trash-outline" size={15} color="#e63946" />
                   </Pressable>
                 </View>

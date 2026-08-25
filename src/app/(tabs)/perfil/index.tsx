@@ -20,7 +20,7 @@ function MenuLink({
       <Pressable
         className={`flex-row items-center gap-3 p-4 ${last ? "" : "border-b border-navy/5"}`}
       >
-        <Ionicons name={icon} size={18} color="#e63946" />
+        <Ionicons name={icon} size={18} color="#0b1e3d" />
         <Text className="flex-1 text-sm font-medium text-navy">{label}</Text>
         <Ionicons name="chevron-forward" size={16} color="#0b1e3d60" />
       </Pressable>

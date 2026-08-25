@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { Link, useLocalSearchParams } from "expo-router";
+import { useCallback, useState } from "react";
+import { Link, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { apiFetch } from "@/lib/api";
@@ -51,17 +51,30 @@ function formatPrice(cents: number): string {
 export default function PedidoDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [order, setOrder] = useState<ApiOrderDetail | null>(null);
+  const [loadError, setLoadError] = useState(false);
   const [simulating, setSimulating] = useState(false);
+  const [mercadoPagoAvailable, setMercadoPagoAvailable] = useState(false);
 
   const load = useCallback(() => {
+    setLoadError(false);
     apiFetch(`/api/mobile/pedidos/${id}`)
       .then((res) => res.json())
-      .then((data) => setOrder(data.order ?? null));
+      .then((data) => {
+        if (data.order) setOrder(data.order);
+        else setLoadError(true);
+      })
+      .catch(() => setLoadError(true));
   }, [id]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  useFocusEffect(
+    useCallback(() => {
+      load();
+      apiFetch("/api/mobile/pedidos/payment-methods")
+        .then((res) => res.json())
+        .then((data) => setMercadoPagoAvailable(Boolean(data.mercadoPagoAvailable)))
+        .catch(() => {});
+    }, [load])
+  );
 
   async function simulatePayment() {
     setSimulating(true);
@@ -73,6 +86,17 @@ export default function PedidoDetailScreen() {
     } finally {
       setSimulating(false);
     }
+  }
+
+  if (loadError) {
+    return (
+      <View className="flex-1 items-center justify-center bg-cream p-4">
+        <Text className="text-center text-navy/60">Não foi possível carregar esse pedido.</Text>
+        <Pressable onPress={load} className="mt-4 rounded-full bg-navy px-5 py-2.5">
+          <Text className="text-sm font-medium text-white">Tentar de novo</Text>
+        </Pressable>
+      </View>
+    );
   }
 
   if (!order) {
@@ -168,19 +192,21 @@ export default function PedidoDetailScreen() {
             {order.walletDiscountCents > 0 &&
               " O desconto de saldo mostrado é o combinado — o valor final é confirmado junto com o pagamento."}
           </Text>
-          <Pressable
-            disabled={simulating}
-            onPress={simulatePayment}
-            className="mt-4 items-center rounded-full bg-amber-500 py-3.5"
-          >
-            {simulating ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text className="font-semibold text-white">
-                Simular confirmação do Mercado Pago (modo de teste)
-              </Text>
-            )}
-          </Pressable>
+          {!mercadoPagoAvailable && (
+            <Pressable
+              disabled={simulating}
+              onPress={simulatePayment}
+              className="mt-4 items-center rounded-full bg-amber-500 py-3.5"
+            >
+              {simulating ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text className="font-semibold text-white">
+                  Simular confirmação do Mercado Pago (modo de teste)
+                </Text>
+              )}
+            </Pressable>
+          )}
         </>
       )}
     </ScrollView>
