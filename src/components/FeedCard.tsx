@@ -1,7 +1,9 @@
-import { useState } from "react";
-import { Image, Linking, Pressable, Text, View } from "react-native";
+import { useRef, useState } from "react";
+import { Image, Linking, Platform, Pressable, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
+import { captureRef } from "react-native-view-shot";
+import * as Sharing from "expo-sharing";
 import type { ApiFeedItem } from "@/lib/api";
 import { LADDER_LENGTHS, getBearTier, petProgressLabelFor } from "@/constants/petStages";
 import { PetAnimation } from "@/components/PetAnimation";
@@ -25,11 +27,32 @@ export function FeedCard({
   onToggleShare?: (item: ApiFeedItem) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const cardRef = useRef<View>(null);
   const hasPet = item.goalType != null && item.stage != null && item.milestoneValue != null;
   const bearTier = hasPet ? getBearTier(item.goalType!, item.milestoneValue!) : null;
   const progressPercent = hasPet
     ? Math.round(((item.stage! + 1) / LADDER_LENGTHS[item.goalType!]) * 100)
     : 0;
+
+  /**
+   * Tira um "print" do card da conquista (bichinho + troféus + título) e
+   * abre o menu nativo de compartilhamento com essa imagem — não funciona
+   * no preview web (view-shot e o Web Share API de arquivo local não dão
+   * suporte a isso), então falha em silêncio lá: o toggle de publicar no
+   * feed do app (onToggleShare, chamado independente disso) continua
+   * funcionando normalmente.
+   */
+  async function handleShareImage() {
+    if (Platform.OS === "web" || !cardRef.current) return;
+    try {
+      const uri = await captureRef(cardRef, { format: "jpg", quality: 0.9 });
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, { dialogTitle: "Compartilhar conquista" });
+      }
+    } catch {
+      // Best-effort — publicar no feed já aconteceu de qualquer forma.
+    }
+  }
 
   return (
     <View
@@ -40,63 +63,65 @@ export function FeedCard({
       }
     >
       {hasPet ? (
-        <LinearGradient
-          colors={["#134e4a", "#042f2e", "#020617"]}
-          start={{ x: 0.5, y: 0 }}
-          end={{ x: 0.5, y: 1 }}
-          className="items-center gap-2 px-4 py-8"
-        >
-          <View className="w-full flex-row justify-end">
-            <View className="h-9 w-9 items-center justify-center rounded-full bg-white/10">
-              <Text className="text-base">{bearTier!.badge}</Text>
-            </View>
-          </View>
-
-          <View className="w-full items-center justify-center" style={{ height: 200 }}>
-            {CONFETTI.map((c, i) => (
-              <Text
-                key={i}
-                className="absolute text-lg"
-                style={{
-                  top: c.top,
-                  left: c.left,
-                  right: c.right,
-                  bottom: c.bottom,
-                  transform: [{ rotate: c.rotate }],
-                }}
-              >
-                {c.emoji}
-              </Text>
-            ))}
-            <PetAnimation goalType={item.goalType!} milestoneValue={item.milestoneValue!} />
-          </View>
-
-          <Text
-            className="mt-2 text-4xl font-extrabold text-white"
-            style={{
-              textShadowColor: "rgba(0,0,0,0.35)",
-              textShadowOffset: { width: 0, height: 1 },
-              textShadowRadius: 3,
-            }}
+        <View ref={cardRef} collapsable={false}>
+          <LinearGradient
+            colors={["#134e4a", "#042f2e", "#020617"]}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 1 }}
+            className="items-center gap-2 px-4 py-8"
           >
-            {item.title}
-          </Text>
-          <Text className="mt-1.5 text-xs font-semibold uppercase tracking-wide text-[#94a3b8]">
-            {petProgressLabelFor(item.goalType!)}
-          </Text>
-
-          <View className="mt-3 w-full gap-1">
-            <View className="h-2 w-full overflow-hidden rounded-full bg-white/10">
-              <View
-                className="h-full rounded-full bg-[#f59e0b]"
-                style={{ width: `${progressPercent}%` }}
-              />
+            <View className="w-full flex-row justify-end">
+              <View className="h-9 w-9 items-center justify-center rounded-full bg-white/10">
+                <Text className="text-base">{bearTier!.badge}</Text>
+              </View>
             </View>
-            <Text className="self-end text-[10px] font-medium text-[#cbd5e1]">
-              Fase {bearTier!.label} · {progressPercent}% do objetivo
+
+            <View className="w-full items-center justify-center" style={{ height: 200 }}>
+              {CONFETTI.map((c, i) => (
+                <Text
+                  key={i}
+                  className="absolute text-lg"
+                  style={{
+                    top: c.top,
+                    left: c.left,
+                    right: c.right,
+                    bottom: c.bottom,
+                    transform: [{ rotate: c.rotate }],
+                  }}
+                >
+                  {c.emoji}
+                </Text>
+              ))}
+              <PetAnimation goalType={item.goalType!} milestoneValue={item.milestoneValue!} />
+            </View>
+
+            <Text
+              className="mt-2 text-4xl font-extrabold text-white"
+              style={{
+                textShadowColor: "rgba(0,0,0,0.35)",
+                textShadowOffset: { width: 0, height: 1 },
+                textShadowRadius: 3,
+              }}
+            >
+              {item.title}
             </Text>
-          </View>
-        </LinearGradient>
+            <Text className="mt-1.5 text-xs font-semibold uppercase tracking-wide text-[#94a3b8]">
+              {petProgressLabelFor(item.goalType!)}
+            </Text>
+
+            <View className="mt-3 w-full gap-1">
+              <View className="h-2 w-full overflow-hidden rounded-full bg-white/10">
+                <View
+                  className="h-full rounded-full bg-[#f59e0b]"
+                  style={{ width: `${progressPercent}%` }}
+                />
+              </View>
+              <Text className="self-end text-[10px] font-medium text-[#cbd5e1]">
+                Fase {bearTier!.label} · {progressPercent}% do objetivo
+              </Text>
+            </View>
+          </LinearGradient>
+        </View>
       ) : (
         Boolean(item.imageUrl) && (
           <Image source={{ uri: item.imageUrl! }} className="h-56 w-full" resizeMode="cover" />
@@ -158,7 +183,10 @@ export function FeedCard({
 
           {Boolean(item.shareState) && onToggleShare && (
             <Pressable
-              onPress={() => onToggleShare(item)}
+              onPress={() => {
+                onToggleShare(item);
+                if (hasPet) handleShareImage();
+              }}
               className="ml-auto flex-row items-center gap-1.5"
             >
               <Ionicons

@@ -22,6 +22,9 @@ export default function PerfilLayout() {
       <Stack.Screen name="medicamentos/index" />
       <Stack.Screen name="medicamentos/configurar" />
       <Stack.Screen name="medicamentos/[id]/recomprar" />
+      <Stack.Screen name="metas/index" />
+      <Stack.Screen name="metas/nova" />
+      <Stack.Screen name="metas/[id]" />
     </Stack>
   );
 }

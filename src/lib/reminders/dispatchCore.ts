@@ -2,6 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { todayDate } from "@/lib/timeline/format";
 import { sendPushToUser } from "@/lib/push/expoPush";
 import { estimateRunOutDate, daysBetween } from "@/lib/medications/medicationCore";
+import { dueTipIndexes } from "@/lib/goals/goalCore";
+import { pickTipForIndex } from "@/lib/goals/goalTips";
 
 // O disparo não roda exatamente no minuto do horário cadastrado (depende
 // de com que frequência o cron externo chama essa rota) — essa tolerância
@@ -87,6 +89,44 @@ export async function dispatchMedicationRepurchaseAlerts(now: Date = new Date())
       data: { medicationTrackingId: tracking.id },
     });
     sent += 1;
+  }
+
+  return sent;
+}
+
+/**
+ * Dicas de meta (Metas com prazo) — diferente dos lembretes acima, não é
+ * "está no horário certo agora", é "todas as dicas que já deveriam ter
+ * sido enviadas até agora" (dueTipIndexes em lib/goals/goalCore.ts), pra
+ * nunca perder uma dica se o cron ficar um tempo sem rodar — manda as
+ * atrasadas de uma vez em vez de pular pra frente. Idempotente via
+ * GoalTipDispatch (@@unique([goalId, tipIndex])).
+ */
+export async function dispatchDueGoalTips(now: Date = new Date()): Promise<number> {
+  const today = todayDate();
+
+  const goals = await prisma.goal.findMany({
+    where: { endDate: { gte: today } },
+    include: {
+      tipDispatches: { select: { tipIndex: true } },
+      checklistItem: { select: { category: true } },
+    },
+  });
+
+  let sent = 0;
+  for (const goal of goals) {
+    const alreadySent = new Set(goal.tipDispatches.map((d) => d.tipIndex));
+    const due = dueTipIndexes(goal, now).filter((index) => !alreadySent.has(index));
+
+    for (const index of due) {
+      await sendPushToUser(goal.userId, {
+        title: `Dica pra sua meta: ${goal.title}`,
+        body: pickTipForIndex(goal.metric, index, goal.checklistItem?.category),
+        data: { screen: "metas" },
+      });
+      await prisma.goalTipDispatch.create({ data: { goalId: goal.id, tipIndex: index } });
+      sent += 1;
+    }
   }
 
   return sent;

@@ -13,7 +13,9 @@ type ApiOrderItem = {
 type ApiOrderDetail = {
   id: string;
   status: "PENDING" | "APPROVED" | "REJECTED";
+  subtotalCents: number;
   totalCents: number;
+  walletDiscountCents: number;
   items: ApiOrderItem[];
 };
 
@@ -87,6 +89,16 @@ export default function PedidoDetailScreen() {
           </View>
         ))}
         <View className="mt-2 flex-row justify-between border-t border-navy/10 pt-2">
+          <Text className="text-navy/70">Subtotal</Text>
+          <Text className="text-navy/70">{formatPrice(order.subtotalCents)}</Text>
+        </View>
+        {order.walletDiscountCents > 0 && (
+          <View className="mt-1 flex-row justify-between">
+            <Text className="text-coral">Desconto (saldo)</Text>
+            <Text className="text-coral">-{formatPrice(order.walletDiscountCents)}</Text>
+          </View>
+        )}
+        <View className="mt-1 flex-row justify-between">
           <Text className="font-semibold text-navy">Total</Text>
           <Text className="font-semibold text-navy">{formatPrice(order.totalCents)}</Text>
         </View>
@@ -97,6 +109,8 @@ export default function PedidoDetailScreen() {
           <Text className="mt-4 text-sm text-navy/60">
             Assim que o pagamento for confirmado, o status deste pedido é atualizado
             automaticamente.
+            {order.walletDiscountCents > 0 &&
+              " O desconto de saldo mostrado é o combinado — o valor final é confirmado junto com o pagamento."}
           </Text>
           <Pressable
             disabled={simulating}

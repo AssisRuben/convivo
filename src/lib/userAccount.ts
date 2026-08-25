@@ -28,6 +28,11 @@ export async function createUserAccount(
     ? await prisma.user.findUnique({ where: { referralCode: input.referralCode } })
     : null;
 
+  // O mesmo campo de código serve pros dois casos — quem é o dono do
+  // código decide se vira indicação de amigo ou vínculo de vendedor (ver
+  // attributeCode, abaixo, pro fluxo equivalente pós-cadastro).
+  const referrerIsVendedor = referrer?.isVendedor ?? false;
+
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
       const user = await prisma.user.create({
@@ -36,16 +41,19 @@ export async function createUserAccount(
           email: input.email,
           passwordHash,
           referralCode: generateCode(),
-          referredById: referrer?.id,
+          referredById: referrer && !referrerIsVendedor ? referrer.id : undefined,
+          vendedorId: referrer && referrerIsVendedor ? referrer.id : undefined,
           cart: { create: {} },
         },
       });
 
-      if (referrer) {
+      if (referrer && !referrerIsVendedor) {
         // Sem crédito em dinheiro aqui — o modelo é comissão por compra do
         // indicado (ver lib/orders/orderCore.ts), não bônus de cadastro.
         // A meta em escada de "amigos indicados" continua contando
-        // cadastro, é só o bichinho/badge, não afeta a carteira.
+        // cadastro, é só o bichinho/badge, não afeta a carteira. Vínculo
+        // de vendedor não entra nessa escada (é uma coisa diferente de
+        // "amigos indicados").
         await checkReferralMilestones(referrer.id);
       }
 
@@ -60,6 +68,47 @@ export async function createUserAccount(
     }
   }
   throw new Error("Não foi possível criar a conta");
+}
+
+export type AttributeCodeResult =
+  | { ok: true; kind: "amigo" | "vendedor" }
+  | { ok: false; error: string };
+
+/**
+ * Vínculo de código depois do cadastro — mesma detecção automática
+ * amigo/vendedor de createUserAccount, mas pra quem já tem conta (ex:
+ * cliente cadastrado sem código que depois é atendido por um vendedor na
+ * farmácia). Cada tipo de vínculo só pode ser setado uma vez por usuário
+ * (trava no primeiro, sem sobrescrever).
+ */
+export async function attributeCode(userId: string, code: string): Promise<AttributeCodeResult> {
+  const owner = await prisma.user.findUnique({ where: { referralCode: code } });
+  if (!owner || owner.id === userId) {
+    return { ok: false, error: "Código inválido" };
+  }
+
+  if (owner.isVendedor) {
+    const current = await prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { vendedorId: true },
+    });
+    if (current.vendedorId) {
+      return { ok: false, error: "Você já tem um vendedor vinculado" };
+    }
+    await prisma.user.update({ where: { id: userId }, data: { vendedorId: owner.id } });
+    return { ok: true, kind: "vendedor" };
+  }
+
+  const current = await prisma.user.findUniqueOrThrow({
+    where: { id: userId },
+    select: { referredById: true },
+  });
+  if (current.referredById) {
+    return { ok: false, error: "Você já foi indicado por alguém" };
+  }
+  await prisma.user.update({ where: { id: userId }, data: { referredById: owner.id } });
+  await checkReferralMilestones(owner.id);
+  return { ok: true, kind: "amigo" };
 }
 
 export async function verifyUserCredentials(

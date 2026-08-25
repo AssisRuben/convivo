@@ -59,6 +59,7 @@ export default function PerfilScreen() {
           label="Histórico de compras"
         />
         <MenuLink href="/perfil/medicamentos" icon="medkit-outline" label="Medicamentos" />
+        <MenuLink href="/perfil/metas" icon="flag-outline" label="Minhas metas" />
         <MenuLink href="/perfil/minhas-postagens" icon="ribbon-outline" label="Minhas postagens" />
         <MenuLink href="/perfil/fidelidade" icon="medal-outline" label="Cartão fidelidade" />
         <MenuLink href="/perfil/indicacao" icon="gift-outline" label="Indique e ganhe" last />

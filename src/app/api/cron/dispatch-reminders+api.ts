@@ -1,4 +1,5 @@
 import {
+  dispatchDueGoalTips,
   dispatchDueRoutineReminders,
   dispatchMedicationRepurchaseAlerts,
 } from "@/lib/reminders/dispatchCore";
@@ -13,10 +14,11 @@ export async function POST(request: Request) {
     return Response.json({ error: "Não autorizado" }, { status: 401 });
   }
 
-  const [routineReminders, medicationAlerts] = await Promise.all([
+  const [routineReminders, medicationAlerts, goalTips] = await Promise.all([
     dispatchDueRoutineReminders(),
     dispatchMedicationRepurchaseAlerts(),
+    dispatchDueGoalTips(),
   ]);
 
-  return Response.json({ routineReminders, medicationAlerts });
+  return Response.json({ routineReminders, medicationAlerts, goalTips });
 }

@@ -20,6 +20,7 @@ function useNotificationTapNavigation() {
       const screen = response.notification.request.content.data?.screen;
       if (screen === "medicamentos") router.push("/perfil/medicamentos");
       else if (screen === "rotina") router.push("/rotina");
+      else if (screen === "metas") router.push("/perfil/metas");
     });
     return () => subscription.remove();
   }, []);

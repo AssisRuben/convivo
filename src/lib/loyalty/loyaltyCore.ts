@@ -14,8 +14,11 @@ export type LoyaltyProgress = {
 };
 
 async function countQualifyingOrders(userId: string): Promise<number> {
+  // subtotalCents (valor bruto dos itens), não totalCents (valor cobrado
+  // após desconto de saldo) — resgatar saldo não deveria fazer o cliente
+  // "perder" o selo de uma compra que já era grande o suficiente.
   return prisma.order.count({
-    where: { userId, status: "APPROVED", totalCents: { gte: LOYALTY_MIN_ORDER_CENTS } },
+    where: { userId, status: "APPROVED", subtotalCents: { gte: LOYALTY_MIN_ORDER_CENTS } },
   });
 }
 

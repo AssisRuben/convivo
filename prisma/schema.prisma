@@ -8,15 +8,24 @@ datasource db {
 }
 
 model User {
-  id                 String   @id @default(cuid())
-  name               String
-  email              String   @unique
-  passwordHash       String
-  cpf                String?  @unique
-  vendedorAttributed Boolean  @default(false)
-  referralCode       String   @unique
-  referredById       String?
-  createdAt          DateTime @default(now())
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  cpf          String?  @unique
+  referralCode String   @unique
+  referredById String?
+  createdAt    DateTime @default(now())
+
+  // Vendedor: papel especial (só atribuído via SQL direto — sem
+  // autoatendimento) e o vínculo cliente→vendedor, independente da
+  // indicação entre amigos acima. Um cliente pode ter os dois ao mesmo
+  // tempo — o amigo e o vendedor ganham comissão juntos, cada um a sua
+  // taxa (ver creditReferralCommission/creditVendedorCommission em
+  // lib/orders/orderCore.ts). Uma vez setado, vendedorId não muda mais
+  // (trava no primeiro vínculo, ver attributeCode em lib/userAccount.ts).
+  isVendedor Boolean @default(false)
+  vendedorId String?
 
   // Telefone e nascimento — exigidos pelo checkout (efetuar-venda-v1 da
   // Trier/SGF precisa dos dois no `cliente`).
@@ -43,6 +52,8 @@ model User {
   orders               Order[]
   referredBy           User?                @relation("Referrals", fields: [referredById], references: [id])
   referrals            User[]               @relation("Referrals")
+  vendedor             User?                @relation("VendedorClientes", fields: [vendedorId], references: [id])
+  clientesVendidos     User[]               @relation("VendedorClientes")
   careLinksAsTitular   CareLink[]           @relation("TitularLinks")
   careLinksAsCaregiver CareLink[]           @relation("CaregiverLinks")
   healthMeasurements   HealthMeasurement[]
@@ -55,6 +66,7 @@ model User {
   loyaltyStampCycles   LoyaltyStampCycle[]
   medicationTrackings  MedicationTracking[]
   expoPushTokens       ExpoPushToken[]
+  goals                Goal[]
 }
 
 enum WalletEntrySource {
@@ -64,6 +76,8 @@ enum WalletEntrySource {
   REFERRAL_SIGNUP
   REFERRAL_PURCHASE_COMMISSION
   LOYALTY_STAMP_REWARD
+  VENDEDOR_PURCHASE_COMMISSION
+  WALLET_REDEMPTION
 }
 
 // Extrato de crédito do usuário (hoje só bônus de indicação; comissão por
@@ -175,10 +189,22 @@ enum FulfillmentType {
 }
 
 model Order {
-  id                String          @id @default(cuid())
-  userId            String
-  status            OrderStatus     @default(PENDING)
-  totalCents        Int
+  id     String      @id @default(cuid())
+  userId String
+  status OrderStatus @default(PENDING)
+
+  // subtotalCents é o valor bruto dos itens, nunca muda — é sobre esse
+  // valor que o cartão fidelidade qualifica o pedido (ver
+  // checkLoyaltyStampReward em lib/loyalty/loyaltyCore.ts), pra resgatar
+  // saldo não fazer o cliente "perder" o selo de uma compra grande.
+  // totalCents é o valor cobrado de fato (subtotalCents - walletDiscountCents)
+  // — o mesmo reportado pra Trier. walletDiscountCents muda de sentido em
+  // duas fases: desconto pedido enquanto PENDING, desconto efetivamente
+  // debitado da carteira quando aprovado (ver approveOrder).
+  subtotalCents      Int
+  totalCents         Int
+  walletDiscountCents Int @default(0)
+
   mpPaymentId       String?
   fulfillmentType   FulfillmentType @default(PICKUP)
   addressCep        String?
@@ -310,6 +336,7 @@ model CareChecklistItem {
   medicationTracking MedicationTracking?       @relation(fields: [medicationTrackingId], references: [id])
   completions        CareChecklistCompletion[]
   reminderDispatches CareReminderDispatch[]
+  goals              Goal[]
 }
 
 // Ficha de acompanhamento de um medicamento comprado — quantidade total,
@@ -352,6 +379,53 @@ model ExpoPushToken {
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id])
+}
+
+enum GoalMetric {
+  PESO
+  PRESSAO
+  ROTINA
+}
+
+// Meta declarada pelo usuário com alvo e prazo — diferente das escadas
+// automáticas de GoalType/GOAL_LADDERS (achievements.ts), que não têm
+// prazo e olham o histórico inteiro. Os dois sistemas convivem sem se
+// tocar. baselineValue é o peso registrado no momento da criação da meta
+// (não o primeiro peso já registrado, que é o que a escada automática
+// usa) — só usado quando metric = PESO. checklistItemId só é usado
+// quando metric = ROTINA: a meta cria um CareChecklistItem de verdade
+// por baixo e mede progresso pelas conclusões dele.
+model Goal {
+  id              String     @id @default(cuid())
+  userId          String
+  metric          GoalMetric
+  title           String
+  targetValue     Float?
+  baselineValue   Float?
+  startDate       DateTime   @db.Date
+  endDate         DateTime   @db.Date
+  checklistItemId String?
+  createdAt       DateTime   @default(now())
+
+  user          User               @relation(fields: [userId], references: [id])
+  checklistItem CareChecklistItem? @relation(fields: [checklistItemId], references: [id])
+  tipDispatches GoalTipDispatch[]
+
+  @@index([userId, endDate])
+}
+
+// Idempotência do envio de dicas — evita reenviar a mesma dica (mesmo
+// índice) duas vezes se o cron rodar mais de uma vez no período devido,
+// igual CareReminderDispatch/MedicationRepurchaseAlert.
+model GoalTipDispatch {
+  id       String   @id @default(cuid())
+  goalId   String
+  tipIndex Int
+  sentAt   DateTime @default(now())
+
+  goal Goal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  @@unique([goalId, tipIndex])
 }
 
 model CareChecklistCompletion {

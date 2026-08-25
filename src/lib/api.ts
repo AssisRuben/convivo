@@ -126,3 +126,36 @@ export type RoutineItemInput = {
   timeOfDay?: string | null;
   daysOfWeek: number[];
 };
+
+export type ApiGoalMetric = "PESO" | "PRESSAO" | "ROTINA";
+
+export type ApiGoalStatus = "ACTIVE" | "COMPLETED" | "EXPIRED";
+
+export type ApiGoal = {
+  id: string;
+  metric: ApiGoalMetric;
+  title: string;
+  targetValue: number | null;
+  baselineValue: number | null;
+  startDate: string;
+  endDate: string;
+  status: ApiGoalStatus;
+  progressRatio: number | null;
+  progressLabel: string;
+  daysElapsed: number;
+  daysTotal: number;
+  tipsSentCount: number;
+};
+
+export type ApiGoalTip = { index: number; sentAt: string; text: string };
+
+export type ApiGoalDetail = ApiGoal & { tips: ApiGoalTip[] };
+
+export type GoalInput = {
+  metric: ApiGoalMetric;
+  title: string;
+  targetValue?: number | null;
+  startDate: string;
+  endDate: string;
+  routine?: { category: ApiCareCategory; timeOfDay?: string | null; daysOfWeek: number[] };
+};

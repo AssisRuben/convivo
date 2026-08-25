@@ -1,6 +1,7 @@
 import { getApiUserId } from "@/lib/apiAuth";
 import { prisma } from "@/lib/prisma";
 import { createOrderForItems, type OrderAddressInput } from "@/lib/orders/orderCore";
+import { parseWalletDiscountCents } from "@/lib/wallet";
 import type { FulfillmentType } from "@/lib/generated/prisma/client";
 
 export async function POST(request: Request, { id }: Record<string, string>) {
@@ -33,13 +34,15 @@ export async function POST(request: Request, { id }: Record<string, string>) {
   const body = await request.json().catch(() => ({}));
   const fulfillmentType: FulfillmentType = body.fulfillmentType === "DELIVERY" ? "DELIVERY" : "PICKUP";
   const address: OrderAddressInput | undefined = body.address ?? undefined;
+  const walletDiscountCents = parseWalletDiscountCents(body);
 
   try {
     const order = await createOrderForItems(
       userId,
       [{ productId: product.id, quantity: tracking.totalUnits, unitPriceCents: product.priceCents }],
       fulfillmentType,
-      address
+      address,
+      walletDiscountCents
     );
     return Response.json({ order });
   } catch (error) {

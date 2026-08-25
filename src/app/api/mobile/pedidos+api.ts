@@ -1,6 +1,7 @@
 import { getApiUserId } from "@/lib/apiAuth";
 import { prisma } from "@/lib/prisma";
 import { createOrderFromCart } from "@/lib/orders/orderCore";
+import { parseWalletDiscountCents } from "@/lib/wallet";
 
 export async function GET(request: Request) {
   const userId = await getApiUserId(request);
@@ -21,8 +22,11 @@ export async function POST(request: Request) {
     return Response.json({ error: "Não autenticado" }, { status: 401 });
   }
 
+  const body = await request.json().catch(() => null);
+  const walletDiscountCents = parseWalletDiscountCents(body);
+
   try {
-    const order = await createOrderFromCart(userId);
+    const order = await createOrderFromCart(userId, undefined, walletDiscountCents);
     return Response.json({ order });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Não foi possível criar o pedido";

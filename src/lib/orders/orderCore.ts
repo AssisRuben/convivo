@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { getOrCreateCart } from "@/lib/cart";
 import { efetuarVendaTrier, getPharmacyEndereco, isTrierConfigured } from "@/lib/orders/trier";
 import { checkLoyaltyStampReward } from "@/lib/loyalty/loyaltyCore";
+import { getWalletBalanceCents } from "@/lib/wallet";
 import type {
   FulfillmentType,
   Order,
@@ -11,6 +12,7 @@ import type {
 } from "@/lib/generated/prisma/client";
 
 const REFERRAL_COMMISSION_RATE = 0.02;
+const VENDEDOR_COMMISSION_RATE = 0.05;
 
 export type OrderItemInput = { productId: string; quantity: number; unitPriceCents: number };
 
@@ -33,19 +35,34 @@ export async function createOrderForItems(
   userId: string,
   items: OrderItemInput[],
   fulfillmentType: FulfillmentType = "PICKUP",
-  address?: OrderAddressInput
+  address?: OrderAddressInput,
+  requestedWalletDiscountCents = 0
 ): Promise<Order> {
   if (items.length === 0) {
     throw new Error("Nenhum item pra criar o pedido");
   }
 
-  const totalCents = items.reduce((sum, item) => sum + item.unitPriceCents * item.quantity, 0);
+  const subtotalCents = items.reduce((sum, item) => sum + item.unitPriceCents * item.quantity, 0);
+
+  // Desconto travado na criação — só uma "promessa": o débito de verdade
+  // da carteira só acontece na aprovação (ver approveOrder), que relê o
+  // saldo e pode reduzir esse valor se ele tiver sido gasto em outro
+  // pedido nesse meio tempo. Nunca confia no valor pedido sem checar
+  // contra o subtotal e o saldo atual.
+  const balanceCents = await getWalletBalanceCents(userId);
+  const walletDiscountCents = Math.max(
+    0,
+    Math.min(requestedWalletDiscountCents, subtotalCents, balanceCents)
+  );
+  const totalCents = subtotalCents - walletDiscountCents;
 
   return prisma.$transaction(async (tx) => {
     const order = await tx.order.create({
       data: {
         userId,
+        subtotalCents,
         totalCents,
+        walletDiscountCents,
         fulfillmentType,
         addressCep: address?.cep ?? null,
         addressLogradouro: address?.logradouro ?? null,
@@ -76,7 +93,8 @@ export async function createOrderForItems(
 
 export async function createOrderFromCart(
   userId: string,
-  fulfillmentType: FulfillmentType = "PICKUP"
+  fulfillmentType: FulfillmentType = "PICKUP",
+  requestedWalletDiscountCents = 0
 ): Promise<Order> {
   const cart = await getOrCreateCart(userId);
   if (cart.items.length === 0) {
@@ -90,7 +108,9 @@ export async function createOrderFromCart(
       quantity: item.quantity,
       unitPriceCents: item.product.priceCents,
     })),
-    fulfillmentType
+    fulfillmentType,
+    undefined,
+    requestedWalletDiscountCents
   );
 
   await prisma.cartItem.deleteMany({ where: { cartId: cart.id } });
@@ -170,13 +190,12 @@ async function syncOrderToTrier(order: OrderWithRelations): Promise<void> {
 }
 
 /**
- * Comissão recorrente de 2% da margem bruta pro indicador — toda compra do
- * indicado, não só a primeira. Itens sem `costCents` são pulados (margem
- * desconhecida não é estimada).
+ * Margem bruta do pedido (soma unitPriceCents - costCents por item, só os
+ * que têm custo cadastrado) — base de cálculo das comissões de amigo e de
+ * vendedor abaixo, que coexistem e usam a mesma margem cada uma com sua
+ * taxa.
  */
-async function creditReferralCommission(order: OrderWithRelations): Promise<void> {
-  if (!order.user.referredById) return;
-
+function calculateOrderMarginCents(order: OrderWithRelations): number {
   let marginCents = 0;
   for (const item of order.items) {
     if (item.product.costCents == null) continue;
@@ -184,7 +203,18 @@ async function creditReferralCommission(order: OrderWithRelations): Promise<void
     if (itemMargin <= 0) continue;
     marginCents += itemMargin * item.quantity;
   }
-  const commissionCents = Math.round(marginCents * REFERRAL_COMMISSION_RATE);
+  return marginCents;
+}
+
+/**
+ * Comissão recorrente de 2% da margem bruta pro amigo que indicou — toda
+ * compra do indicado, não só a primeira. Independente da comissão de
+ * vendedor abaixo: os dois vínculos podem existir juntos no mesmo cliente.
+ */
+async function creditReferralCommission(order: OrderWithRelations): Promise<void> {
+  if (!order.user.referredById) return;
+
+  const commissionCents = Math.round(calculateOrderMarginCents(order) * REFERRAL_COMMISSION_RATE);
   if (commissionCents <= 0) return;
 
   await prisma.walletEntry.create({
@@ -193,6 +223,28 @@ async function creditReferralCommission(order: OrderWithRelations): Promise<void
       amountCents: commissionCents,
       source: "REFERRAL_PURCHASE_COMMISSION",
       description: `Comissão de 2% pela compra de ${order.user.name}`,
+    },
+  });
+}
+
+/**
+ * Comissão recorrente de 5% da margem bruta pro vendedor vinculado ao
+ * cliente — taxa maior que a de amigo (papel mais ativo, atendimento
+ * presencial). Coexiste com creditReferralCommission: um cliente pode ter
+ * amigo indicador E vendedor ao mesmo tempo, cada um ganha a sua parte.
+ */
+async function creditVendedorCommission(order: OrderWithRelations): Promise<void> {
+  if (!order.user.vendedorId) return;
+
+  const commissionCents = Math.round(calculateOrderMarginCents(order) * VENDEDOR_COMMISSION_RATE);
+  if (commissionCents <= 0) return;
+
+  await prisma.walletEntry.create({
+    data: {
+      userId: order.user.vendedorId,
+      amountCents: commissionCents,
+      source: "VENDEDOR_PURCHASE_COMMISSION",
+      description: `Comissão de 5% pela compra de ${order.user.name}`,
     },
   });
 }
@@ -211,9 +263,38 @@ export async function approveOrder(orderId: string): Promise<void> {
   });
   if (order.status !== "PENDING") return;
 
-  await prisma.order.update({ where: { id: orderId }, data: { status: "APPROVED" } });
+  // Relê o saldo e o débito na mesma transação — o valor pedido na
+  // criação (order.walletDiscountCents) pode ter ficado desatualizado se
+  // o cliente gastou saldo em outro pedido nesse meio tempo; aqui trava
+  // no que realmente existe agora, nunca no que foi prometido antes.
+  const updated = await prisma.$transaction(async (tx) => {
+    const balanceCents = await getWalletBalanceCents(order.userId, tx);
+    const walletDiscountCents = Math.max(0, Math.min(order.walletDiscountCents, balanceCents));
+    const totalCents = order.subtotalCents - walletDiscountCents;
 
-  await syncOrderToTrier(order);
-  await creditReferralCommission(order);
+    const updatedOrder = await tx.order.update({
+      where: { id: orderId },
+      data: { status: "APPROVED", totalCents, walletDiscountCents },
+    });
+
+    if (walletDiscountCents > 0) {
+      await tx.walletEntry.create({
+        data: {
+          userId: order.userId,
+          amountCents: -walletDiscountCents,
+          source: "WALLET_REDEMPTION",
+          description: `Desconto de saldo aplicado no pedido ${orderId}`,
+        },
+      });
+    }
+
+    return updatedOrder;
+  });
+
+  const orderForDownstream: OrderWithRelations = { ...order, ...updated };
+
+  await syncOrderToTrier(orderForDownstream);
+  await creditReferralCommission(orderForDownstream);
+  await creditVendedorCommission(orderForDownstream);
   await checkLoyaltyStampReward(order.userId);
 }

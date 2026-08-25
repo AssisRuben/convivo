@@ -1,8 +1,17 @@
 import { useCallback, useRef, useState } from "react";
 import { useFocusEffect } from "expo-router";
-import { ActivityIndicator, Pressable, Share, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  Share,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { apiFetch } from "@/lib/api";
+import { showAlert } from "@/lib/alert";
 
 function formatPrice(cents: number): string {
   return (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -12,7 +21,11 @@ export default function IndicacaoScreen() {
   const [referralCode, setReferralCode] = useState<string | null>(null);
   const [referralCount, setReferralCount] = useState(0);
   const [saldoCents, setSaldoCents] = useState(0);
+  const [hasReferrer, setHasReferrer] = useState(true);
+  const [hasVendedor, setHasVendedor] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [codeInput, setCodeInput] = useState("");
+  const [linking, setLinking] = useState(false);
   const loadedOnce = useRef(false);
 
   const load = useCallback(async () => {
@@ -24,11 +37,40 @@ export default function IndicacaoScreen() {
         setReferralCode(data.referralCode);
         setReferralCount(data.referralCount ?? 0);
         setSaldoCents(data.saldoCents ?? 0);
+        setHasReferrer(Boolean(data.hasReferrer));
+        setHasVendedor(Boolean(data.hasVendedor));
       }
     } finally {
       setLoading(false);
     }
   }, []);
+
+  async function handleLinkCode() {
+    const code = codeInput.trim();
+    if (!code) return;
+    setLinking(true);
+    try {
+      const res = await apiFetch("/api/mobile/vincular-codigo", {
+        method: "POST",
+        body: JSON.stringify({ code }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showAlert("Não foi possível vincular", data.error);
+        return;
+      }
+      setCodeInput("");
+      showAlert(
+        "Código vinculado!",
+        data.kind === "vendedor"
+          ? "Vendedor vinculado à sua conta."
+          : "Amigo vinculado à sua conta."
+      );
+      load();
+    } finally {
+      setLinking(false);
+    }
+  }
 
   useFocusEffect(
     useCallback(() => {
@@ -54,7 +96,7 @@ export default function IndicacaoScreen() {
   }
 
   return (
-    <View className="flex-1 bg-cream p-4">
+    <ScrollView className="flex-1 bg-cream" contentContainerClassName="p-4 pb-24">
       <View className="items-center rounded-2xl bg-navy px-6 py-6">
         <Ionicons name="gift-outline" size={26} color="#e63946" />
         <Text className="mt-1 text-lg font-semibold text-white">Indique e Ganhe</Text>
@@ -93,6 +135,41 @@ export default function IndicacaoScreen() {
         Você ganha 2% da margem toda vez que um amigo indicado compra — não só na primeira
         compra. O uso desse saldo nas suas próprias compras ainda está sendo configurado.
       </Text>
-    </View>
+
+      {(!hasReferrer || !hasVendedor) && (
+        <View className="mt-6 rounded-2xl bg-card p-4 shadow-sm">
+          <Text className="mb-2 text-sm font-medium text-navy">
+            Tem um código de amigo ou de vendedor?
+          </Text>
+          <View className="flex-row gap-2">
+            <TextInput
+              value={codeInput}
+              onChangeText={setCodeInput}
+              placeholder="Código"
+              autoCapitalize="characters"
+              className="flex-1 rounded-xl border border-navy/10 bg-cream p-3"
+            />
+            <Pressable
+              disabled={linking || !codeInput.trim()}
+              onPress={handleLinkCode}
+              className="items-center justify-center rounded-xl bg-navy px-4 disabled:opacity-50"
+            >
+              {linking ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text className="font-semibold text-white">Vincular</Text>
+              )}
+            </Pressable>
+          </View>
+          <Text className="mt-2 text-xs text-navy/50">
+            {hasReferrer
+              ? "Você já tem um amigo vinculado — pode adicionar um código de vendedor."
+              : hasVendedor
+                ? "Você já tem um vendedor vinculado — pode adicionar o código de um amigo."
+                : "Vale código de amigo ou de vendedor da farmácia — cada um só pode ser vinculado uma vez."}
+          </Text>
+        </View>
+      )}
+    </ScrollView>
   );
 }
