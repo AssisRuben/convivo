@@ -13,6 +13,22 @@ export type LoyaltyProgress = {
   rewardPerCycleCents: number;
 };
 
+/**
+ * Aritmética pura do cartão — quantos selos preenchidos no ciclo atual, e
+ * se `qualifyingOrders` acabou de bater um múltiplo de 10 (nesse caso,
+ * qual o número do ciclo completado). Separada da leitura do banco pra
+ * dar pra testar sem Prisma.
+ */
+export function computeStampCycle(qualifyingOrders: number): {
+  stampsFilled: number;
+  justCompletedCycle: number | null;
+} {
+  const stampsFilled = qualifyingOrders % LOYALTY_STAMP_CARD_SIZE;
+  const justCompletedCycle =
+    qualifyingOrders > 0 && stampsFilled === 0 ? qualifyingOrders / LOYALTY_STAMP_CARD_SIZE : null;
+  return { stampsFilled, justCompletedCycle };
+}
+
 async function countQualifyingOrders(userId: string): Promise<number> {
   // subtotalCents (valor bruto dos itens), não totalCents (valor cobrado
   // após desconto de saldo) — resgatar saldo não deveria fazer o cliente
@@ -33,7 +49,7 @@ export async function getLoyaltyProgress(userId: string): Promise<LoyaltyProgres
   ]);
 
   return {
-    stampsFilled: qualifyingOrders % LOYALTY_STAMP_CARD_SIZE,
+    stampsFilled: computeStampCycle(qualifyingOrders).stampsFilled,
     stampsTotal: LOYALTY_STAMP_CARD_SIZE,
     completedCycles: cycles._count,
     totalRewardCents: cycles._sum.rewardCents ?? 0,
@@ -52,9 +68,10 @@ export async function getLoyaltyProgress(userId: string): Promise<LoyaltyProgres
  */
 export async function checkLoyaltyStampReward(userId: string): Promise<void> {
   const qualifyingOrders = await countQualifyingOrders(userId);
-  if (qualifyingOrders === 0 || qualifyingOrders % LOYALTY_STAMP_CARD_SIZE !== 0) return;
+  const { justCompletedCycle } = computeStampCycle(qualifyingOrders);
+  if (justCompletedCycle == null) return;
 
-  const cycleNumber = qualifyingOrders / LOYALTY_STAMP_CARD_SIZE;
+  const cycleNumber = justCompletedCycle;
 
   try {
     await prisma.$transaction([

@@ -41,8 +41,20 @@ function RootNavigator() {
       <Stack.Screen name="(auth)" />
       <Stack.Screen name="(tabs)" />
       <Stack.Screen
-        name="produto/[id]"
-        options={{ ...brandHeaderOptions, headerShown: true }}
+        name="produto/[codigo]"
+        options={{
+          ...brandHeaderOptions,
+          headerShown: true,
+          // Empilhada por cima do app inteiro, fora das abas — a barra de
+          // baixo não aparece aqui, então sem seta de voltar o usuário
+          // fica sem nenhuma saída visível (diferente do resto do app,
+          // onde tocar na aba de novo sempre volta pro topo daquela aba).
+          headerBackVisible: true,
+        }}
+      />
+      <Stack.Screen
+        name="categoria/[slug]"
+        options={{ ...brandHeaderOptions, headerShown: true, headerBackVisible: true }}
       />
     </Stack>
   );

@@ -27,6 +27,41 @@ export type ApiProduct = {
   stock: number;
 };
 
+export type ApiCatalogCategorySlug =
+  | "FRALDAS"
+  | "HIGIENE_PERFUMARIA"
+  | "ALIMENTACAO_INFANTIL"
+  | "CONVENIENCIA"
+  | "MEDICAMENTOS"
+  | "OUTROS";
+
+export type ApiCatalogItem = {
+  codigo: number;
+  name: string;
+  priceCents: number;
+  precoAnteriorCents: number | null;
+  emPromocao: boolean;
+  imageUrl: string;
+  stock: number;
+  category: ApiCatalogCategorySlug;
+};
+
+export type ApiCatalogPromoItem = ApiCatalogItem & { precoPromocionalCents: number };
+
+export type ApiCatalogCategorySection = {
+  slug: ApiCatalogCategorySlug;
+  label: string;
+  products: ApiCatalogItem[];
+};
+
+export type ApiCatalogHome = {
+  destaques: ApiCatalogItem[];
+  promocoes: ApiCatalogPromoItem[];
+  categorias: ApiCatalogCategorySection[];
+};
+
+export type ApiCatalogProductDetail = ApiCatalogItem & { description: string | null };
+
 export type ApiCartItem = {
   id: string;
   productId: string;

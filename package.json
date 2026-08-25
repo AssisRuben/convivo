@@ -27,6 +27,7 @@
     "expo-system-ui": "~57.0.2",
     "expo-web-browser": "~57.0.2",
     "jose": "^6.2.9",
+    "mercadopago": "^3.4.0",
     "nativewind": "^4.2.6",
     "pg": "^8.23.0",
     "prisma": "^7.9.1",
@@ -50,7 +51,8 @@
     "eslint": "^9.0.0",
     "eslint-config-expo": "~57.0.1",
     "tailwindcss": "^3.4.19",
-    "typescript": "~6.0.3"
+    "typescript": "~6.0.3",
+    "vitest": "^4.1.11"
   },
   "scripts": {
     "start": "expo start",
@@ -58,7 +60,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "test": "vitest run"
   },
   "private": true
 }

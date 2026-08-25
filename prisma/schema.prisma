@@ -129,24 +129,31 @@ model CareLink {
   caregiver User? @relation("CaregiverLinks", fields: [caregiverId], references: [id])
 }
 
-enum ProductCategory {
-  MEDICAMENTO
-  PRODUTO
-}
-
+// Espelho "write-through" do catálogo real da farmácia (banco externo, ver
+// lib/catalog/catalogDb.ts) — não é mais uma tabela curada à mão. Toda vez
+// que o app toca um produto (navegar, ver detalhe, adicionar ao carrinho,
+// fechar pedido), busca ao vivo na origem e sobrescreve a linha aqui,
+// chaveada por codigoProduto. Existe só porque CartItem/OrderItem precisam
+// de uma FK local de verdade — não dá pra ter FK entre bancos diferentes.
+// name sem @unique (nome de origem não garante isso) e description
+// opcional (não existe coluna equivalente na origem) por causa disso.
 model Product {
   id                  String                 @id @default(cuid())
-  name                String                 @unique
-  description         String
+  name                String
+  description         String?
   priceCents          Int
   // Custo do produto — usado só server-side pra calcular comissão de
   // indicação (2% da margem bruta). Nullable: sem custo definido, a
-  // comissão daquele item é pulada, nunca estimada.
+  // comissão daquele item é pulada, nunca estimada. Vem de custo_medio no
+  // espelho a partir do catálogo real.
   costCents           Int?
   imageUrl            String
   stock               Int                    @default(0)
   codigoProduto       Int?                   @unique
-  category            ProductCategory        @default(PRODUTO)
+  // Slug já mapeado (ver constants/catalogCategories.ts), não mais um
+  // enum fixo — a taxonomia de vitrine é curada em código a partir do
+  // "grupo" de origem, não corresponde a MEDICAMENTO/PRODUTO de antes.
+  category            String?
   usoContinuo         Boolean                @default(false)
   duracaoEstimadaDias Int?
   healthCheckType     HealthMeasurementType?
@@ -188,6 +195,12 @@ enum FulfillmentType {
   PICKUP
 }
 
+enum PaymentMethod {
+  ONLINE_MP
+  CARTAO_PRESENCIAL
+  DINHEIRO
+}
+
 model Order {
   id     String      @id @default(cuid())
   userId String
@@ -205,7 +218,18 @@ model Order {
   totalCents         Int
   walletDiscountCents Int @default(0)
 
+  // paymentMethod nunca cai no @default abaixo na prática — a aplicação
+  // sempre exige um valor explícito (ver createOrderForItems), o default
+  // é só rede de segurança pra migration de linhas já existentes. Cartão
+  // presencial e dinheiro aprovam o pedido na hora da criação (pagamento
+  // acontece fisicamente, fora do controle do app); só ONLINE_MP fica
+  // PENDING esperando o webhook do Mercado Pago.
+  paymentMethod     PaymentMethod   @default(CARTAO_PRESENCIAL)
+  cashTenderedCents Int?
   mpPaymentId       String?
+  mpPreferenceId    String?
+  mpStatus          String?
+  mpError           String?
   fulfillmentType   FulfillmentType @default(PICKUP)
   addressCep        String?
   addressLogradouro String?

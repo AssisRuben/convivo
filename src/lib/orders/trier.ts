@@ -3,6 +3,7 @@
 // `enderecoEntrega` é obrigatório na prática mesmo em retirada (usar o
 // endereço da própria farmácia nesse caso), `cliente` só precisa de
 // nome+CPF, e `vendedor` não deve ser usado em venda de e-commerce.
+import { centsToReais } from "@/lib/money";
 
 export type TrierEnderecoEntrega = {
   logradouro: string;
@@ -46,10 +47,6 @@ function trierUrl(baseUrl: string, path: string): string {
 // fuso/horário de verão aqui.
 function formatTrierDate(date: Date): string {
   return date.toISOString().replace(/\.\d{3}Z$/, "+0000");
-}
-
-function centsToReais(cents: number): number {
-  return Math.round(cents) / 100;
 }
 
 /**

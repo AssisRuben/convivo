@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { useLocalSearchParams } from "expo-router";
+import { Link, useLocalSearchParams } from "expo-router";
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { apiFetch } from "@/lib/api";
 
 type ApiOrderItem = {
@@ -10,12 +11,18 @@ type ApiOrderItem = {
   product: { name: string };
 };
 
+type ApiPaymentMethod = "ONLINE_MP" | "CARTAO_PRESENCIAL" | "DINHEIRO";
+
 type ApiOrderDetail = {
   id: string;
   status: "PENDING" | "APPROVED" | "REJECTED";
   subtotalCents: number;
   totalCents: number;
   walletDiscountCents: number;
+  paymentMethod: ApiPaymentMethod;
+  cashTenderedCents: number | null;
+  trierError: string | null;
+  mpError: string | null;
   items: ApiOrderItem[];
 };
 
@@ -23,6 +30,12 @@ const STATUS_LABEL: Record<ApiOrderDetail["status"], string> = {
   PENDING: "Pagamento pendente",
   APPROVED: "Pagamento aprovado",
   REJECTED: "Pagamento rejeitado",
+};
+
+const PAYMENT_METHOD_LABEL: Record<ApiPaymentMethod, string> = {
+  ONLINE_MP: "Mercado Pago",
+  CARTAO_PRESENCIAL: "Cartão na loja",
+  DINHEIRO: "Dinheiro",
 };
 
 const STATUS_COLOR: Record<ApiOrderDetail["status"], string> = {
@@ -104,10 +117,53 @@ export default function PedidoDetailScreen() {
         </View>
       </View>
 
+      <View className="mt-3 rounded-2xl bg-card p-4 shadow-sm">
+        <View className="flex-row justify-between">
+          <Text className="text-navy/70">Forma de pagamento</Text>
+          <Text className="text-navy">{PAYMENT_METHOD_LABEL[order.paymentMethod]}</Text>
+        </View>
+        {order.paymentMethod === "DINHEIRO" && order.cashTenderedCents != null && (
+          <View className="mt-1 flex-row justify-between">
+            <Text className="text-navy/70">Troco</Text>
+            <Text className="text-navy">
+              {formatPrice(order.cashTenderedCents - order.totalCents)} (pago com{" "}
+              {formatPrice(order.cashTenderedCents)})
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {order.status === "REJECTED" && Boolean(order.mpError) && (
+        <View className="mt-4 rounded-2xl bg-coral/10 p-4">
+          <View className="flex-row items-center gap-2">
+            <Ionicons name="close-circle-outline" size={18} color="#e63946" />
+            <Text className="flex-1 text-sm font-medium text-coral">Pagamento não foi concluído</Text>
+          </View>
+          <Text className="mt-1 text-xs text-navy/60">{order.mpError}</Text>
+        </View>
+      )}
+
+      {order.status === "APPROVED" && Boolean(order.trierError) && (
+        <View className="mt-4 rounded-2xl bg-coral/10 p-4">
+          <View className="flex-row items-center gap-2">
+            <Ionicons name="alert-circle-outline" size={18} color="#e63946" />
+            <Text className="flex-1 text-sm font-medium text-coral">
+              Esse pedido ainda não foi registrado na farmácia
+            </Text>
+          </View>
+          <Text className="mt-1 text-xs text-navy/60">{order.trierError}</Text>
+          {order.trierError?.includes("CPF") && (
+            <Link href="/perfil/meus-dados" className="mt-2 text-xs font-medium text-mint">
+              Completar CPF em Meus dados →
+            </Link>
+          )}
+        </View>
+      )}
+
       {order.status === "PENDING" && (
         <>
           <Text className="mt-4 text-sm text-navy/60">
-            Assim que o pagamento for confirmado, o status deste pedido é atualizado
+            Assim que o Mercado Pago confirmar o pagamento, o status deste pedido é atualizado
             automaticamente.
             {order.walletDiscountCents > 0 &&
               " O desconto de saldo mostrado é o combinado — o valor final é confirmado junto com o pagamento."}
@@ -121,7 +177,7 @@ export default function PedidoDetailScreen() {
               <ActivityIndicator color="#fff" />
             ) : (
               <Text className="font-semibold text-white">
-                Simular pagamento aprovado (modo de teste)
+                Simular confirmação do Mercado Pago (modo de teste)
               </Text>
             )}
           </Pressable>

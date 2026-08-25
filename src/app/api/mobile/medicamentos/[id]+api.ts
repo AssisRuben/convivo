@@ -4,6 +4,7 @@ import {
   deactivateMedicationTracking,
   listMedicationTrackingsForUser,
 } from "@/lib/medications/medicationCore";
+import { getCatalogProductByCodigo } from "@/lib/catalog/catalogDb";
 
 /**
  * Preço/quantidade do medicamento antes da recompra — recomprar.tsx
@@ -27,20 +28,27 @@ export async function GET(request: Request, { id }: Record<string, string>) {
     );
   }
 
-  const product = await prisma.product.findUnique({
-    where: { codigoProduto: tracking.codigoProduto },
-  });
-  if (!product) {
+  // Ao vivo, não o espelho local — preview precisa refletir preço/estoque
+  // reais, não o que ficou salvo da última vez que alguém tocou nesse
+  // produto (mesmo bug de frescor que existia antes desta mudança).
+  const catalogProduct = await getCatalogProductByCodigo(tracking.codigoProduto);
+  if (!catalogProduct) {
     return Response.json(
-      { error: "Produto não encontrado no catálogo — ainda não sincronizado com a Trier" },
+      { error: "Produto não encontrado no catálogo ou indisponível no momento" },
+      { status: 400 }
+    );
+  }
+  if (catalogProduct.estoqueAtual < tracking.totalUnits) {
+    return Response.json(
+      { error: `Estoque insuficiente — restam ${catalogProduct.estoqueAtual} unidade(s)` },
       { status: 400 }
     );
   }
 
   return Response.json({
-    productName: product.name,
+    productName: catalogProduct.nome,
     totalUnits: tracking.totalUnits,
-    subtotalCents: product.priceCents * tracking.totalUnits,
+    subtotalCents: catalogProduct.precoCents * tracking.totalUnits,
   });
 }
 

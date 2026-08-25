@@ -273,3 +273,35 @@ ALTER TABLE "Goal" ADD CONSTRAINT "Goal_userId_fkey" FOREIGN KEY ("userId") REFE
 ALTER TABLE "Goal" ADD CONSTRAINT "Goal_checklistItemId_fkey" FOREIGN KEY ("checklistItemId") REFERENCES "CareChecklistItem"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 ALTER TABLE "GoalTipDispatch" ADD CONSTRAINT "GoalTipDispatch_goalId_fkey" FOREIGN KEY ("goalId") REFERENCES "Goal"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- ============================================================
+-- 1f) Migration de Métodos de Pagamento
+-- Equivalente a prisma/migrations/20260820070000_add_payment_methods
+-- Mercado Pago online, cartão presencial e dinheiro (com troco) — ver
+-- src/lib/orders/mercadopago.ts e as mudanças em createOrderForItems/
+-- approveOrder/rejectOrder em src/lib/orders/orderCore.ts.
+-- ============================================================
+CREATE TYPE "PaymentMethod" AS ENUM ('ONLINE_MP', 'CARTAO_PRESENCIAL', 'DINHEIRO');
+
+ALTER TABLE "Order" ADD COLUMN "paymentMethod" "PaymentMethod" NOT NULL DEFAULT 'CARTAO_PRESENCIAL';
+ALTER TABLE "Order" ADD COLUMN "cashTenderedCents" INTEGER;
+ALTER TABLE "Order" ADD COLUMN "mpPreferenceId" TEXT;
+ALTER TABLE "Order" ADD COLUMN "mpStatus" TEXT;
+ALTER TABLE "Order" ADD COLUMN "mpError" TEXT;
+
+CREATE INDEX "Order_mpPreferenceId_idx" ON "Order"("mpPreferenceId");
+
+-- ============================================================
+-- 1g) Migration do Catálogo ao vivo (espelho write-through)
+-- Equivalente a prisma/migrations/20260820080000_live_catalog_mirror
+-- Product deixa de ser tabela curada: nome não é mais único (vem do
+-- banco externo da farmácia), description e category ficam opcionais
+-- (sem coluna equivalente/taxonomia própria na origem) — ver
+-- src/lib/catalog/catalogDb.ts e src/lib/catalog/catalogMirror.ts.
+-- ============================================================
+DROP INDEX "Product_name_key";
+ALTER TABLE "Product" ALTER COLUMN "description" DROP NOT NULL;
+ALTER TABLE "Product" ALTER COLUMN "category" DROP DEFAULT;
+ALTER TABLE "Product" ALTER COLUMN "category" TYPE TEXT USING "category"::TEXT;
+ALTER TABLE "Product" ALTER COLUMN "category" DROP NOT NULL;
+DROP TYPE "ProductCategory";

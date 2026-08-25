@@ -1,0 +1,51 @@
+import { getApiUserId } from "@/lib/apiAuth";
+import { getActivePromotions, listCatalogForBrowsing } from "@/lib/catalog/catalogDb";
+import { toBrowseView } from "@/lib/catalog/catalogView";
+import {
+  CATALOG_CATEGORIES,
+  CATALOG_CATEGORY_META,
+  grupoValuesForCategory,
+} from "@/constants/catalogCategories";
+
+const PRODUCTS_PER_SECTION = 12;
+
+// "Destaques" não tem nenhum sinal de popularidade na origem (sem
+// contador de venda, sem ranking) — é uma seleção simples e determinística
+// (mais recentemente atualizados), não "mais vendido". Documentado aqui
+// pra não parecer curadoria de verdade quando não é.
+export async function GET(request: Request) {
+  const userId = await getApiUserId(request);
+  if (!userId) {
+    return Response.json({ error: "Não autenticado" }, { status: 401 });
+  }
+
+  const [destaquesRaw, promocoesRaw] = await Promise.all([
+    listCatalogForBrowsing({ limit: PRODUCTS_PER_SECTION, orderBy: "updated_at" }),
+    getActivePromotions(PRODUCTS_PER_SECTION),
+  ]);
+
+  const categorias = await Promise.all(
+    CATALOG_CATEGORIES.filter((slug) => slug !== "OUTROS").map(async (slug) => {
+      const products = await listCatalogForBrowsing({
+        grupos: grupoValuesForCategory(slug),
+        limit: PRODUCTS_PER_SECTION,
+      });
+      return {
+        slug,
+        label: CATALOG_CATEGORY_META[slug].label,
+        products: await toBrowseView(products),
+      };
+    })
+  );
+
+  const promocoesView = await toBrowseView(promocoesRaw);
+
+  return Response.json({
+    destaques: await toBrowseView(destaquesRaw),
+    promocoes: promocoesView.map((item, i) => ({
+      ...item,
+      precoPromocionalCents: promocoesRaw[i].precoPromocionalCents,
+    })),
+    categorias: categorias.filter((c) => c.products.length > 0),
+  });
+}
