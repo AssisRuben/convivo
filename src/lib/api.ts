@@ -25,6 +25,7 @@ export type ApiProduct = {
   priceCents: number;
   imageUrl: string;
   stock: number;
+  category: string | null;
 };
 
 export type ApiCatalogCategorySlug =

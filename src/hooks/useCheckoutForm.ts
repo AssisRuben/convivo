@@ -29,6 +29,34 @@ export function useCheckoutForm() {
   const [paymentMethod, setPaymentMethod] = useState<CheckoutPaymentMethod>("CARTAO_PRESENCIAL");
   const [cashInput, setCashInput] = useState("");
   const [mercadoPagoAvailable, setMercadoPagoAvailable] = useState(false);
+  const [cepLookupLoading, setCepLookupLoading] = useState(false);
+
+  /**
+   * Mascara "00000-000" enquanto digita e, com os 8 dígitos completos,
+   * busca o endereço no ViaCEP (gratuito, sem chave, mantido pelos Correios
+   * via terceiro) pra preencher rua/bairro/cidade/UF sozinho — número
+   * continua manual, já que o CEP não sabe qual casa/apê é. Nunca lança:
+   * CEP inválido ou API fora do ar só deixa os campos como estavam, pro
+   * usuário preencher na mão.
+   */
+  const handleCepChange = useCallback((text: string) => {
+    const digits = text.replace(/\D/g, "").slice(0, 8);
+    setCep(digits.length > 5 ? `${digits.slice(0, 5)}-${digits.slice(5)}` : digits);
+
+    if (digits.length !== 8) return;
+    setCepLookupLoading(true);
+    fetch(`https://viacep.com.br/ws/${digits}/json/`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.erro) return;
+        setLogradouro(data.logradouro ?? "");
+        setBairro(data.bairro ?? "");
+        setCidade(data.localidade ?? "");
+        setEstado(data.uf ?? "");
+      })
+      .catch(() => {})
+      .finally(() => setCepLookupLoading(false));
+  }, []);
 
   const applyProfileDefaults = useCallback((profile: ApiProfile) => {
     setCep(profile.cep ?? "");
@@ -76,6 +104,8 @@ export function useCheckoutForm() {
     setFulfillmentType,
     cep,
     setCep,
+    handleCepChange,
+    cepLookupLoading,
     logradouro,
     setLogradouro,
     numero,

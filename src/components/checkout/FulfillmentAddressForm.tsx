@@ -1,4 +1,4 @@
-import { Pressable, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Pressable, Text, TextInput, View } from "react-native";
 import type { CheckoutFormState } from "@/hooks/useCheckoutForm";
 
 /**
@@ -39,12 +39,17 @@ export function FulfillmentAddressForm({ form }: { form: CheckoutFormState }) {
       {form.fulfillmentType === "DELIVERY" && (
         <View className="gap-2 rounded-2xl bg-card p-4 shadow-sm">
           <Text className="text-sm font-medium text-navy">Endereço de entrega</Text>
-          <TextInput
-            value={form.cep}
-            onChangeText={form.setCep}
-            placeholder="CEP"
-            className="rounded-xl border border-navy/10 p-3"
-          />
+          <View className="flex-row items-center gap-2">
+            <TextInput
+              value={form.cep}
+              onChangeText={form.handleCepChange}
+              placeholder="CEP"
+              keyboardType="numeric"
+              maxLength={9}
+              className="flex-1 rounded-xl border border-navy/10 p-3"
+            />
+            {form.cepLookupLoading && <ActivityIndicator size="small" color="#0b1e3d" />}
+          </View>
           <TextInput
             value={form.logradouro}
             onChangeText={form.setLogradouro}
@@ -74,8 +79,10 @@ export function FulfillmentAddressForm({ form }: { form: CheckoutFormState }) {
             />
             <TextInput
               value={form.estado}
-              onChangeText={form.setEstado}
+              onChangeText={(text) => form.setEstado(text.toUpperCase())}
               placeholder="UF"
+              maxLength={2}
+              autoCapitalize="characters"
               className="w-16 rounded-xl border border-navy/10 p-3"
             />
           </View>

@@ -3,7 +3,6 @@ import { Link, useFocusEffect, useRouter } from "expo-router";
 import {
   ActivityIndicator,
   FlatList,
-  Image,
   Pressable,
   Text,
   TextInput,
@@ -17,6 +16,7 @@ import { showAlert } from "@/lib/alert";
 import { useCheckoutForm } from "@/hooks/useCheckoutForm";
 import { FulfillmentAddressForm } from "@/components/checkout/FulfillmentAddressForm";
 import { PaymentMethodSelector } from "@/components/checkout/PaymentMethodSelector";
+import { ProductImage } from "@/components/catalog/ProductImage";
 
 function formatPrice(cents: number): string {
   return (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -155,7 +155,12 @@ export default function CarrinhoScreen() {
         }
         renderItem={({ item }) => (
           <View className="flex-row items-center gap-3 rounded-2xl bg-card p-3 shadow-sm">
-            <Image source={{ uri: item.product.imageUrl }} className="h-14 w-14 rounded-xl" />
+            <ProductImage
+              key={item.product.imageUrl}
+              uri={item.product.imageUrl}
+              category={item.product.category}
+              className="h-14 w-14 rounded-xl"
+            />
             <View className="flex-1">
               <Text className="font-semibold text-navy">{item.product.name}</Text>
               <Text className="text-navy/60">{formatPrice(item.product.priceCents)}</Text>

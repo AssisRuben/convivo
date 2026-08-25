@@ -69,7 +69,13 @@ export function grupoValuesForCategory(slug: CatalogCategorySlug): string[] {
 // espelho local em catalogMirror.ts/catalogView.ts), também é usado
 // direto no cliente (ProductImage.tsx) pra reagir a link de imagem
 // externa quebrado em tempo de render, sem depender de nada server-only.
-export function fallbackImageForCategory(category: CatalogCategorySlug): string {
-  const emoji = CATALOG_CATEGORY_META[category].emoji;
-  return `https://placehold.co/400x400/fafaf7/0b1e3d?text=${encodeURIComponent(emoji)}`;
+//
+// Aceita string solta (não só o slug tipado) porque Product.category no
+// espelho local é texto livre — produtos curados à mão de antes desta
+// migração (sem codigoProduto, órfãos da vitrine nova, mas ainda em
+// carrinhos/pedidos antigos) podem carregar um valor de categoria que já
+// não existe na taxonomia atual. Cai em OUTROS em vez de quebrar o render.
+export function fallbackImageForCategory(category: string | null | undefined): string {
+  const meta = CATALOG_CATEGORY_META[category as CatalogCategorySlug] ?? CATALOG_CATEGORY_META.OUTROS;
+  return `https://placehold.co/400x400/fafaf7/0b1e3d?text=${encodeURIComponent(meta.emoji)}`;
 }

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Image } from "react-native";
-import { fallbackImageForCategory, type CatalogCategorySlug } from "@/constants/catalogCategories";
+import { fallbackImageForCategory } from "@/constants/catalogCategories";
 
 /**
  * A URL de imagem do produto vem de fonte externa (Open Food/Products
@@ -20,7 +20,7 @@ export function ProductImage({
   className,
 }: {
   uri: string;
-  category: CatalogCategorySlug;
+  category: string | null | undefined;
   className?: string;
 }) {
   const [failed, setFailed] = useState(false);
