@@ -3,6 +3,7 @@ import { deleteItemAsync, getItemAsync, setItemAsync } from "@/lib/storage";
 import { apiFetch } from "@/lib/api";
 import { TOKEN_KEY, USER_KEY } from "@/lib/storageKeys";
 import { registerPushToken } from "@/lib/push/registerPushToken";
+import { registerForceLogoutHandler } from "@/lib/authEvents";
 
 export type AuthUser = { id: string; name: string; email: string };
 
@@ -81,6 +82,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(null);
     setUser(null);
   }
+
+  useEffect(() => {
+    registerForceLogoutHandler(logout);
+  });
 
   return (
     <AuthContext.Provider value={{ token, user, isLoading, login, register, logout }}>

@@ -1,10 +1,11 @@
 import { getApiUserId } from "@/lib/apiAuth";
 import { prisma } from "@/lib/prisma";
 import {
-  createOrderFromCart,
+  createOrderForItems,
   parseCashTenderedCents,
   parsePaymentMethod,
   type OrderAddressInput,
+  type OrderItemInput,
 } from "@/lib/orders/orderCore";
 import { parseWalletDiscountCents } from "@/lib/wallet";
 import type { FulfillmentType } from "@/lib/generated/prisma/client";
@@ -22,6 +23,27 @@ export async function GET(request: Request) {
   return Response.json({ orders });
 }
 
+function parseItems(raw: unknown): OrderItemInput[] | null {
+  if (!Array.isArray(raw) || raw.length === 0) return null;
+
+  const items: OrderItemInput[] = [];
+  for (const entry of raw) {
+    const codigoProduto = Number(entry?.codigoProduto);
+    const quantity = Number(entry?.quantity);
+    if (!Number.isFinite(codigoProduto) || !Number.isInteger(quantity) || quantity <= 0) {
+      return null;
+    }
+    items.push({ codigoProduto, quantity });
+  }
+  return items;
+}
+
+// O carrinho vive só no dispositivo (ver lib/cartState.tsx) — nunca é
+// persistido no servidor enquanto está sendo montado. Aqui é o único
+// ponto em que ele fala com o banco: recebe a lista final e cria o
+// pedido, resolvendo preço/estoque ao vivo (createOrderForItems), nunca
+// confiando no preço que o cliente mandou (nem manda, só codigoProduto e
+// quantidade).
 export async function POST(request: Request) {
   const userId = await getApiUserId(request);
   if (!userId) {
@@ -29,6 +51,11 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json().catch(() => null);
+  const items = parseItems(body?.items);
+  if (!items) {
+    return Response.json({ error: "Carrinho vazio ou inválido" }, { status: 400 });
+  }
+
   const paymentMethod = parsePaymentMethod(body?.paymentMethod);
   if (!paymentMethod) {
     return Response.json({ error: "Forma de pagamento inválida" }, { status: 400 });
@@ -39,7 +66,7 @@ export async function POST(request: Request) {
   const cashTenderedCents = parseCashTenderedCents(body?.cashTenderedCents);
 
   try {
-    const { order, checkoutUrl } = await createOrderFromCart(userId, {
+    const { order, checkoutUrl } = await createOrderForItems(userId, items, {
       fulfillmentType,
       address,
       requestedWalletDiscountCents: walletDiscountCents,

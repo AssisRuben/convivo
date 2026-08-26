@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
 import { ActivityIndicator, ScrollView, Text, View } from "react-native";
 import { apiFetch, type ApiCatalogHome } from "@/lib/api";
@@ -8,9 +8,17 @@ export default function CatalogScreen() {
   const router = useRouter();
   const [home, setHome] = useState<ApiCatalogHome | null>(null);
   const [loading, setLoading] = useState(true);
+  const loadedOnce = useRef(false);
 
   useFocusEffect(
     useCallback(() => {
+      // Só busca uma vez — sem isso, voltar de um /produto/[codigo]
+      // recarregava a vitrine inteira do zero a cada vez (perdia posição
+      // de scroll, mostrava spinner de novo), já que focus dispara toda
+      // vez que a aba volta a ficar em foco, não só na primeira entrada.
+      if (loadedOnce.current) return;
+      loadedOnce.current = true;
+
       let cancelled = false;
       setLoading(true);
       apiFetch("/api/mobile/catalog/home")

@@ -35,6 +35,7 @@ export async function GET(request: Request, { codigo }: Record<string, string>) 
       imageUrl: mirrored.imageUrl,
       stock: catalogProduct.estoqueAtual,
       category: mapGrupoToCategory(catalogProduct.grupo),
+      exigeReceita: catalogProduct.exigeReceita,
     },
   });
 }

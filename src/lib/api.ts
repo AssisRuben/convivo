@@ -1,5 +1,7 @@
+import { router } from "expo-router";
 import { getItemAsync } from "@/lib/storage";
 import { TOKEN_KEY } from "@/lib/storageKeys";
+import { triggerForceLogout } from "@/lib/authEvents";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL!;
 
@@ -7,6 +9,12 @@ const API_URL = process.env.EXPO_PUBLIC_API_URL!;
  * Wrapper de fetch centralizado — injeta o token JWT salvo (se houver) em
  * todo request. Usado por todas as telas que falam com o backend próprio
  * do app (rotas `+api.ts` do Expo Router, em src/app/api/mobile/**).
+ *
+ * Toda tela chama `res.json()` direto na resposta sem checar `res.ok` —
+ * um 401 (token inválido/expirado, ex: segredo do JWT trocado) virava
+ * `undefined` nos campos esperados e quebrava o componente ("Cannot read
+ * properties of undefined"). Tratado aqui uma vez só: 401 limpa a sessão
+ * guardada e manda pro login, em vez de cada tela precisar checar.
  */
 export async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
   const token = await getItemAsync(TOKEN_KEY);
@@ -15,18 +23,15 @@ export async function apiFetch(path: string, options: RequestInit = {}): Promise
   headers.set("Content-Type", "application/json");
   if (token) headers.set("Authorization", `Bearer ${token}`);
 
-  return fetch(`${API_URL}${path}`, { ...options, headers });
-}
+  const res = await fetch(`${API_URL}${path}`, { ...options, headers });
 
-export type ApiProduct = {
-  id: string;
-  name: string;
-  description: string;
-  priceCents: number;
-  imageUrl: string;
-  stock: number;
-  category: string | null;
-};
+  if (res.status === 401 && token) {
+    triggerForceLogout();
+    router.replace("/login");
+  }
+
+  return res;
+}
 
 export type ApiCatalogCategorySlug =
   | "FRALDAS"
@@ -61,18 +66,9 @@ export type ApiCatalogHome = {
   categorias: ApiCatalogCategorySection[];
 };
 
-export type ApiCatalogProductDetail = ApiCatalogItem & { description: string | null };
-
-export type ApiCartItem = {
-  id: string;
-  productId: string;
-  quantity: number;
-  product: ApiProduct;
-};
-
-export type ApiCart = {
-  id: string;
-  items: ApiCartItem[];
+export type ApiCatalogProductDetail = ApiCatalogItem & {
+  description: string | null;
+  exigeReceita: boolean | null;
 };
 
 export type ApiFeedComment = {

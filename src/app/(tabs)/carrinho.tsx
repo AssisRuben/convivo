@@ -11,12 +11,13 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
-import { apiFetch, type ApiCart } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 import { showAlert } from "@/lib/alert";
 import { useCheckoutForm } from "@/hooks/useCheckoutForm";
 import { FulfillmentAddressForm } from "@/components/checkout/FulfillmentAddressForm";
 import { PaymentMethodSelector } from "@/components/checkout/PaymentMethodSelector";
 import { ProductImage } from "@/components/catalog/ProductImage";
+import { useCart } from "@/lib/cartState";
 
 function formatPrice(cents: number): string {
   return (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -32,24 +33,24 @@ function parseReaisToCents(text: string): number {
 export default function CarrinhoScreen() {
   const router = useRouter();
   const form = useCheckoutForm();
-  const [cart, setCart] = useState<ApiCart | null>(null);
+  const { items, totalCents: total, setQuantity, clear } = useCart();
   const [saldoCents, setSaldoCents] = useState(0);
   const [hasCpf, setHasCpf] = useState(true);
   const [loading, setLoading] = useState(true);
-  const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [finishing, setFinishing] = useState(false);
   const [discountInput, setDiscountInput] = useState("");
 
+  // Carrinho em si vem de useCart() (local, instantâneo) — isso aqui só
+  // busca o que realmente precisa do servidor: saldo pra desconto, CPF
+  // cadastrado, disponibilidade do Mercado Pago.
   const load = useCallback(() => {
     setLoading(true);
     Promise.all([
-      apiFetch("/api/mobile/cart").then((res) => res.json()),
       apiFetch("/api/mobile/wallet").then((res) => res.json()),
       apiFetch("/api/mobile/profile").then((res) => res.json()),
       form.loadMercadoPagoAvailability(),
     ])
-      .then(([cartData, walletData, profileData]) => {
-        setCart(cartData.cart);
+      .then(([walletData, profileData]) => {
         setSaldoCents(walletData.saldoCents ?? 0);
         setHasCpf(Boolean(profileData.profile?.cpf));
         form.applyProfileDefaults(profileData.profile);
@@ -64,8 +65,6 @@ export default function CarrinhoScreen() {
     }, [load])
   );
 
-  const items = cart?.items ?? [];
-  const total = items.reduce((sum, item) => sum + item.product.priceCents * item.quantity, 0);
   const maxDiscountCents = Math.min(saldoCents, total);
   // Clamp é só pra um preview honesto na tela — o servidor recalcula e
   // trava o valor de qualquer forma (nunca confia no que o cliente manda).
@@ -75,41 +74,33 @@ export default function CarrinhoScreen() {
   );
   const totalCents = total - clampedDiscountCents;
 
-  async function changeQuantity(itemId: string, quantity: number) {
-    setUpdatingId(itemId);
-    try {
-      if (quantity <= 0) {
-        await apiFetch(`/api/mobile/cart/items/${itemId}`, { method: "DELETE" });
-      } else {
-        await apiFetch(`/api/mobile/cart/items/${itemId}`, {
-          method: "PATCH",
-          body: JSON.stringify({ quantity }),
-        });
-      }
-      load();
-    } finally {
-      setUpdatingId(null);
-    }
-  }
-
   async function finishOrder() {
     const validationError = form.validate(totalCents);
     if (validationError) {
       showAlert("Verifique os dados", validationError);
       return;
     }
+    if (items.length === 0) return;
 
     setFinishing(true);
     try {
       const res = await apiFetch("/api/mobile/pedidos", {
         method: "POST",
-        body: JSON.stringify(form.toRequestBody(clampedDiscountCents)),
+        body: JSON.stringify({
+          ...form.toRequestBody(clampedDiscountCents),
+          items: items.map((item) => ({
+            codigoProduto: item.codigoProduto,
+            quantity: item.quantity,
+          })),
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
         showAlert("Não foi possível fechar o pedido", data.error ?? "Tente novamente");
         return;
       }
+
+      clear();
 
       if (data.checkoutUrl) {
         await WebBrowser.openAuthSessionAsync(
@@ -135,7 +126,7 @@ export default function CarrinhoScreen() {
     <View className="flex-1 bg-cream">
       <FlatList
         data={items}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => String(item.codigoProduto)}
         contentContainerClassName="gap-3 p-4 pb-24"
         ListHeaderComponent={
           !hasCpf && items.length > 0 ? (
@@ -156,26 +147,24 @@ export default function CarrinhoScreen() {
         renderItem={({ item }) => (
           <View className="flex-row items-center gap-3 rounded-2xl bg-card p-3 shadow-sm">
             <ProductImage
-              key={item.product.imageUrl}
-              uri={item.product.imageUrl}
-              category={item.product.category}
+              key={item.imageUrl}
+              uri={item.imageUrl}
+              category={item.category}
               className="h-14 w-14 rounded-xl"
             />
             <View className="flex-1">
-              <Text className="font-semibold text-navy">{item.product.name}</Text>
-              <Text className="text-navy/60">{formatPrice(item.product.priceCents)}</Text>
+              <Text className="font-semibold text-navy">{item.name}</Text>
+              <Text className="text-navy/60">{formatPrice(item.priceCents)}</Text>
             </View>
             <Pressable
-              disabled={updatingId === item.id}
-              onPress={() => changeQuantity(item.id, item.quantity - 1)}
+              onPress={() => setQuantity(item.codigoProduto, item.quantity - 1)}
               className="h-8 w-8 items-center justify-center rounded-full bg-navy/5"
             >
               <Text className="text-lg text-navy">−</Text>
             </Pressable>
             <Text className="w-5 text-center text-navy">{item.quantity}</Text>
             <Pressable
-              disabled={updatingId === item.id}
-              onPress={() => changeQuantity(item.id, item.quantity + 1)}
+              onPress={() => setQuantity(item.codigoProduto, item.quantity + 1)}
               className="h-8 w-8 items-center justify-center rounded-full bg-navy/5"
             >
               <Text className="text-lg text-navy">+</Text>

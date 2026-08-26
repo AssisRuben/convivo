@@ -1,5 +1,4 @@
 import { prisma } from "@/lib/prisma";
-import { getOrCreateCart } from "@/lib/cart";
 import { efetuarVendaTrier, getPharmacyEndereco, isTrierConfigured } from "@/lib/orders/trier";
 import { createPreferenceForOrder, isMercadoPagoConfigured } from "@/lib/orders/mercadopago";
 import { checkLoyaltyStampReward } from "@/lib/loyalty/loyaltyCore";
@@ -83,10 +82,11 @@ export type CreateOrderResult = {
 };
 
 /**
- * Cria o pedido a partir de uma lista explícita de itens (não do carrinho
- * ao vivo) — usado tanto pelo checkout normal (`createOrderFromCart`,
- * abaixo) quanto pela recompra de 1 clique de medicamento, que não deve
- * mexer no carrinho de compras do usuário. É o único lugar que resolve
+ * Cria o pedido a partir de uma lista explícita de itens — o carrinho em
+ * si vive só no dispositivo (ver lib/cartState.tsx), nunca persistido no
+ * servidor; essa função é chamada tanto pelo checkout normal (a lista que
+ * o cliente monta localmente) quanto pela recompra de 1 clique de
+ * medicamento. É o único lugar que resolve
  * produto: busca cada item ao vivo no catálogo real (preço, estoque,
  * elegibilidade), nunca confia em preço/estoque que o chamador já tinha
  * em mãos de antes — inclusive protege a recompra de medicamento, que
@@ -250,29 +250,6 @@ export async function createOrderForItems(
     data: { mpPreferenceId: preference.preferenceId },
   });
   return { order, checkoutUrl: preference.checkoutUrl };
-}
-
-export async function createOrderFromCart(
-  userId: string,
-  options: CreateOrderOptions
-): Promise<CreateOrderResult> {
-  const cart = await getOrCreateCart(userId);
-  if (cart.items.length === 0) {
-    throw new Error("Carrinho vazio");
-  }
-
-  const items: OrderItemInput[] = cart.items.map((item) => {
-    if (item.product.codigoProduto == null) {
-      throw new Error(`Produto "${item.product.name}" não está mais disponível`);
-    }
-    return { codigoProduto: item.product.codigoProduto, quantity: item.quantity };
-  });
-
-  const result = await createOrderForItems(userId, items, options);
-
-  await prisma.cartItem.deleteMany({ where: { cartId: cart.id } });
-
-  return result;
 }
 
 type OrderWithRelations = Order & {

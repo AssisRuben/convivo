@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { fallbackImageForCategory, mapGrupoToCategory } from "@/constants/catalogCategories";
+import { mapGrupoToCategory } from "@/constants/catalogCategories";
 import { fetchProductImageUrl } from "@/lib/catalog/productImage";
 import type { CatalogProduct } from "@/lib/catalog/catalogDb";
 import type { Product } from "@/lib/generated/prisma/client";
@@ -23,10 +23,10 @@ export async function mirrorCatalogProduct(
     select: { imageUrl: true },
   });
 
+  // "" quando nenhuma fonte externa tem foto — ProductImage.tsx renderiza
+  // o ícone de categoria local nesse caso, não precisa de mais uma URL.
   const imageUrl =
-    existing?.imageUrl ||
-    (await fetchProductImageUrl(catalogProduct.codigoBarras)) ||
-    fallbackImageForCategory(category);
+    existing?.imageUrl || (await fetchProductImageUrl(catalogProduct.codigoBarras)) || "";
 
   return prisma.product.upsert({
     where: { codigoProduto: catalogProduct.codigo },

@@ -40,6 +40,9 @@ export type CatalogProduct = {
   percentualDesconto: number | null;
   custoMedioCents: number | null;
   estoqueAtual: number;
+  // null = produtos ainda não sincronizado pra esse item, receita não
+  // confirmada por aqui — informar/conferir no ato da entrega.
+  exigeReceita: boolean | null;
 };
 
 function centsFromReais(value: string | number | null): number {
@@ -48,17 +51,23 @@ function centsFromReais(value: string | number | null): number {
 }
 
 // SELECT + join comuns a listCatalogForBrowsing e getCatalogProductByCodigo
-// — INNER JOIN (não LEFT) de propósito: um produto sem linha em `produtos`
-// não tem como confirmar exige_receita = false, e o padrão seguro pra
-// elegibilidade desconhecida é excluir, não incluir.
+// — LEFT JOIN: a tabela `produtos` (preço atual/promoção/receita) ainda
+// não está sincronizada pelo n8n da farmácia (vazia por enquanto), então
+// depender dela via INNER excluiria o catálogo inteiro. Preço cai pro
+// `preco_venda` de produto_catalogo quando não há linha em `produtos`.
+// Receita não é mais filtro de exclusão aqui — decisão do usuário: a
+// exigência é informada e conferida no ato da entrega, não na vitrine.
+// Controlado (tipo_lista) continua excluído, é uma restrição diferente
+// (substância controlada), não relacionada a confirmar receita comum.
 const BASE_SELECT = `
   SELECT pc.codigo, pc.codigo_barras, pc.nome, pc.marca, pc.grupo,
-         p.preco_atual, p.preco_anterior, p.em_promocao, p.percentual_desconto,
+         COALESCE(p.preco_atual, pc.preco_venda) AS preco_atual,
+         p.preco_anterior, p.em_promocao, p.percentual_desconto,
+         p.exige_receita,
          pc.custo_medio, pc.estoque_atual
   FROM produto_catalogo pc
-  INNER JOIN produtos p ON p.codigo = pc.codigo
+  LEFT JOIN produtos p ON p.codigo = pc.codigo
   WHERE pc.estoque_atual > 0
-    AND p.exige_receita = false
     AND (pc.tipo_lista IS NULL OR pc.tipo_lista <> ALL($1::text[]))
 `;
 
@@ -70,8 +79,9 @@ type Row = {
   grupo: string | null;
   preco_atual: string;
   preco_anterior: string | null;
-  em_promocao: boolean;
+  em_promocao: boolean | null;
   percentual_desconto: string | null;
+  exige_receita: boolean | null;
   custo_medio: string | null;
   estoque_atual: number;
 };
@@ -85,10 +95,11 @@ function rowToCatalogProduct(row: Row): CatalogProduct {
     grupo: row.grupo,
     precoCents: centsFromReais(row.preco_atual),
     precoAnteriorCents: row.preco_anterior != null ? centsFromReais(row.preco_anterior) : null,
-    emPromocao: row.em_promocao,
+    emPromocao: row.em_promocao ?? false,
     percentualDesconto: row.percentual_desconto != null ? Number(row.percentual_desconto) : null,
     custoMedioCents: row.custo_medio != null ? centsFromReais(row.custo_medio) : null,
     estoqueAtual: row.estoque_atual,
+    exigeReceita: row.exige_receita,
   };
 }
 
@@ -106,7 +117,10 @@ export async function listCatalogForBrowsing(opts: {
 
   const limit = opts.limit ?? 20;
   const offset = opts.offset ?? 0;
-  const order = opts.orderBy === "preco_atual_desc" ? "p.preco_atual DESC" : "pc.updated_at DESC NULLS LAST";
+  // "preco_atual" aqui é o alias do SELECT (COALESCE já resolvido), não a
+  // coluna crua de `produtos` — que fica NULL pra quase tudo enquanto essa
+  // tabela não é sincronizada.
+  const order = opts.orderBy === "preco_atual_desc" ? "preco_atual DESC" : "pc.updated_at DESC NULLS LAST";
 
   const params: unknown[] = [CONTROLLED_TIPO_LISTA];
   let where = "";
@@ -148,16 +162,16 @@ export async function getActivePromotions(limit = 20): Promise<
 
   const res = await pool.query<Row & { preco_promocional: string }>(
     `SELECT pc.codigo, pc.codigo_barras, pc.nome, pc.marca, pc.grupo,
-            p.preco_atual, p.preco_anterior, p.em_promocao, p.percentual_desconto,
+            COALESCE(p.preco_atual, pc.preco_venda) AS preco_atual,
+            p.preco_anterior, p.em_promocao, p.percentual_desconto, p.exige_receita,
             pc.custo_medio, pc.estoque_atual, cp.preco_promocional
      FROM campanha_produtos cp
      INNER JOIN campanhas c ON c.id = cp.campanha_id
      INNER JOIN produto_catalogo pc ON pc.codigo = cp.codigo_produto
-     INNER JOIN produtos p ON p.codigo = pc.codigo
+     LEFT JOIN produtos p ON p.codigo = pc.codigo
      WHERE CURRENT_DATE BETWEEN cp.data_inicio AND cp.data_fim
        AND CURRENT_DATE BETWEEN c.data_inicio AND c.data_fim
        AND pc.estoque_atual > 0
-       AND p.exige_receita = false
        AND (pc.tipo_lista IS NULL OR pc.tipo_lista <> ALL($1::text[]))
      ORDER BY cp.data_fim ASC
      LIMIT $2`,

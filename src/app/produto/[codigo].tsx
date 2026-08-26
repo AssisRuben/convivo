@@ -10,6 +10,7 @@ import {
 import { apiFetch, type ApiCatalogProductDetail } from "@/lib/api";
 import { showAlert } from "@/lib/alert";
 import { ProductImage } from "@/components/catalog/ProductImage";
+import { useCart } from "@/lib/cartState";
 
 function formatPrice(cents: number): string {
   return (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -20,7 +21,7 @@ export default function ProdutoScreen() {
   const router = useRouter();
   const [product, setProduct] = useState<ApiCatalogProductDetail | null>(null);
   const [notFound, setNotFound] = useState(false);
-  const [adding, setAdding] = useState(false);
+  const { addItem } = useCart();
 
   useEffect(() => {
     apiFetch(`/api/mobile/catalog/produto/${codigo}`)
@@ -31,23 +32,27 @@ export default function ProdutoScreen() {
       });
   }, [codigo]);
 
-  async function addToCart() {
-    setAdding(true);
-    try {
-      const res = await apiFetch("/api/mobile/cart/items", {
-        method: "POST",
-        body: JSON.stringify({ codigoProduto: Number(codigo), quantity: 1 }),
-      });
-      if (!res.ok) throw new Error();
-      showAlert("Adicionado!", "Produto adicionado ao carrinho.", [
-        { text: "Continuar comprando", style: "cancel" },
-        { text: "Ver carrinho", onPress: () => router.push("/carrinho") },
-      ]);
-    } catch {
-      showAlert("Erro", "Não foi possível adicionar ao carrinho.");
-    } finally {
-      setAdding(false);
-    }
+  // Local, instantâneo — nada de chamada de rede aqui. O carrinho só fala
+  // com o servidor no "Finalizar pedido" (ver carrinho.tsx), que resolve
+  // preço/estoque ao vivo de qualquer forma — não tem risco em confiar no
+  // que já está na tela agora.
+  function addToCart() {
+    if (!product) return;
+    addItem(
+      {
+        codigoProduto: product.codigo,
+        name: product.name,
+        priceCents: product.priceCents,
+        imageUrl: product.imageUrl,
+        category: product.category,
+        stock: product.stock,
+      },
+      1
+    );
+    showAlert("Adicionado!", "Produto adicionado ao carrinho.", [
+      { text: "Continuar comprando", style: "cancel" },
+      { text: "Ver carrinho", onPress: () => router.push("/carrinho") },
+    ]);
   }
 
   if (notFound) {
@@ -85,19 +90,22 @@ export default function ProdutoScreen() {
           )}
         </View>
         {outOfStock && <Text className="text-sm font-medium text-coral">Esgotado no momento</Text>}
+        {product.exigeReceita && (
+          <View className="mt-1 flex-row items-center gap-1.5 rounded-lg bg-amber-500/10 px-3 py-2">
+            <Text className="text-xs font-medium text-amber-700">
+              Este produto exige receita — a conferência é feita no ato da entrega.
+            </Text>
+          </View>
+        )}
 
         <Pressable
-          disabled={adding || outOfStock}
+          disabled={outOfStock}
           onPress={addToCart}
           className="mt-4 items-center rounded-xl bg-navy p-3.5 disabled:opacity-50"
         >
-          {adding ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text className="font-semibold text-white">
-              {outOfStock ? "Indisponível" : "Adicionar ao carrinho"}
-            </Text>
-          )}
+          <Text className="font-semibold text-white">
+            {outOfStock ? "Indisponível" : "Adicionar ao carrinho"}
+          </Text>
         </Pressable>
       </View>
     </ScrollView>

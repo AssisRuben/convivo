@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { ActivityIndicator, FlatList, Pressable, Text, View } from "react-native";
 import { apiFetch, type ApiCatalogItem } from "@/lib/api";
@@ -14,6 +14,11 @@ export default function CategoriaScreen() {
   const [products, setProducts] = useState<ApiCatalogItem[]>([]);
   const [title, setTitle] = useState(label ?? "Categoria");
   const [loading, setLoading] = useState(true);
+  // Guarda o slug já carregado, não só "já carregou uma vez" — voltar de
+  // um /produto/[codigo] não deve recarregar (perde a rolagem à toa),
+  // mas trocar de categoria (mesma rota, slug diferente) precisa buscar
+  // de novo.
+  const loadedSlugRef = useRef<string | null>(null);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -26,7 +31,13 @@ export default function CategoriaScreen() {
       .finally(() => setLoading(false));
   }, [slug]);
 
-  useFocusEffect(load);
+  useFocusEffect(
+    useCallback(() => {
+      if (loadedSlugRef.current === slug) return;
+      loadedSlugRef.current = slug;
+      load();
+    }, [slug, load])
+  );
 
   if (loading) {
     return (

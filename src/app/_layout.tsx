@@ -5,7 +5,10 @@ import { Stack, router } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import * as Notifications from "expo-notifications";
 import { AuthProvider, useAuth } from "@/lib/auth";
-import { brandHeaderOptions } from "@/components/AppHeader";
+import { brandHeaderOptions, BackHeaderButton } from "@/components/AppHeader";
+import { ProfileDrawerProvider } from "@/lib/profileDrawer";
+import { ProfileDrawer } from "@/components/ProfileDrawer";
+import { CartProvider } from "@/lib/cartState";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -37,33 +40,46 @@ function RootNavigator() {
   if (isLoading) return null;
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="(auth)" />
-      <Stack.Screen name="(tabs)" />
-      <Stack.Screen
-        name="produto/[codigo]"
-        options={{
-          ...brandHeaderOptions,
-          headerShown: true,
-          // Empilhada por cima do app inteiro, fora das abas — a barra de
-          // baixo não aparece aqui, então sem seta de voltar o usuário
-          // fica sem nenhuma saída visível (diferente do resto do app,
-          // onde tocar na aba de novo sempre volta pro topo daquela aba).
-          headerBackVisible: true,
-        }}
-      />
-      <Stack.Screen
-        name="categoria/[slug]"
-        options={{ ...brandHeaderOptions, headerShown: true, headerBackVisible: true }}
-      />
-    </Stack>
+    <>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen
+          name="produto/[codigo]"
+          options={{
+            ...brandHeaderOptions,
+            headerShown: true,
+            // Empilhada por cima do app inteiro, fora das abas — a barra de
+            // baixo não aparece aqui, então sem seta de voltar o usuário
+            // fica sem nenhuma saída visível (diferente do resto do app,
+            // onde tocar na aba de novo sempre volta pro topo daquela aba).
+            headerBackVisible: true,
+            headerLeft: BackHeaderButton,
+          }}
+        />
+        <Stack.Screen
+          name="categoria/[slug]"
+          options={{
+            ...brandHeaderOptions,
+            headerShown: true,
+            headerBackVisible: true,
+            headerLeft: BackHeaderButton,
+          }}
+        />
+      </Stack>
+      <ProfileDrawer />
+    </>
   );
 }
 
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <RootNavigator />
+      <CartProvider>
+        <ProfileDrawerProvider>
+          <RootNavigator />
+        </ProfileDrawerProvider>
+      </CartProvider>
     </AuthProvider>
   );
 }

@@ -6,7 +6,11 @@ export default defineConfig({
   migrations: {
     path: "prisma/migrations",
   },
+  // O CLI (migrate/db execute) precisa da conexão direta — o pool em modo
+  // transaction (DATABASE_URL, porta 6543) trava em comandos que exigem
+  // advisory lock. O app em runtime (src/lib/prisma.ts) continua na
+  // conexão pooled normalmente.
   datasource: {
-    url: process.env["DATABASE_URL"],
+    url: process.env["DIRECT_URL"],
   },
 });

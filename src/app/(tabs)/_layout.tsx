@@ -2,9 +2,11 @@ import { Redirect, Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/lib/auth";
 import { brandHeaderOptions } from "@/components/AppHeader";
+import { useProfileDrawer } from "@/lib/profileDrawer";
 
 export default function TabsLayout() {
   const { token } = useAuth();
+  const { open: openProfileDrawer } = useProfileDrawer();
   if (!token) return <Redirect href="/login" />;
 
   return (
@@ -60,16 +62,15 @@ export default function TabsLayout() {
             <Ionicons name="person-outline" size={size} color={color} />
           ),
         }}
-        listeners={({ navigation }) => ({
-          // Tocar no ícone de Perfil sempre volta pro menu — mesmo depois
-          // de um push vindo de outra aba (ex: Carrinho → Pedido) ter
-          // deixado essa aba "fundo" numa tela aninhada. Sem isso, o reset
-          // padrão só acontece tocando duas vezes (aba já em foco).
+        listeners={{
+          // Tocar no ícone de Perfil abre o menu como painel lateral (não
+          // navega pra tela cheia) — fica por cima do que já estava na
+          // tela, então funciona de qualquer aba.
           tabPress: (e) => {
             e.preventDefault();
-            navigation.navigate("perfil", { screen: "index" });
+            openProfileDrawer();
           },
-        })}
+        }}
       />
       <Tabs.Screen
         name="carrinho"

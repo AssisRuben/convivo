@@ -1,6 +1,6 @@
 import { getApiUserId } from "@/lib/apiAuth";
 import { getActivePromotions, listCatalogForBrowsing } from "@/lib/catalog/catalogDb";
-import { toBrowseView } from "@/lib/catalog/catalogView";
+import { toBrowseViewEager } from "@/lib/catalog/catalogView";
 import {
   CATALOG_CATEGORIES,
   CATALOG_CATEGORY_META,
@@ -33,15 +33,15 @@ export async function GET(request: Request) {
       return {
         slug,
         label: CATALOG_CATEGORY_META[slug].label,
-        products: await toBrowseView(products),
+        products: await toBrowseViewEager(products),
       };
     })
   );
 
-  const promocoesView = await toBrowseView(promocoesRaw);
+  const promocoesView = await toBrowseViewEager(promocoesRaw);
 
   return Response.json({
-    destaques: await toBrowseView(destaquesRaw),
+    destaques: await toBrowseViewEager(destaquesRaw),
     promocoes: promocoesView.map((item, i) => ({
       ...item,
       precoPromocionalCents: promocoesRaw[i].precoPromocionalCents,
