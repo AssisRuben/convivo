@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useRouter, type Href } from "expo-router";
-import { Animated, Dimensions, Pressable, ScrollView, Text, View } from "react-native";
+import { Animated, Dimensions, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/lib/auth";
 import { useProfileDrawer } from "@/lib/profileDrawer";
@@ -70,7 +70,22 @@ export function ProfileDrawer() {
     // esquerda), deixando o app inteiro com scroll horizontal e conteúdo
     // cortado. Isolar aqui garante que nada do que acontece dentro do
     // drawer vaza pro layout do resto do app.
-    <View pointerEvents="box-none" style={{ position: "fixed", inset: 0, overflow: "hidden", zIndex: 40 }}>
+    //
+    // "fixed" só existe no CSS (react-native-web mapeia certinho) — no
+    // nativo (iOS/Android/Expo Go) `position` só aceita "absolute" ou
+    // "relative"; um valor inválido é descartado, o container encolhe pra
+    // tamanho zero e o overflow:hidden corta o drawer inteiro, mesmo com
+    // `isOpen` true e a animação rodando. Descoberto batendo no app real:
+    // sumia sem erro nenhum, funcionava normal no preview web.
+    <View
+      pointerEvents="box-none"
+      style={{
+        position: Platform.OS === "web" ? "fixed" : "absolute",
+        inset: 0,
+        overflow: "hidden",
+        zIndex: 40,
+      }}
+    >
       {isOpen && (
         <Pressable
           onPress={close}
