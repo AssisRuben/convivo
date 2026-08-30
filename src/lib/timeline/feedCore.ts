@@ -184,7 +184,7 @@ function interleave<T>(lists: T[][]): T[] {
 // some conforme o usuário rola. Por isso não é Math.random(): é semeado
 // por usuário+hora, então o resultado é estável durante uma sessão de
 // scroll mas muda de hora em hora (e de usuário pra usuário).
-function hashSeed(input: string): number {
+export function hashSeed(input: string): number {
   let hash = 0;
   for (let i = 0; i < input.length; i++) {
     hash = (Math.imul(31, hash) + input.charCodeAt(i)) | 0;
@@ -192,7 +192,7 @@ function hashSeed(input: string): number {
   return hash;
 }
 
-function seededShuffle<T>(items: T[], seed: number): T[] {
+export function seededShuffle<T>(items: T[], seed: number): T[] {
   const result = [...items];
   let state = seed | 0;
   const next = () => {

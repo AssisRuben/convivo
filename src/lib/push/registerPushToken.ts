@@ -1,6 +1,5 @@
 import { Platform } from "react-native";
-import Constants from "expo-constants";
-import * as Notifications from "expo-notifications";
+import Constants, { ExecutionEnvironment } from "expo-constants";
 import { apiFetch } from "@/lib/api";
 
 /**
@@ -8,11 +7,21 @@ import { apiFetch } from "@/lib/api";
  * sentido em dispositivo real (Expo push não existe no preview web usado
  * pra testar este projeto, por isso o guard de Platform). Nunca lança:
  * falha aqui não pode travar login/cadastro.
+ *
+ * `expo-notifications` é importado dinamicamente aqui dentro, não no topo
+ * do arquivo — o módulo tem efeito colateral no próprio import (registra
+ * um listener de token sozinho), e desde o SDK 53 o Expo Go no Android
+ * não suporta mais isso (removido, só funciona em development build) —
+ * só o import já derrubava o app inteiro no Expo Go antes de qualquer
+ * checagem em runtime ter chance de rodar.
  */
 export async function registerPushToken(): Promise<void> {
   if (Platform.OS === "web") return;
+  if (Constants.executionEnvironment === ExecutionEnvironment.StoreClient) return;
 
   try {
+    const Notifications = await import("expo-notifications");
+
     if (Platform.OS === "android") {
       await Notifications.setNotificationChannelAsync("default", {
         name: "Convivo",

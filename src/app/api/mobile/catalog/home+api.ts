@@ -24,24 +24,30 @@ export async function GET(request: Request) {
     getActivePromotions(PRODUCTS_PER_SECTION),
   ]);
 
-  const categorias = await Promise.all(
-    CATALOG_CATEGORIES.filter((slug) => slug !== "OUTROS").map(async (slug) => {
-      const products = await listCatalogForBrowsing({
-        grupos: grupoValuesForCategory(slug),
-        limit: PRODUCTS_PER_SECTION,
-      });
-      return {
-        slug,
-        label: CATALOG_CATEGORY_META[slug].label,
-        products: await toBrowseViewEager(products),
-      };
-    })
-  );
-
-  const promocoesView = await toBrowseViewEager(promocoesRaw);
+  // As três seções abaixo resolvem foto em paralelo entre si (não só
+  // dentro de cada uma) — antes rodavam em série (categorias, depois
+  // promoções, depois destaques), o que somava os tempos de resolução de
+  // imagem de cada seção em vez de sobrepor.
+  const [destaquesView, promocoesView, categorias] = await Promise.all([
+    toBrowseViewEager(destaquesRaw),
+    toBrowseViewEager(promocoesRaw),
+    Promise.all(
+      CATALOG_CATEGORIES.filter((slug) => slug !== "OUTROS").map(async (slug) => {
+        const products = await listCatalogForBrowsing({
+          grupos: grupoValuesForCategory(slug),
+          limit: PRODUCTS_PER_SECTION,
+        });
+        return {
+          slug,
+          label: CATALOG_CATEGORY_META[slug].label,
+          products: await toBrowseViewEager(products),
+        };
+      })
+    ),
+  ]);
 
   return Response.json({
-    destaques: await toBrowseViewEager(destaquesRaw),
+    destaques: destaquesView,
     promocoes: promocoesView.map((item, i) => ({
       ...item,
       precoPromocionalCents: promocoesRaw[i].precoPromocionalCents,

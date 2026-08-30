@@ -27,7 +27,7 @@ export type MedicationTrackingView = {
   daysUntilRunOut: number;
 };
 
-function validateInput(input: MedicationTrackingInput): void {
+export function validateInput(input: MedicationTrackingInput): void {
   if (!input.productName.trim()) throw new Error("Nome do medicamento é obrigatório");
   if (!Number.isInteger(input.totalUnits) || input.totalUnits <= 0) {
     throw new Error("Quantidade total inválida");

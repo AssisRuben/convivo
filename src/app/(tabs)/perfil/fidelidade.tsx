@@ -1,16 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useFocusEffect } from "expo-router";
-import { ActivityIndicator, ScrollView, Text, View } from "react-native";
+import { ActivityIndicator, Animated, ScrollView, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withDelay,
-  withSequence,
-  withSpring,
-  withTiming,
-} from "react-native-reanimated";
 import { apiFetch, type ApiLoyaltyProgress } from "@/lib/api";
 
 function formatPrice(cents: number): string {
@@ -20,29 +12,47 @@ function formatPrice(cents: number): string {
 /**
  * Um medalhão do cartão — os conquistados "giram e estouram" pra dentro em
  * cascata (delay por índice) toda vez que a tela ganha foco, imitando uma
- * moeda caindo no lugar. Os vazios ficam estáticos (nada a revelar).
+ * moeda caindo no lugar. Os vazios ficam estáticos (nada a revelar). Usa
+ * `Animated` nativo do react-native, não react-native-reanimated — esse
+ * exigia react-native-worklets, cujo binário nativo pré-compilado no
+ * Expo Go trava o app (crash confirmado batendo no dispositivo real,
+ * `libworklets.so` na pilha); `Animated` do core nunca teve esse problema.
  */
 function StampSlot({ index, filled }: { index: number; filled: boolean }) {
-  const scale = useSharedValue(filled ? 0 : 1);
-  const opacity = useSharedValue(filled ? 0 : 1);
-  const rotate = useSharedValue(filled ? -12 : 0);
+  const [scale] = useState(() => new Animated.Value(filled ? 0 : 1));
+  const [opacity] = useState(() => new Animated.Value(filled ? 0 : 1));
+  const [rotate] = useState(() => new Animated.Value(filled ? -12 : 0));
 
   useEffect(() => {
     if (!filled) return;
     const delay = index * 90;
-    scale.value = withDelay(
-      delay,
-      withSequence(withSpring(1.18, { damping: 6 }), withSpring(1, { damping: 9 }))
-    );
-    opacity.value = withDelay(delay, withTiming(1, { duration: 180 }));
-    rotate.value = withDelay(delay, withSpring(0, { damping: 8 }));
+    Animated.parallel([
+      Animated.sequence([
+        Animated.delay(delay),
+        Animated.sequence([
+          Animated.spring(scale, { toValue: 1.18, damping: 6, useNativeDriver: true }),
+          Animated.spring(scale, { toValue: 1, damping: 9, useNativeDriver: true }),
+        ]),
+      ]),
+      Animated.sequence([
+        Animated.delay(delay),
+        Animated.timing(opacity, { toValue: 1, duration: 180, useNativeDriver: true }),
+      ]),
+      Animated.sequence([
+        Animated.delay(delay),
+        Animated.spring(rotate, { toValue: 0, damping: 8, useNativeDriver: true }),
+      ]),
+    ]).start();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filled, index]);
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }, { rotate: `${rotate.value}deg` }],
-    opacity: opacity.value,
-  }));
+  const animatedStyle = {
+    transform: [
+      { scale },
+      { rotate: rotate.interpolate({ inputRange: [-12, 0], outputRange: ["-12deg", "0deg"] }) },
+    ],
+    opacity,
+  };
 
   if (!filled) {
     return (

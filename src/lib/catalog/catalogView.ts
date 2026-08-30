@@ -60,7 +60,20 @@ export async function toBrowseView(products: CatalogProduct[]): Promise<CatalogB
  * são baratas, toBrowseView reaproveita).
  */
 export async function toBrowseViewEager(products: CatalogProduct[]): Promise<CatalogBrowseItem[]> {
-  const mirrored = await Promise.all(products.map((product) => mirrorCatalogProduct(product)));
+  const codigos = products.map((p) => p.codigo);
+  const cached = codigos.length
+    ? await prisma.product.findMany({
+        where: { codigoProduto: { in: codigos } },
+        select: { codigoProduto: true, imageUrl: true },
+      })
+    : [];
+  const cachedImageByCodigo = new Map(cached.map((row) => [row.codigoProduto, row.imageUrl]));
+
+  const mirrored = await Promise.all(
+    products.map((product) =>
+      mirrorCatalogProduct(product, undefined, cachedImageByCodigo.get(product.codigo) ?? "")
+    )
+  );
 
   return products.map((product, i) => ({
     codigo: product.codigo,

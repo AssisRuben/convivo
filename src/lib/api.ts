@@ -1,9 +1,15 @@
+import { Platform } from "react-native";
 import { router } from "expo-router";
 import { getItemAsync } from "@/lib/storage";
 import { TOKEN_KEY } from "@/lib/storageKeys";
 import { triggerForceLogout } from "@/lib/authEvents";
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL!;
+// No web, a página e a API sempre são servidas pelo mesmo processo Metro —
+// usar path relativo garante same-origin não importa em qual host/porta o
+// navegador abriu a página, evitando o CORS que EXPO_PUBLIC_API_URL (fixo
+// no IP de LAN, pensado pro Expo Go num celular físico) causaria se
+// apontasse pra um host diferente do que serviu a página.
+const API_URL = Platform.OS === "web" ? "" : process.env.EXPO_PUBLIC_API_URL!;
 
 /**
  * Wrapper de fetch centralizado — injeta o token JWT salvo (se houver) em

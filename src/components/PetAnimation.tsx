@@ -1,13 +1,5 @@
-import { useEffect } from "react";
-import { Text, View } from "react-native";
-import Animated, {
-  Easing,
-  useAnimatedStyle,
-  useSharedValue,
-  withRepeat,
-  withSequence,
-  withTiming,
-} from "react-native-reanimated";
+import { useEffect, useState } from "react";
+import { Animated, Easing, Text, View } from "react-native";
 import { getBearTier, type PetGoalType } from "@/constants/petStages";
 
 const BASE_SIZE = 110;
@@ -21,8 +13,11 @@ const SPARKLES: Record<"hearts" | "stars", string[]> = {
  * O bichinho — emoji de urso (sem risco de licença) com troféu(s),
  * medalha e coroa se acumulando conforme a fase, imitando a progressão de
  * "personagem ganhando itens" pedida pelo usuário. Tudo posicionado de
- * forma absoluta ao redor de um grupo que balança inteiro via Reanimated
- * (assim os acessórios nunca se desalinham do personagem).
+ * forma absoluta ao redor de um grupo que balança inteiro. Usa o
+ * `Animated` nativo do react-native, não react-native-reanimated — esse
+ * exigia react-native-worklets, cujo binário nativo pré-compilado no
+ * Expo Go trava o app (crash confirmado batendo no dispositivo real,
+ * `libworklets.so` na pilha); `Animated` do core nunca teve esse problema.
  */
 export function PetAnimation({
   goalType,
@@ -32,22 +27,32 @@ export function PetAnimation({
   milestoneValue: number;
 }) {
   const tier = getBearTier(goalType, milestoneValue);
-  const bounce = useSharedValue(0);
+  const [bounce] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
-    bounce.value = withRepeat(
-      withSequence(
-        withTiming(-6, { duration: 900, easing: Easing.inOut(Easing.quad) }),
-        withTiming(0, { duration: 900, easing: Easing.inOut(Easing.quad) })
-      ),
-      -1,
-      true
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(bounce, {
+          toValue: -6,
+          duration: 900,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(bounce, {
+          toValue: 0,
+          duration: 900,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ])
     );
+    loop.start();
+    return () => loop.stop();
   }, [bounce]);
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: bounce.value }, { scale: tier.scale }],
-  }));
+  const animatedStyle = {
+    transform: [{ translateY: bounce }, { scale: tier.scale }],
+  };
 
   const medalEmoji = tier.medal === "gold" ? "🥇" : tier.medal === "bronze" ? "🥉" : null;
 

@@ -4,18 +4,27 @@
 // trier.ts/mercadopago.ts: nunca lança, null quando não encontrado em
 // nenhuma fonte.
 //
-// Ordem: Open Food Facts → Open Products Facts (gratuitas, sem chave —
-// mas TÊM rate limit na prática, mesmo sem token/quota documentada, ver
-// circuit breaker abaixo; mantidas por ONG, boa cobertura de alimento/
-// bebida/higiene, que é o que sobra no catálogo já que receita/controlado
-// é excluído) → Cosmos/Bluesoft (só se COSMOS_API_KEY estiver
-// configurada; plano gratuito da Cosmos é bem mais limitado ainda, por
-// isso vem por último, como reforço, não fonte principal).
+// Ordem: Kodebar (base CMED de medicamentos ANVISA integrada — a fonte
+// certa pra maioria deste catálogo, que é remédio, não comida; cota
+// diária baixa no plano grátis, por isso primeiro só faz sentido porque
+// falha rápido/barato quando esgota) → Open Food Facts → Open Products
+// Facts (gratuitas, sem chave — mas TÊM rate limit na prática, mesmo sem
+// token/quota documentada, ver circuit breaker abaixo; mantidas por ONG,
+// boa cobertura de alimento/bebida/higiene, que é o resto do catálogo) →
+// Cosmos/Bluesoft (só se COSMOS_API_KEY estiver configurada; plano
+// gratuito da Cosmos é bem mais limitado ainda, por isso vem por último,
+// como reforço, não fonte principal).
 const OPEN_FACTS_TIMEOUT_MS = 4000;
 const USER_AGENT = "Convivo-App/1.0";
 
+const KODEBAR_HOST = "kodebar.korvensistemas.com.br";
+
 export function isCosmosConfigured(): boolean {
   return Boolean(process.env.COSMOS_API_KEY);
+}
+
+export function isKodebarConfigured(): boolean {
+  return Boolean(process.env.KODEBAR_API_KEY);
 }
 
 // Circuit breaker em memória (por processo), por domínio/fonte — achado
@@ -35,8 +44,52 @@ function isRateLimited(host: string): boolean {
   return until != null && Date.now() < until;
 }
 
-function markRateLimited(host: string): void {
-  rateLimitedUntilByHost.set(host, Date.now() + RATE_LIMIT_COOLDOWN_MS);
+function markRateLimited(host: string, cooldownMs = RATE_LIMIT_COOLDOWN_MS): void {
+  rateLimitedUntilByHost.set(host, Date.now() + cooldownMs);
+}
+
+// Cota da Kodebar é diária (reseta à meia-noite), não uma janela curta —
+// diferente do 429 do Open Facts (rate limit de rajada, some em minutos),
+// insistir de 5 em 5 min só desperdiça chamadas até o dia virar. Cooldown
+// até a meia-noite local evita isso.
+function msUntilNextMidnight(): number {
+  const now = new Date();
+  const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0);
+  return nextMidnight.getTime() - now.getTime();
+}
+
+async function fetchFromKodebar(codigoBarras: string): Promise<string | null> {
+  const apiKey = process.env.KODEBAR_API_KEY;
+  if (!apiKey) return null;
+  if (isRateLimited(KODEBAR_HOST)) return null;
+
+  try {
+    const res = await fetch(
+      `https://${KODEBAR_HOST}/gtin/lookup?gtin=${encodeURIComponent(codigoBarras)}`,
+      {
+        headers: { "X-API-Key": apiKey },
+        signal: AbortSignal.timeout(OPEN_FACTS_TIMEOUT_MS),
+      }
+    );
+
+    if (res.status === 429) {
+      markRateLimited(KODEBAR_HOST, msUntilNextMidnight());
+      return null;
+    }
+    if (!res.ok) return null; // 401/404 inclusos — sem chave válida ou sem match, não é erro pra logar
+
+    const data = await res.json();
+    // quality_score da própria Kodebar: 0=miss, 1=fonte externa (auto-
+    // enriquecido, ninguém confirmou que a foto bate com o produto real),
+    // 2=cliente sem foto, 3=cliente com foto, 4=validado. Só aceita >= 3 —
+    // score 1 é justamente o tipo de match automático sem verificação que
+    // pode trazer a foto errada pro código de barras certo.
+    const qualityScore = typeof data?.quality_score === "number" ? data.quality_score : 0;
+    if (qualityScore < 3) return null;
+    return typeof data?.thumbnail === "string" && data.thumbnail ? data.thumbnail : null;
+  } catch {
+    return null;
+  }
 }
 
 async function fetchFromOpenFacts(domain: string, codigoBarras: string): Promise<string | null> {
@@ -96,6 +149,9 @@ async function fetchFromCosmos(codigoBarras: string): Promise<string | null> {
  */
 export async function fetchProductImageUrl(codigoBarras: string | null): Promise<string | null> {
   if (!codigoBarras) return null;
+
+  const fromKodebar = await fetchFromKodebar(codigoBarras);
+  if (fromKodebar) return fromKodebar;
 
   const fromOpenFoodFacts = await fetchFromOpenFacts("world.openfoodfacts.org", codigoBarras);
   if (fromOpenFoodFacts) return fromOpenFoodFacts;

@@ -13,20 +13,36 @@ import type { Product } from "@/lib/generated/prisma/client";
  */
 export async function mirrorCatalogProduct(
   catalogProduct: CatalogProduct,
-  stockOverride?: number
+  stockOverride?: number,
+  // Passado por chamadores em lote (toBrowseViewEager) que já buscaram a
+  // imagem cacheada de todos os itens numa única query — evita um
+  // findUnique por item quando resolvendo ~70 produtos de uma vez pra
+  // home. Chamadores de item único (detalhe, carrinho, pedido) deixam
+  // undefined e caem no findUnique de sempre.
+  knownCachedImageUrl?: string
 ): Promise<Product> {
   const category = mapGrupoToCategory(catalogProduct.grupo);
   const stock = stockOverride ?? catalogProduct.estoqueAtual;
 
-  const existing = await prisma.product.findUnique({
-    where: { codigoProduto: catalogProduct.codigo },
-    select: { imageUrl: true },
-  });
-
-  // "" quando nenhuma fonte externa tem foto — ProductImage.tsx renderiza
-  // o ícone de categoria local nesse caso, não precisa de mais uma URL.
+  // Medicamento nunca recebe foto de fonte externa/crowdsourced (Kodebar,
+  // Open Food/Products Facts, Cosmos) — código de barras casa com o
+  // produto certo, mas a FOTO anexada àquele código nessas bases pode
+  // estar errada (upload trocado por outro contribuinte), e mostrar o
+  // remédio errado é risco de segurança do paciente, não só estética.
+  // Nenhuma fonte oficial (ANVISA/CMED) publica foto por GTIN — pesquisado
+  // e confirmado, não existe alternativa confiável hoje. Ícone genérico é
+  // mais seguro que uma foto real do produto errado.
   const imageUrl =
-    existing?.imageUrl || (await fetchProductImageUrl(catalogProduct.codigoBarras)) || "";
+    category === "MEDICAMENTOS"
+      ? ""
+      : (knownCachedImageUrl !== undefined
+          ? knownCachedImageUrl
+          : (
+              await prisma.product.findUnique({
+                where: { codigoProduto: catalogProduct.codigo },
+                select: { imageUrl: true },
+              })
+            )?.imageUrl) || (await fetchProductImageUrl(catalogProduct.codigoBarras)) || "";
 
   return prisma.product.upsert({
     where: { codigoProduto: catalogProduct.codigo },
@@ -45,6 +61,11 @@ export async function mirrorCatalogProduct(
       costCents: catalogProduct.custoMedioCents,
       stock,
       category,
+      // Inclui imageUrl aqui (diferente de antes) pra permitir zerar foto
+      // de medicamento já espelhado antes dessa política existir — pra
+      // qualquer outra categoria o valor já é o cacheado/igual de sempre,
+      // não muda nada na prática.
+      imageUrl,
     },
   });
 }
