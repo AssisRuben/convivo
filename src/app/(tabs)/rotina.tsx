@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useFocusEffect } from "expo-router";
 import {
   ActivityIndicator,
@@ -17,6 +17,11 @@ import {
 } from "@/lib/api";
 import { CARE_CATEGORIES, CARE_CATEGORY_META, WEEKDAY_LABELS } from "@/constants/careCategories";
 import { showAlert } from "@/lib/alert";
+import { LoadingScreen } from "@/components/LoadingScreen";
+import { ROTINA_CACHE_KEY, fetchRotina } from "@/lib/tabPrefetch";
+import { getCached, loadCached, setCached } from "@/lib/tabDataCache";
+
+const cachedRotina = getCached<{ items: ApiChecklistItem[] }>(ROTINA_CACHE_KEY);
 
 type FormState = {
   id: string | null;
@@ -35,8 +40,8 @@ const EMPTY_FORM: FormState = {
 };
 
 export default function RotinaScreen() {
-  const [items, setItems] = useState<ApiChecklistItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [items, setItems] = useState<ApiChecklistItem[]>(cachedRotina?.items ?? []);
+  const [loading, setLoading] = useState(cachedRotina === undefined);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState | null>(null);
   const [saving, setSaving] = useState(false);
@@ -45,11 +50,8 @@ export default function RotinaScreen() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiFetch("/api/mobile/rotina");
-      if (res.ok) {
-        const data = await res.json();
-        setItems(data.items ?? []);
-      }
+      const data = await loadCached(ROTINA_CACHE_KEY, fetchRotina);
+      setItems(data.items ?? []);
     } finally {
       setLoading(false);
     }
@@ -59,9 +61,18 @@ export default function RotinaScreen() {
     useCallback(() => {
       if (loadedOnce.current) return;
       loadedOnce.current = true;
+      if (cachedRotina !== undefined) return; // já veio do cache/prefetch
       load();
     }, [load])
   );
+
+  // Espelha o state atual no cache — cobre a carga inicial e qualquer
+  // mutação (completar, salvar, remover) sem precisar sincronizar em
+  // cada handler.
+  useEffect(() => {
+    if (!loading) setCached(ROTINA_CACHE_KEY, { items });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items]);
 
   async function toggleComplete(item: ApiChecklistItem) {
     setBusyId(item.id);
@@ -135,11 +146,7 @@ export default function RotinaScreen() {
   }
 
   if (loading) {
-    return (
-      <View className="flex-1 items-center justify-center bg-cream">
-        <ActivityIndicator color="#0b1e3d" />
-      </View>
-    );
+    return <LoadingScreen />;
   }
 
   const grouped = CARE_CATEGORIES.map((category) => ({

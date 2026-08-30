@@ -8,6 +8,13 @@ const NINJA_FACTS_MAX_LIMIT = 30;
 const NEWSDATA_API_KEY = process.env.NEWSDATA_API_KEY;
 const NEWS_MAX_LIMIT = 10;
 
+// Nenhum fetch abaixo tinha timeout — achado depurando o feed demorando
+// demais pra abrir: uma fonte externa lenta/travada (BCB, NewsData,
+// Unsplash) prendia a resposta inteira, sem limite, já que o runtime não
+// aplica timeout nenhum por padrão num fetch simples. Com isso, o pior
+// caso de cada chamada fica preso nesse teto em vez de aberto.
+const EXTERNAL_TIMEOUT_MS = 4000;
+
 const FRASES_JSON_URL =
   "https://raw.githubusercontent.com/devmatheusguerra/frasesJSON/master/frases.json";
 const GOOGLE_NEWS_RSS_URL = "https://news.google.com/rss?hl=pt-BR&gl=BR&ceid=BR:pt-BR";
@@ -41,7 +48,7 @@ async function fetchNewsDataByCategory(category: string, limit: number): Promise
       url.searchParams.set("country", "br");
       url.searchParams.set("language", "pt");
       url.searchParams.set("category", category);
-      const res = await fetch(url);
+      const res = await fetch(url, { signal: AbortSignal.timeout(EXTERNAL_TIMEOUT_MS) });
       if (!res.ok) return [];
       const data = await res.json();
       const results: {
@@ -101,7 +108,9 @@ async function fetchNewsDataArticles(limit: number): Promise<NewsItem[]> {
 async function fetchGoogleNewsRss(limit: number): Promise<NewsItem[]> {
   return cached(`googlenews:${limit}`, 3600, async () => {
     try {
-      const res = await fetch(GOOGLE_NEWS_RSS_URL);
+      const res = await fetch(GOOGLE_NEWS_RSS_URL, {
+        signal: AbortSignal.timeout(EXTERNAL_TIMEOUT_MS),
+      });
       if (!res.ok) return [];
       const xml = await res.text();
 
@@ -155,7 +164,10 @@ export async function fetchNinjaFacts(limit = NINJA_FACTS_MAX_LIMIT): Promise<We
       try {
         const url = new URL("https://api.api-ninjas.com/v1/facts");
         url.searchParams.set("limit", String(cappedLimit));
-        const res = await fetch(url, { headers: { "X-Api-Key": NINJA_API_KEY } });
+        const res = await fetch(url, {
+          headers: { "X-Api-Key": NINJA_API_KEY },
+          signal: AbortSignal.timeout(EXTERNAL_TIMEOUT_MS),
+        });
         if (res.ok) {
           const data: { fact: string }[] = await res.json();
           if (Array.isArray(data) && data.length > 0) {
@@ -181,10 +193,17 @@ export async function fetchNinjaFacts(limit = NINJA_FACTS_MAX_LIMIT): Promise<We
 export async function fetchFinanceSnippet(): Promise<FinanceSnippet | null> {
   return cached("finance", 3600, async () => {
     try {
+      const fetchOpts = { signal: AbortSignal.timeout(EXTERNAL_TIMEOUT_MS) };
       const [cambioRes, selicRes, ipcaRes] = await Promise.all([
-        fetch("https://economia.awesomeapi.com.br/json/last/USD-BRL,EUR-BRL,BTC-BRL"),
-        fetch("https://api.bcb.gov.br/dados/serie/bcdata.sgs.432/dados/ultimos/1?formato=json"),
-        fetch("https://api.bcb.gov.br/dados/serie/bcdata.sgs.433/dados/ultimos/1?formato=json"),
+        fetch("https://economia.awesomeapi.com.br/json/last/USD-BRL,EUR-BRL,BTC-BRL", fetchOpts),
+        fetch(
+          "https://api.bcb.gov.br/dados/serie/bcdata.sgs.432/dados/ultimos/1?formato=json",
+          fetchOpts
+        ),
+        fetch(
+          "https://api.bcb.gov.br/dados/serie/bcdata.sgs.433/dados/ultimos/1?formato=json",
+          fetchOpts
+        ),
       ]);
 
       const parts: string[] = [];
@@ -236,7 +255,7 @@ export async function fetchFunQuote(): Promise<FunQuote | null> {
   // última busca, em vez de virar exatamente na virada do dia.
   return cached(`quote:${todayDateString()}`, 86400, async () => {
     try {
-      const res = await fetch(FRASES_JSON_URL);
+      const res = await fetch(FRASES_JSON_URL, { signal: AbortSignal.timeout(EXTERNAL_TIMEOUT_MS) });
       if (!res.ok) return null;
       const frases: { autor: string; frase: string }[] = await res.json();
       if (!Array.isArray(frases) || frases.length === 0) return null;
@@ -280,6 +299,7 @@ export async function fetchCoverImages(query: string, count: number): Promise<st
 
       const res = await fetch(url, {
         headers: { Authorization: `Client-ID ${UNSPLASH_ACCESS_KEY}` },
+        signal: AbortSignal.timeout(EXTERNAL_TIMEOUT_MS),
       });
       if (!res.ok) return [];
       const data = await res.json();

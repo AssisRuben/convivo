@@ -1,12 +1,23 @@
+import { useEffect } from "react";
 import { Redirect, Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/lib/auth";
 import { brandHeaderOptions } from "@/components/AppHeader";
 import { useProfileDrawer } from "@/lib/profileDrawer";
+import { prefetchAllTabs } from "@/lib/tabPrefetch";
 
 export default function TabsLayout() {
   const { token } = useAuth();
   const { open: openProfileDrawer } = useProfileDrawer();
+
+  // Dispara a busca das 4 abas em paralelo assim que o usuário loga, em
+  // vez de cada uma só buscar quando ganha foco pela primeira vez — troca
+  // de aba fica instantânea depois disso (ver tabPrefetch.ts). Roda uma
+  // vez por sessão de token (login/restauração), não a cada re-render.
+  useEffect(() => {
+    if (token) prefetchAllTabs();
+  }, [token]);
+
   if (!token) return <Redirect href="/login" />;
 
   return (

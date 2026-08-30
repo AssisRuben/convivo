@@ -1,17 +1,22 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useFocusEffect } from "expo-router";
 import { ActivityIndicator, FlatList, RefreshControl, Text, View } from "react-native";
 import { apiFetch, type ApiFeedItem } from "@/lib/api";
 import { FeedCard } from "@/components/FeedCard";
+import { LoadingScreen } from "@/components/LoadingScreen";
+import { FEED_INITIAL_CACHE_KEY, fetchFeedInitial } from "@/lib/tabPrefetch";
+import { getCached, loadCached, setCached } from "@/lib/tabDataCache";
 
 const PAGE_SIZE = 10;
 
+const cachedInitial = getCached<{ items: ApiFeedItem[]; hasMore: boolean }>(FEED_INITIAL_CACHE_KEY);
+
 export default function FeedScreen() {
-  const [items, setItems] = useState<ApiFeedItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [items, setItems] = useState<ApiFeedItem[]>(cachedInitial?.items ?? []);
+  const [loading, setLoading] = useState(cachedInitial === undefined);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(false);
+  const [hasMore, setHasMore] = useState(cachedInitial?.hasMore ?? false);
   const loadedOnce = useRef(false);
 
   const loadPage = useCallback(async (offset: number) => {
@@ -23,21 +28,29 @@ export default function FeedScreen() {
   const loadInitial = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await loadPage(0);
+      const data = await loadCached(FEED_INITIAL_CACHE_KEY, fetchFeedInitial);
       setItems(data.items);
       setHasMore(data.hasMore);
     } finally {
       setLoading(false);
     }
-  }, [loadPage]);
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
       if (loadedOnce.current) return;
       loadedOnce.current = true;
+      if (cachedInitial !== undefined) return; // já veio do cache/prefetch
       loadInitial();
     }, [loadInitial])
   );
+
+  // Espelha a página inicial no cache (não a paginação seguinte — só o
+  // que o prefetch/primeira carga populam faz sentido reaproveitar).
+  useEffect(() => {
+    if (!loading) setCached(FEED_INITIAL_CACHE_KEY, { items, hasMore });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, hasMore]);
 
   async function onRefresh() {
     setRefreshing(true);
@@ -102,11 +115,7 @@ export default function FeedScreen() {
   }
 
   if (loading) {
-    return (
-      <View className="flex-1 items-center justify-center bg-cream">
-        <ActivityIndicator color="#0b1e3d" />
-      </View>
-    );
+    return <LoadingScreen />;
   }
 
   return (

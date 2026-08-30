@@ -32,12 +32,19 @@ export async function dispatchDueRoutineReminders(now: Date = new Date()): Promi
 
   const items = await prisma.careChecklistItem.findMany({
     where: { active: true, timeOfDay: { not: null } },
-    include: { reminderDispatches: { where: { date: today } } },
+    include: {
+      reminderDispatches: { where: { date: today } },
+      completions: { where: { date: today } },
+    },
   });
 
   let sent = 0;
   for (const item of items) {
     if (item.reminderDispatches.length > 0) continue;
+    // Já marcado como feito hoje (ver toggleComplete em (tabs)/rotina.tsx)
+    // — lembrete existe pra não deixar esquecer, não faz sentido avisar de
+    // novo depois que a pessoa já confirmou que fez.
+    if (item.completions.length > 0) continue;
     if (item.daysOfWeek.length > 0 && !item.daysOfWeek.includes(weekday)) continue;
     if (!item.timeOfDay) continue;
 

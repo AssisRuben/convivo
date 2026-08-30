@@ -1,13 +1,18 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
-import { ActivityIndicator, ScrollView, Text, View } from "react-native";
-import { apiFetch, type ApiCatalogHome } from "@/lib/api";
+import { ScrollView, Text } from "react-native";
+import type { ApiCatalogHome } from "@/lib/api";
 import { ProductCarousel } from "@/components/catalog/ProductCarousel";
+import { LoadingScreen } from "@/components/LoadingScreen";
+import { CATALOG_HOME_CACHE_KEY, fetchCatalogHome } from "@/lib/tabPrefetch";
+import { getCached, loadCached, setCached } from "@/lib/tabDataCache";
 
 export default function CatalogScreen() {
   const router = useRouter();
-  const [home, setHome] = useState<ApiCatalogHome | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [home, setHome] = useState<ApiCatalogHome | null>(
+    () => getCached<ApiCatalogHome>(CATALOG_HOME_CACHE_KEY) ?? null
+  );
+  const [loading, setLoading] = useState(home === null);
   const loadedOnce = useRef(false);
 
   useFocusEffect(
@@ -18,11 +23,11 @@ export default function CatalogScreen() {
       // vez que a aba volta a ficar em foco, não só na primeira entrada.
       if (loadedOnce.current) return;
       loadedOnce.current = true;
+      if (home !== null) return; // já veio do cache/prefetch
 
       let cancelled = false;
       setLoading(true);
-      apiFetch("/api/mobile/catalog/home")
-        .then((res) => res.json())
+      loadCached(CATALOG_HOME_CACHE_KEY, fetchCatalogHome)
         .then((data) => {
           if (!cancelled) setHome(data);
         })
@@ -32,15 +37,19 @@ export default function CatalogScreen() {
       return () => {
         cancelled = true;
       };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
   );
 
+  // Espelha o state atual no cache — pega tanto a carga inicial quanto
+  // qualquer atualização futura, sem precisar sincronizar em cada lugar
+  // que muda `home`.
+  useEffect(() => {
+    if (home !== null) setCached(CATALOG_HOME_CACHE_KEY, home);
+  }, [home]);
+
   if (loading || !home) {
-    return (
-      <View className="flex-1 items-center justify-center bg-cream">
-        <ActivityIndicator color="#0b1e3d" />
-      </View>
-    );
+    return <LoadingScreen />;
   }
 
   const isEmpty =

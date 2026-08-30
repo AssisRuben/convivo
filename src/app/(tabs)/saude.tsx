@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { useFocusEffect } from "expo-router";
 import {
   ActivityIndicator,
@@ -10,28 +10,19 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Svg, { Circle, Polyline } from "react-native-svg";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, type ApiHealthMeasurement, type ApiHealthMeasurementType } from "@/lib/api";
 import { showAlert } from "@/lib/alert";
+import { LoadingScreen } from "@/components/LoadingScreen";
+import { SAUDE_CACHE_KEY, fetchSaude } from "@/lib/tabPrefetch";
+import { getCached, loadCached, setCached } from "@/lib/tabDataCache";
 
 const CHART_WIDTH = 140;
 const CHART_HEIGHT = 80;
 const CHART_PADDING = 8;
 
-type MeasurementType = "PRESSAO" | "PESO" | "GORDURA" | "GLICEMIA";
+const cachedSaude = getCached<{ measurements: ApiHealthMeasurement[] }>(SAUDE_CACHE_KEY);
 
-type ApiHealthMeasurement = {
-  id: string;
-  type: MeasurementType;
-  pressaoSistolica: number | null;
-  pressaoDiastolica: number | null;
-  pesoKg: number | null;
-  percentualGordura: number | null;
-  glicemiaMgDl: number | null;
-  local: string;
-  measuredAt: string;
-};
-
-const TYPE_LABELS: Record<MeasurementType, string> = {
+const TYPE_LABELS: Record<ApiHealthMeasurementType, string> = {
   PRESSAO: "Pressão",
   PESO: "Peso",
   GORDURA: "% Gordura",
@@ -67,56 +58,110 @@ function groupByDay(items: ApiHealthMeasurement[]): DayGroup[] {
   }));
 }
 
-function MiniLineChart({
-  title,
-  points,
-  color,
-}: {
-  title: string;
-  points: { date: string; value: number }[];
-  color: string;
-}) {
-  if (points.length === 0) return null;
-  const last = points.slice(-8);
-  const max = Math.max(...last.map((p) => p.value));
-  const min = Math.min(...last.map((p) => p.value));
+type ChartSeries = { label: string; color: string; points: { date: string; value: number }[] };
+
+function formatAxisValue(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+/**
+ * Aceita várias séries no mesmo gráfico (ex: sistólica + diastólica) —
+ * todas compartilham a mesma escala Y (min/max combinado de todas),
+ * senão cada linha normalizada separadamente esconderia a diferença real
+ * entre sistólica e diastólica, que é justamente o que importa ver.
+ * Eixo X mostra pelo menos 3 datas quando há pontos suficientes (antes
+ * só mostrava a primeira e a última, escondendo o meio da evolução).
+ */
+function MultiLineChart({ title, series }: { title: string; series: ChartSeries[] }) {
+  const nonEmpty = series.filter((s) => s.points.length > 0);
+  if (nonEmpty.length === 0) return null;
+
+  const lastBySeries = nonEmpty.map((s) => s.points.slice(-8));
+  const allValues = lastBySeries.flat().map((p) => p.value);
+  const max = Math.max(...allValues);
+  const min = Math.min(...allValues);
   const range = max - min || 1;
   const innerWidth = CHART_WIDTH - CHART_PADDING * 2;
   const innerHeight = CHART_HEIGHT - CHART_PADDING * 2;
-  const stepX = last.length > 1 ? innerWidth / (last.length - 1) : 0;
 
-  const coords = last.map((p, i) => ({
-    x: CHART_PADDING + i * stepX,
-    y: CHART_PADDING + (1 - (p.value - min) / range) * innerHeight,
+  // Assume que as séries compartilham as mesmas datas (sistólica e
+  // diastólica sempre vêm juntas na mesma medição) — usa a mais longa
+  // como referência pra posição X e pros rótulos do eixo.
+  const reference = lastBySeries.reduce((a, b) => (b.length > a.length ? b : a));
+  const stepX = reference.length > 1 ? innerWidth / (reference.length - 1) : 0;
+
+  const seriesCoords = nonEmpty.map((s, si) => ({
+    ...s,
+    coords: lastBySeries[si].map((p, i) => ({
+      x: CHART_PADDING + i * stepX,
+      y: CHART_PADDING + (1 - (p.value - min) / range) * innerHeight,
+    })),
   }));
+
+  const labelCount = Math.min(reference.length, 4);
+  const labelIndices = Array.from({ length: labelCount }, (_, i) =>
+    labelCount === 1 ? 0 : Math.round((i * (reference.length - 1)) / (labelCount - 1))
+  );
 
   return (
     <View className="w-[48%] rounded-2xl bg-card p-3 shadow-sm">
-      <Text className="mb-2 text-xs font-medium text-navy">{title}</Text>
-      <Svg width="100%" height={CHART_HEIGHT} viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}>
-        <Polyline
-          points={coords.map((c) => `${c.x},${c.y}`).join(" ")}
-          fill="none"
-          stroke={color}
-          strokeWidth={2}
-          strokeLinejoin="round"
-          strokeLinecap="round"
-        />
-        {coords.map((c, i) => (
-          <Circle key={i} cx={c.x} cy={c.y} r={2.5} fill={color} />
-        ))}
-      </Svg>
-      <View className="mt-1 flex-row justify-between">
-        <Text className="text-[10px] text-navy/40">{last[0]?.date}</Text>
-        <Text className="text-[10px] text-navy/40">{last[last.length - 1]?.date}</Text>
+      <View className="mb-2 flex-row items-center justify-between">
+        <Text className="text-xs font-medium text-navy">{title}</Text>
+        {nonEmpty.length > 1 && (
+          <View className="flex-row gap-2">
+            {nonEmpty.map((s) => (
+              <View key={s.label} className="flex-row items-center gap-1">
+                <View className="h-2 w-2 rounded-full" style={{ backgroundColor: s.color }} />
+                <Text className="text-[9px] text-navy/50">{s.label}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+      <View className="flex-row">
+        <View style={{ height: CHART_HEIGHT }} className="mr-1 justify-between">
+          <Text className="text-[9px] leading-[9px] text-navy/40">{formatAxisValue(max)}</Text>
+          <Text className="text-[9px] leading-[9px] text-navy/40">
+            {formatAxisValue((max + min) / 2)}
+          </Text>
+          <Text className="text-[9px] leading-[9px] text-navy/40">{formatAxisValue(min)}</Text>
+        </View>
+        <View className="flex-1">
+          <Svg width="100%" height={CHART_HEIGHT} viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}>
+            {seriesCoords.map((s) => (
+              <Fragment key={s.label}>
+                <Polyline
+                  points={s.coords.map((c) => `${c.x},${c.y}`).join(" ")}
+                  fill="none"
+                  stroke={s.color}
+                  strokeWidth={2}
+                  strokeLinejoin="round"
+                  strokeLinecap="round"
+                />
+                {s.coords.map((c, i) => (
+                  <Circle key={i} cx={c.x} cy={c.y} r={2.5} fill={s.color} />
+                ))}
+              </Fragment>
+            ))}
+          </Svg>
+          <View className="mt-1 flex-row justify-between">
+            {labelIndices.map((idx) => (
+              <Text key={idx} className="text-[10px] text-navy/40">
+                {reference[idx]?.date}
+              </Text>
+            ))}
+          </View>
+        </View>
       </View>
     </View>
   );
 }
 
 export default function SaudeScreen() {
-  const [measurements, setMeasurements] = useState<ApiHealthMeasurement[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [measurements, setMeasurements] = useState<ApiHealthMeasurement[]>(
+    cachedSaude?.measurements ?? []
+  );
+  const [loading, setLoading] = useState(cachedSaude === undefined);
   const [saving, setSaving] = useState(false);
   const loadedOnce = useRef(false);
 
@@ -130,11 +175,8 @@ export default function SaudeScreen() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiFetch("/api/mobile/saude");
-      if (res.ok) {
-        const data = await res.json();
-        setMeasurements(data.measurements ?? []);
-      }
+      const data = await loadCached(SAUDE_CACHE_KEY, fetchSaude);
+      setMeasurements(data.measurements ?? []);
     } finally {
       setLoading(false);
     }
@@ -144,9 +186,18 @@ export default function SaudeScreen() {
     useCallback(() => {
       if (loadedOnce.current) return;
       loadedOnce.current = true;
+      if (cachedSaude !== undefined) return; // já veio do cache/prefetch
       load();
     }, [load])
   );
+
+  // Espelha o state atual no cache — cobre a carga inicial e qualquer
+  // mutação (novo registro, remoção) sem precisar sincronizar em cada
+  // handler.
+  useEffect(() => {
+    if (!loading) setCached(SAUDE_CACHE_KEY, { measurements });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [measurements]);
 
   async function handleAdd() {
     const measuredAt = new Date().toISOString();
@@ -209,11 +260,7 @@ export default function SaudeScreen() {
   }
 
   if (loading) {
-    return (
-      <View className="flex-1 items-center justify-center bg-cream">
-        <ActivityIndicator color="#0b1e3d" />
-      </View>
-    );
+    return <LoadingScreen />;
   }
 
   const sorted = [...measurements].sort(
@@ -225,6 +272,9 @@ export default function SaudeScreen() {
   const sistolicaPoints = sorted
     .filter((m) => m.type === "PRESSAO" && m.pressaoSistolica != null)
     .map((m) => ({ date: shortDate(m.measuredAt), value: m.pressaoSistolica! }));
+  const diastolicaPoints = sorted
+    .filter((m) => m.type === "PRESSAO" && m.pressaoDiastolica != null)
+    .map((m) => ({ date: shortDate(m.measuredAt), value: m.pressaoDiastolica! }));
   const gorduraPoints = sorted
     .filter((m) => m.type === "GORDURA" && m.percentualGordura != null)
     .map((m) => ({ date: shortDate(m.measuredAt), value: m.percentualGordura! }));
@@ -238,15 +288,31 @@ export default function SaudeScreen() {
     <ScrollView className="flex-1 bg-cream" contentContainerClassName="p-4 pb-24">
       {(pesoPoints.length > 0 ||
         sistolicaPoints.length > 0 ||
+        diastolicaPoints.length > 0 ||
         gorduraPoints.length > 0 ||
         glicemiaPoints.length > 0) && (
         <>
           <Text className="mb-2 text-sm font-semibold text-navy">Evolução</Text>
           <View className="mb-5 flex-row flex-wrap justify-between gap-y-3">
-            <MiniLineChart title="Peso (kg)" points={pesoPoints} color="#e63946" />
-            <MiniLineChart title="Pressão sistólica" points={sistolicaPoints} color="#e63946" />
-            <MiniLineChart title="Gordura corporal (%)" points={gorduraPoints} color="#2ec4b6" />
-            <MiniLineChart title="Glicemia (mg/dL)" points={glicemiaPoints} color="#2ec4b6" />
+            <MultiLineChart
+              title="Peso (kg)"
+              series={[{ label: "Peso", color: "#e63946", points: pesoPoints }]}
+            />
+            <MultiLineChart
+              title="Pressão (mmHg)"
+              series={[
+                { label: "Sistólica", color: "#e63946", points: sistolicaPoints },
+                { label: "Diastólica", color: "#2ec4b6", points: diastolicaPoints },
+              ]}
+            />
+            <MultiLineChart
+              title="Gordura corporal (%)"
+              series={[{ label: "Gordura", color: "#2ec4b6", points: gorduraPoints }]}
+            />
+            <MultiLineChart
+              title="Glicemia (mg/dL)"
+              series={[{ label: "Glicemia", color: "#2ec4b6", points: glicemiaPoints }]}
+            />
           </View>
         </>
       )}

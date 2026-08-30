@@ -1,6 +1,6 @@
 import { getApiUserId } from "@/lib/apiAuth";
 import { getActivePromotions, listCatalogForBrowsing } from "@/lib/catalog/catalogDb";
-import { toBrowseViewEager } from "@/lib/catalog/catalogView";
+import { toBrowseView } from "@/lib/catalog/catalogView";
 import {
   CATALOG_CATEGORIES,
   CATALOG_CATEGORY_META,
@@ -24,13 +24,16 @@ export async function GET(request: Request) {
     getActivePromotions(PRODUCTS_PER_SECTION),
   ]);
 
-  // As três seções abaixo resolvem foto em paralelo entre si (não só
-  // dentro de cada uma) — antes rodavam em série (categorias, depois
-  // promoções, depois destaques), o que somava os tempos de resolução de
-  // imagem de cada seção em vez de sobrepor.
+  // toBrowseView é só leitura de cache local (sem chamar fonte de imagem
+  // externa) — a Home não pode mais esperar Kodebar/Open Facts/Cosmos
+  // resolverem foto de ~70 itens na hora (isso levava a tela a mais de
+  // 10s pra abrir). Foto de produto nunca visto ainda entra depois, via
+  // o backfill diário (scripts/backfill-product-images.ts) ou na hora
+  // que alguém abre o detalhe do produto (produto/[codigo]+api.ts, que
+  // continua resolvendo ao vivo — ali é só 1 item, não ~70).
   const [destaquesView, promocoesView, categorias] = await Promise.all([
-    toBrowseViewEager(destaquesRaw),
-    toBrowseViewEager(promocoesRaw),
+    toBrowseView(destaquesRaw),
+    toBrowseView(promocoesRaw),
     Promise.all(
       CATALOG_CATEGORIES.filter((slug) => slug !== "OUTROS").map(async (slug) => {
         const products = await listCatalogForBrowsing({
@@ -40,7 +43,7 @@ export async function GET(request: Request) {
         return {
           slug,
           label: CATALOG_CATEGORY_META[slug].label,
-          products: await toBrowseViewEager(products),
+          products: await toBrowseView(products),
         };
       })
     ),

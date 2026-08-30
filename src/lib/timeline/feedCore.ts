@@ -229,9 +229,15 @@ export async function getFeedPage(
       fetchNinjaFacts(),
       fetchDiverseCoverImages(30),
       fetchNews(),
+      // Desempate por id além de occurredAt — sem isso, dois eventos com o
+      // mesmo timestamp (comum quando várias conquistas disparam juntas)
+      // podiam vir em ordem relativa diferente entre duas chamadas
+      // separadas (achado via "two children with the same key" no feed:
+      // pool.slice(offset...) de duas chamadas com ordens diferentes faz
+      // o mesmo evento cair em duas páginas — e outro sumir).
       prisma.timelineEvent.findMany({
         where: { userId },
-        orderBy: { occurredAt: "desc" },
+        orderBy: [{ occurredAt: "desc" }, { id: "asc" }],
         take: 100,
       }),
       fetchFinanceSnippet(),

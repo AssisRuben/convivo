@@ -185,6 +185,20 @@ export type ApiGoal = {
   tipsSentCount: number;
 };
 
+export type ApiHealthMeasurementType = "PRESSAO" | "PESO" | "GORDURA" | "GLICEMIA";
+
+export type ApiHealthMeasurement = {
+  id: string;
+  type: ApiHealthMeasurementType;
+  pressaoSistolica: number | null;
+  pressaoDiastolica: number | null;
+  pesoKg: number | null;
+  percentualGordura: number | null;
+  glicemiaMgDl: number | null;
+  local: string;
+  measuredAt: string;
+};
+
 export type ApiGoalTip = { index: number; sentAt: string; text: string };
 
 export type ApiGoalDetail = ApiGoal & { tips: ApiGoalTip[] };

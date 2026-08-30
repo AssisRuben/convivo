@@ -1,6 +1,5 @@
 import { prisma } from "@/lib/prisma";
 import { mapGrupoToCategory, type CatalogCategorySlug } from "@/constants/catalogCategories";
-import { mirrorCatalogProduct } from "@/lib/catalog/catalogMirror";
 import type { CatalogProduct } from "@/lib/catalog/catalogDb";
 
 export type CatalogBrowseItem = {
@@ -47,42 +46,4 @@ export async function toBrowseView(products: CatalogProduct[]): Promise<CatalogB
       category,
     };
   });
-}
-
-/**
- * Mesma visão, mas espelhando de verdade (resolve foto agora, não só usa
- * cache) — só pra conjuntos pequenos e limitados (home: destaques/
- * promoções/prévia de categoria, no máximo ~12 itens cada). A vitrine
- * completa de uma categoria (paginada, potencialmente milhares de itens
- * ao rolar) continua em toBrowseView — resolver foto de tudo ali gastaria
- * a cota gratuita da Cosmos à toa. Aqui compensa: é a primeira impressão
- * do catálogo, e o resultado fica cacheado pra sempre (chamadas seguintes
- * são baratas, toBrowseView reaproveita).
- */
-export async function toBrowseViewEager(products: CatalogProduct[]): Promise<CatalogBrowseItem[]> {
-  const codigos = products.map((p) => p.codigo);
-  const cached = codigos.length
-    ? await prisma.product.findMany({
-        where: { codigoProduto: { in: codigos } },
-        select: { codigoProduto: true, imageUrl: true },
-      })
-    : [];
-  const cachedImageByCodigo = new Map(cached.map((row) => [row.codigoProduto, row.imageUrl]));
-
-  const mirrored = await Promise.all(
-    products.map((product) =>
-      mirrorCatalogProduct(product, undefined, cachedImageByCodigo.get(product.codigo) ?? "")
-    )
-  );
-
-  return products.map((product, i) => ({
-    codigo: product.codigo,
-    name: product.nome,
-    priceCents: product.precoCents,
-    precoAnteriorCents: product.precoAnteriorCents,
-    emPromocao: product.emPromocao,
-    imageUrl: mirrored[i].imageUrl,
-    stock: product.estoqueAtual,
-    category: mapGrupoToCategory(product.grupo),
-  }));
 }

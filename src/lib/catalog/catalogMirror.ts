@@ -13,13 +13,7 @@ import type { Product } from "@/lib/generated/prisma/client";
  */
 export async function mirrorCatalogProduct(
   catalogProduct: CatalogProduct,
-  stockOverride?: number,
-  // Passado por chamadores em lote (toBrowseViewEager) que já buscaram a
-  // imagem cacheada de todos os itens numa única query — evita um
-  // findUnique por item quando resolvendo ~70 produtos de uma vez pra
-  // home. Chamadores de item único (detalhe, carrinho, pedido) deixam
-  // undefined e caem no findUnique de sempre.
-  knownCachedImageUrl?: string
+  stockOverride?: number
 ): Promise<Product> {
   const category = mapGrupoToCategory(catalogProduct.grupo);
   const stock = stockOverride ?? catalogProduct.estoqueAtual;
@@ -35,14 +29,12 @@ export async function mirrorCatalogProduct(
   const imageUrl =
     category === "MEDICAMENTOS"
       ? ""
-      : (knownCachedImageUrl !== undefined
-          ? knownCachedImageUrl
-          : (
-              await prisma.product.findUnique({
-                where: { codigoProduto: catalogProduct.codigo },
-                select: { imageUrl: true },
-              })
-            )?.imageUrl) || (await fetchProductImageUrl(catalogProduct.codigoBarras)) || "";
+      : (
+          await prisma.product.findUnique({
+            where: { codigoProduto: catalogProduct.codigo },
+            select: { imageUrl: true },
+          })
+        )?.imageUrl || (await fetchProductImageUrl(catalogProduct.codigoBarras)) || "";
 
   return prisma.product.upsert({
     where: { codigoProduto: catalogProduct.codigo },
