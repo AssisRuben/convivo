@@ -101,7 +101,7 @@ export type ApiFeedItem = {
   /** Presente em posts de notícia: link pra matéria original. */
   sourceUrl?: string;
   /** Presentes só em conquistas de meta em escada (peso/rotina/indicação). */
-  goalType?: "PESO" | "ROTINA" | "INDICACAO";
+  goalType?: "PESO" | "ROTINA" | "INDICACAO" | "PRESSAO";
   milestoneValue?: number;
   stage?: number;
 };

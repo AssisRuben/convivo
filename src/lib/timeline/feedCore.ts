@@ -319,6 +319,14 @@ export async function getFeedPage(
     extra: getExtraInfo(event.type),
     dateLabel: formatDateLabel(event.occurredAt),
     shareState: event.sharedAt ? "shared" : "shareable",
+    // Sem isso, FeedCard nunca sabia que era uma conquista de meta (peso/
+    // rotina/indicação) — hasPet ficava sempre false e a postagem caía no
+    // layout de texto puro, sem foto nem bichinho, mesmo quando o evento
+    // tinha esses dados no banco. getAchievementsPage (Minhas Postagens)
+    // já fazia certo; essa função (feed principal) tinha ficado pra trás.
+    goalType: event.goalType ?? undefined,
+    milestoneValue: event.milestoneValue ?? undefined,
+    stage: event.stage ?? undefined,
   }));
 
   // Semente por usuário+hora: mesma ordem durante uma sessão de scroll

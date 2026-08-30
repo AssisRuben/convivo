@@ -5,7 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { captureRef } from "react-native-view-shot";
 import * as Sharing from "expo-sharing";
 import type { ApiFeedItem } from "@/lib/api";
-import { LADDER_LENGTHS, getBearTier, petProgressLabelFor } from "@/constants/petStages";
+import { LADDER_LENGTHS, getBearTier, getPetPhoto, petProgressLabelFor } from "@/constants/petStages";
 import { PetAnimation } from "@/components/PetAnimation";
 
 // Offsets sempre positivos, dentro da área visível do banner — o card
@@ -30,6 +30,7 @@ export function FeedCard({
   const cardRef = useRef<View>(null);
   const hasPet = item.goalType != null && item.stage != null && item.milestoneValue != null;
   const bearTier = hasPet ? getBearTier(item.goalType!, item.milestoneValue!) : null;
+  const petPhoto = hasPet ? getPetPhoto(item.goalType!, item.milestoneValue!) : undefined;
   const progressPercent = hasPet
     ? Math.round(((item.stage! + 1) / LADDER_LENGTHS[item.goalType!]) * 100)
     : 0;
@@ -62,7 +63,52 @@ export function FeedCard({
           : "overflow-hidden rounded-2xl bg-card shadow-sm"
       }
     >
-      {hasPet ? (
+      {hasPet && petPhoto ? (
+        // Degrau com foto real (ver getPetPhoto) — a foto vira o card
+        // inteiro, com título/progresso sobrepostos por cima de um
+        // degradê escuro. Altura fixa (não aspectRatio calculado) +
+        // resizeMode="contain": jeito mais simples possível de garantir
+        // que a foto inteira sempre aparece, sem cortar nada.
+        <View ref={cardRef} collapsable={false} style={{ position: "relative" }}>
+          <Image
+            source={petPhoto}
+            style={{ width: "100%", height: 220, backgroundColor: "#0b1e3d" }}
+            resizeMode="contain"
+          />
+          <LinearGradient
+            colors={["transparent", "rgba(2,6,23,0.15)", "rgba(2,6,23,0.9)"]}
+            locations={[0, 0.45, 1]}
+            style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
+          />
+          <View className="absolute right-3 top-3 h-9 w-9 items-center justify-center rounded-full bg-white/20">
+            <Text className="text-base">{bearTier!.badge}</Text>
+          </View>
+          <View className="absolute inset-x-4 bottom-3 gap-1">
+            <Text
+              className="text-2xl font-extrabold text-white"
+              style={{
+                textShadowColor: "rgba(0,0,0,0.5)",
+                textShadowOffset: { width: 0, height: 1 },
+                textShadowRadius: 4,
+              }}
+            >
+              {item.title}
+            </Text>
+            <Text className="text-[10px] font-semibold uppercase tracking-wide text-[#e2e8f0]">
+              {petProgressLabelFor(item.goalType!)}
+            </Text>
+            <View className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-white/20">
+              <View
+                className="h-full rounded-full bg-[#f59e0b]"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </View>
+            <Text className="self-end text-[9px] font-medium text-[#cbd5e1]">
+              Fase {bearTier!.label} · {progressPercent}% do objetivo
+            </Text>
+          </View>
+        </View>
+      ) : hasPet ? (
         <View ref={cardRef} collapsable={false}>
           <LinearGradient
             colors={["#134e4a", "#042f2e", "#020617"]}

@@ -23,8 +23,8 @@ export type TimelineFeedItem = {
   shareState?: "shareable" | "shared";
   /** Presente em posts de notícia: link pra matéria original. */
   sourceUrl?: string;
-  /** Presentes só em conquistas de meta em escada (peso/rotina/indicação). */
-  goalType?: "PESO" | "ROTINA" | "INDICACAO";
+  /** Presentes só em conquistas de meta em escada (peso/rotina/indicação/pressão). */
+  goalType?: "PESO" | "ROTINA" | "INDICACAO" | "PRESSAO";
   milestoneValue?: number;
   stage?: number;
 };

@@ -18,6 +18,10 @@ const SPARKLES: Record<"hearts" | "stars", string[]> = {
  * exigia react-native-worklets, cujo binário nativo pré-compilado no
  * Expo Go trava o app (crash confirmado batendo no dispositivo real,
  * `libworklets.so` na pilha); `Animated` do core nunca teve esse problema.
+ *
+ * Só renderiza esse bichinho pra degraus sem foto real (ver
+ * getPetPhoto em constants/petStages.ts) — quando existe foto, quem
+ * decide isso é o FeedCard, que assume o card inteiro nesse caso.
  */
 export function PetAnimation({
   goalType,
@@ -26,7 +30,6 @@ export function PetAnimation({
   goalType: PetGoalType;
   milestoneValue: number;
 }) {
-  const tier = getBearTier(goalType, milestoneValue);
   const [bounce] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
@@ -50,6 +53,7 @@ export function PetAnimation({
     return () => loop.stop();
   }, [bounce]);
 
+  const tier = getBearTier(goalType, milestoneValue);
   const animatedStyle = {
     transform: [{ translateY: bounce }, { scale: tier.scale }],
   };

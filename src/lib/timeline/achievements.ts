@@ -12,17 +12,23 @@ function startOfDay(date: Date): Date {
 }
 
 // Degraus da meta — quando um novo é cruzado, vira uma postagem em "Minhas
-// postagens" e o bichinho daquela meta evolui um estágio.
+// postagens" e o bichinho daquela meta evolui um estágio. PRESSAO é a
+// única decrescente (sistólica mais baixa = degrau mais difícil) — o
+// resto do mecanismo (recordMilestone, unique constraint) não precisa
+// saber disso, só quem decide quando um degrau foi cruzado (ver
+// checkPressureMilestones abaixo, que percorre a lista na ordem dela).
 export const GOAL_LADDERS: Record<GoalType, number[]> = {
   PESO: [2, 5, 8, 10, 12, 15, 18, 20, 25, 30],
   ROTINA: [30, 60, 90, 120],
   INDICACAO: [1, 3, 5, 10, 20],
+  PRESSAO: [140, 130, 120, 110],
 };
 
 const MILESTONE_EVENT_TYPE: Record<GoalType, TimelineEventType> = {
   PESO: "ACHIEVEMENT_WEIGHT_MILESTONE",
   ROTINA: "ACHIEVEMENT_ROUTINE_STREAK",
   INDICACAO: "ACHIEVEMENT_REFERRAL_MILESTONE",
+  PRESSAO: "ACHIEVEMENT_PRESSURE",
 };
 
 /**
@@ -180,54 +186,32 @@ export async function checkReferralMilestones(userId: string): Promise<void> {
 }
 
 /**
- * Mesma lógica do peso, mas exige que sistólica E diastólica tenham caído
- * em relação à leitura de ~7 dias antes.
+ * Escada de pressão, controlada só pela sistólica (a mais alta) — mesmo
+ * mecanismo de degrau único-por-usuário do peso/rotina/indicação, mas
+ * decrescente: 140 é o degrau mais fácil, 110 o mais difícil. Olha
+ * sempre a medição mais recente (não uma média nem "sustentado por N
+ * dias" — o pedido foi simples: se a sistólica de agora já está dentro
+ * da faixa do degrau, ele foi cruzado) e registra todo degrau já
+ * alcançado que ainda não tinha sido batido antes.
  */
-export async function checkPressureAchievement(userId: string): Promise<void> {
-  const measurements = await prisma.healthMeasurement.findMany({
-    where: {
-      userId,
-      type: "PRESSAO",
-      pressaoSistolica: { not: null },
-      pressaoDiastolica: { not: null },
-    },
+export async function checkPressureMilestones(userId: string): Promise<void> {
+  const latest = await prisma.healthMeasurement.findFirst({
+    where: { userId, type: "PRESSAO", pressaoSistolica: { not: null } },
     orderBy: { measuredAt: "desc" },
-    take: 20,
   });
-  if (measurements.length < 2) return;
+  if (!latest || latest.pressaoSistolica == null) return;
 
-  const latest = measurements[0];
-  const weekAgoTarget = daysBefore(latest.measuredAt, 7);
-  const candidate = measurements.slice(1).find((m) => m.measuredAt <= weekAgoTarget);
-  if (
-    !candidate ||
-    latest.pressaoSistolica == null ||
-    latest.pressaoDiastolica == null ||
-    candidate.pressaoSistolica == null ||
-    candidate.pressaoDiastolica == null
-  ) {
-    return;
-  }
-
-  const improved =
-    latest.pressaoSistolica < candidate.pressaoSistolica &&
-    latest.pressaoDiastolica < candidate.pressaoDiastolica;
-  if (!improved) return;
-
-  const recent = await prisma.timelineEvent.findFirst({
-    where: { userId, type: "ACHIEVEMENT_PRESSURE", occurredAt: { gte: weekAgoTarget } },
-  });
-  if (recent) return;
-
-  await prisma.timelineEvent.create({
-    data: {
+  for (const threshold of GOAL_LADDERS.PRESSAO) {
+    if (latest.pressaoSistolica > threshold) break;
+    await recordMilestone(
       userId,
-      type: "ACHIEVEMENT_PRESSURE",
-      title: "Pressão melhorando 🎉",
-      message: `Sua pressão foi de ${candidate.pressaoSistolica}/${candidate.pressaoDiastolica} para ${latest.pressaoSistolica}/${latest.pressaoDiastolica}.`,
-      occurredAt: latest.measuredAt,
-    },
-  });
+      "PRESSAO",
+      threshold,
+      `Pressão ${threshold} 🎉`,
+      `Sua pressão sistólica chegou a ${latest.pressaoSistolica}, dentro da faixa de ${threshold}. Seu bichinho está evoluindo!`,
+      latest.measuredAt
+    );
+  }
 }
 
 /**

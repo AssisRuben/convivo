@@ -301,6 +301,7 @@ enum GoalType {
   PESO
   ROTINA
   INDICACAO
+  PRESSAO
 }
 
 model TimelineEvent {
