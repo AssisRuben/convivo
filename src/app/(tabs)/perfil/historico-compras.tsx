@@ -28,6 +28,7 @@ export default function HistoricoComprasScreen() {
   const router = useRouter();
   const [items, setItems] = useState<ApiPurchaseHistoryItem[]>([]);
   const [needsContactInfo, setNeedsContactInfo] = useState(false);
+  const [needsVerification, setNeedsVerification] = useState(false);
   const [loading, setLoading] = useState(true);
   const loadedOnce = useRef(false);
 
@@ -39,6 +40,7 @@ export default function HistoricoComprasScreen() {
         const data = await res.json();
         setItems(data.items ?? []);
         setNeedsContactInfo(Boolean(data.needsContactInfo));
+        setNeedsVerification(Boolean(data.needsVerification));
       }
     } finally {
       setLoading(false);
@@ -66,7 +68,7 @@ export default function HistoricoComprasScreen() {
       <View className="flex-1 items-center justify-center gap-3 bg-cream p-6">
         <Ionicons name="document-text-outline" size={32} color="#0b1e3d60" />
         <Text className="text-center text-navy/70">
-          Cadastre seu CPF ou telefone em Meus dados pra ver seu histórico de compras na
+          Cadastre seu CPF e telefone em Meus dados pra ver seu histórico de compras na
           farmácia.
         </Text>
         <Pressable
@@ -74,6 +76,25 @@ export default function HistoricoComprasScreen() {
           className="mt-2 rounded-full bg-navy px-5 py-2.5"
         >
           <Text className="font-semibold text-white">Ir pra Meus dados</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  if (needsVerification) {
+    return (
+      <View className="flex-1 items-center justify-center gap-3 bg-cream p-6">
+        <Ionicons name="shield-checkmark-outline" size={32} color="#0b1e3d60" />
+        <Text className="text-center text-navy/70">
+          Por segurança, seu histórico só libera depois de confirmar que o CPF e o telefone
+          cadastrados são mesmo seus — o telefone precisa bater com o que a farmácia já tem no
+          cadastro.
+        </Text>
+        <Pressable
+          onPress={() => router.push("/perfil/meus-dados")}
+          className="mt-2 rounded-full bg-navy px-5 py-2.5"
+        >
+          <Text className="font-semibold text-white">Conferir CPF e telefone</Text>
         </Pressable>
       </View>
     );

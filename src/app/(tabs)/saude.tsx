@@ -2,6 +2,8 @@ import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { useFocusEffect } from "expo-router";
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -285,7 +287,11 @@ export default function SaudeScreen() {
   const days = groupByDay(measurements);
 
   return (
-    <ScrollView className="flex-1 bg-cream" contentContainerClassName="p-4 pb-24">
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      className="flex-1"
+    >
+      <ScrollView className="flex-1 bg-cream" contentContainerClassName="p-4 pb-24">
       {(pesoPoints.length > 0 ||
         sistolicaPoints.length > 0 ||
         diastolicaPoints.length > 0 ||
@@ -416,6 +422,7 @@ export default function SaudeScreen() {
           ))}
         </View>
       )}
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }

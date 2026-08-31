@@ -72,6 +72,7 @@ export function FulfillmentAddressForm({ form }: { form: CheckoutFormState }) {
               value={form.numero}
               onChangeText={form.setNumero}
               placeholder="Número"
+              keyboardType="numeric"
               className="flex-1 rounded-xl border border-navy/10 p-3"
             />
             <TextInput

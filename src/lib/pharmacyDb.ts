@@ -74,6 +74,37 @@ async function findCodigoCliente(
 }
 
 /**
+ * Confere se o telefone informado bate com o que a Trier já tem cadastrado
+ * pra esse CPF — prova de posse antes de liberar o histórico de compras
+ * (dado sensível de saúde, ver getPurchaseHistoryForUser). Sem isso,
+ * qualquer conta logada podia digitar o CPF de outra pessoa e ver a
+ * compra real dela; comparar contra um segundo dado independente (o
+ * telefone que a farmácia já tinha, não o que a pessoa acabou de digitar)
+ * é o que garante que não é só "eu sei o CPF de alguém". Mesmo critério
+ * de últimos 8 dígitos de findCodigoCliente.
+ */
+export async function verifyCpfPhoneMatch(cpf: string, phone: string): Promise<boolean> {
+  const pool = getPool();
+  if (!pool) return false;
+
+  const cpfDigits = onlyDigits(cpf);
+  const phoneSuffix = last8Digits(phone);
+  if (!cpfDigits || phoneSuffix.length !== 8) return false;
+
+  const res = await pool.query<{ codigo: number }>(
+    `SELECT codigo FROM clientes
+     WHERE regexp_replace(numero_cpf_cnpj, '\\D', '', 'g') = $1
+       AND (
+         right(regexp_replace(coalesce(fone, ''), '\\D', '', 'g'), 8) = $2
+         OR right(regexp_replace(coalesce(celular, ''), '\\D', '', 'g'), 8) = $2
+       )
+     LIMIT 1`,
+    [cpfDigits, phoneSuffix]
+  );
+  return res.rows.length > 0;
+}
+
+/**
  * Histórico de compras real do cliente na farmácia (loja física + qualquer
  * canal), casando por CPF com fallback pra telefone — ver `findCodigoCliente`.
  */

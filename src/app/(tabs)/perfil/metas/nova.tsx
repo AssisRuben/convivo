@@ -1,6 +1,15 @@
 import { useState } from "react";
 import { useRouter } from "expo-router";
-import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import {
   apiFetch,
   type ApiCareCategory,
@@ -86,7 +95,11 @@ export default function NovaMetaScreen() {
   }
 
   return (
-    <ScrollView className="flex-1 bg-cream" contentContainerClassName="gap-3 p-4 pb-24">
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      className="flex-1"
+    >
+      <ScrollView className="flex-1 bg-cream" contentContainerClassName="gap-3 p-4 pb-24">
       <Text className="text-lg font-bold text-navy">Nova meta</Text>
 
       <View className="flex-row gap-2">
@@ -200,6 +213,7 @@ export default function NovaMetaScreen() {
           <Text className="font-semibold text-white">Criar meta</Text>
         )}
       </Pressable>
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }

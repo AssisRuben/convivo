@@ -32,6 +32,17 @@ model User {
   phone     String?
   birthDate DateTime? @db.Date
 
+  // Confirma que o CPF é mesmo do dono da conta — casado contra o
+  // telefone já cadastrado na Trier pra esse CPF (não o que a pessoa
+  // digitou agora), ver verifyCpfPhoneMatch em lib/pharmacyDb.ts. Sem
+  // isso, qualquer conta logada podia digitar o CPF de outra pessoa e ver
+  // o histórico de compra real dela (dado de saúde) — getPurchaseHistoryForUser
+  // só é chamado depois de cpfVerifiedAt estar setado. Attempts/LockedUntil
+  // freiam tentativa de força bruta contra o telefone de um CPF.
+  cpfVerifiedAt              DateTime?
+  cpfVerificationAttempts    Int       @default(0)
+  cpfVerificationLockedUntil DateTime?
+
   // Endereço — mesmo formato do ClienteEcommerceIntegracaoDto da Trier,
   // pra não precisar converter na hora do checkout.
   cep         String?

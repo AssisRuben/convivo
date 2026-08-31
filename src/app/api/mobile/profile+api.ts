@@ -23,8 +23,8 @@ export async function PATCH(request: Request) {
   }
 
   try {
-    const profile = await updateProfileForUser(userId, body);
-    return Response.json({ profile });
+    const { profile, cpfVerification } = await updateProfileForUser(userId, body);
+    return Response.json({ profile, cpfVerification });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Não foi possível salvar";
     return Response.json({ error: message }, { status: 400 });

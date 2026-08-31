@@ -2,6 +2,8 @@ import { useCallback, useRef, useState } from "react";
 import { useFocusEffect } from "expo-router";
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   Share,
@@ -96,7 +98,11 @@ export default function IndicacaoScreen() {
   }
 
   return (
-    <ScrollView className="flex-1 bg-cream" contentContainerClassName="p-4 pb-24">
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      className="flex-1"
+    >
+      <ScrollView className="flex-1 bg-cream" contentContainerClassName="p-4 pb-24">
       <View className="items-center rounded-2xl bg-navy px-6 py-6">
         <Ionicons name="gift-outline" size={26} color="#fff" />
         <Text className="mt-1 text-lg font-semibold text-white">Indique e Ganhe</Text>
@@ -170,6 +176,7 @@ export default function IndicacaoScreen() {
           </Text>
         </View>
       )}
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }

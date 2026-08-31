@@ -1,6 +1,15 @@
 import { useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { apiFetch } from "@/lib/api";
 import { showAlert } from "@/lib/alert";
@@ -79,7 +88,11 @@ export default function ConfigurarMedicamentoScreen() {
   }
 
   return (
-    <ScrollView className="flex-1 bg-cream" contentContainerClassName="gap-3 p-4 pb-24">
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      className="flex-1"
+    >
+      <ScrollView className="flex-1 bg-cream" contentContainerClassName="gap-3 p-4 pb-24">
       <View className="rounded-2xl bg-card p-4 shadow-sm">
         <Text className="text-xs font-medium uppercase tracking-wide text-navy/50">
           Medicamento
@@ -148,6 +161,7 @@ export default function ConfigurarMedicamentoScreen() {
           <Text className="font-semibold text-white">Salvar e ativar lembretes</Text>
         )}
       </Pressable>
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }

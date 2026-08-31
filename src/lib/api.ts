@@ -116,6 +116,9 @@ export type ApiProfile = {
   name: string;
   email: string;
   cpf: string | null;
+  /** Confirmado contra o telefone cadastrado na Trier pra esse CPF — só
+   * true quando bateu; ver profileCore.ts. Campo calculado, não editável. */
+  cpfVerified: boolean;
   phone: string | null;
   birthDate: string | null;
   cep: string | null;
@@ -130,7 +133,9 @@ export type ApiProfile = {
   allergies: string[];
 };
 
-export type ProfileInput = Partial<Omit<ApiProfile, "id" | "email">>;
+export type ProfileInput = Partial<Omit<ApiProfile, "id" | "email" | "cpfVerified">>;
+
+export type CpfVerificationResult = "verified" | "mismatch" | "locked" | null;
 
 export type ApiLoyaltyProgress = {
   stampsFilled: number;

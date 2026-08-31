@@ -3,6 +3,8 @@ import { Link, useFocusEffect, useRouter } from "expo-router";
 import {
   ActivityIndicator,
   FlatList,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   Text,
   TextInput,
@@ -123,7 +125,10 @@ export default function CarrinhoScreen() {
   }
 
   return (
-    <View className="flex-1 bg-cream">
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      className="flex-1 bg-cream"
+    >
       <FlatList
         data={items}
         keyExtractor={(item) => String(item.codigoProduto)}
@@ -238,6 +243,6 @@ export default function CarrinhoScreen() {
           ) : null
         }
       />
-    </View>
+    </KeyboardAvoidingView>
   );
 }

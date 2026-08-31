@@ -1,6 +1,15 @@
 import { useEffect, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
 import { apiFetch, type ApiProfile } from "@/lib/api";
@@ -105,7 +114,11 @@ export default function RecomprarMedicamentoScreen() {
   }
 
   return (
-    <ScrollView className="flex-1 bg-cream" contentContainerClassName="gap-3 p-4 pb-24">
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      className="flex-1"
+    >
+      <ScrollView className="flex-1 bg-cream" contentContainerClassName="gap-3 p-4 pb-24">
       <Text className="text-lg font-bold text-navy">Confirmar recompra</Text>
 
       {infoError && (
@@ -177,6 +190,7 @@ export default function RecomprarMedicamentoScreen() {
           <Text className="font-semibold text-white">Confirmar pedido</Text>
         )}
       </Pressable>
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
