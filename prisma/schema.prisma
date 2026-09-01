@@ -43,6 +43,14 @@ model User {
   cpfVerificationAttempts    Int       @default(0)
   cpfVerificationLockedUntil DateTime?
 
+  // Exclusão de conta (LGPD) é anonimização, não DELETE de verdade — a
+  // linha continua existindo porque Order/WalletEntry/referredBy/
+  // vendedorId de OUTRAS pessoas apontam pra cá, e um hard delete
+  // quebraria o histórico delas. deletedAt marcado + campos de PII
+  // zerados em deleteUserAccount (lib/userAccount.ts); login e
+  // getApiUserId (lib/apiAuth.ts) rejeitam qualquer conta com isso setado.
+  deletedAt DateTime?
+
   // Endereço — mesmo formato do ClienteEcommerceIntegracaoDto da Trier,
   // pra não precisar converter na hora do checkout.
   cep         String?

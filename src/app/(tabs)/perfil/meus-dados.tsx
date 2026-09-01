@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { apiFetch, type ApiProfile, type CpfVerificationResult, type ProfileInput } from "@/lib/api";
 import { showAlert } from "@/lib/alert";
+import { useAuth } from "@/lib/auth";
 
 function onlyDigits(value: string): string {
   return value.replace(/\D/g, "");
@@ -112,6 +113,7 @@ function Field({
   keyboardType,
   autoCapitalize,
   maxLength,
+  secureTextEntry,
 }: {
   label: string;
   value: string;
@@ -120,6 +122,7 @@ function Field({
   keyboardType?: "default" | "numeric" | "phone-pad";
   autoCapitalize?: "none" | "characters" | "words";
   maxLength?: number;
+  secureTextEntry?: boolean;
 }) {
   return (
     <View className="gap-1">
@@ -131,6 +134,7 @@ function Field({
         keyboardType={keyboardType}
         autoCapitalize={autoCapitalize ?? "sentences"}
         maxLength={maxLength}
+        secureTextEntry={secureTextEntry}
         className="rounded-xl border border-navy/10 bg-card p-3"
       />
     </View>
@@ -142,11 +146,15 @@ function SectionTitle({ children }: { children: string }) {
 }
 
 export default function MeusDadosScreen() {
+  const { logout } = useAuth();
   const [form, setForm] = useState<FormState | null>(null);
   const [cpfVerified, setCpfVerified] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const loadedOnce = useRef(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -209,6 +217,36 @@ export default function MeusDadosScreen() {
       showAlert("Erro ao salvar", error instanceof Error ? error.message : undefined);
     } finally {
       setSaving(false);
+    }
+  }
+
+  function confirmDeleteAccount() {
+    showAlert(
+      "Excluir conta",
+      "Seus dados pessoais (endereço, saúde, CPF) são removidos permanentemente e você não poderá recuperar a conta. Pedidos e comissões continuam existindo de forma anônima, sem te identificar. Deseja continuar?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        { text: "Continuar", style: "destructive", onPress: () => setShowDeleteConfirm(true) },
+      ]
+    );
+  }
+
+  async function handleDeleteAccount() {
+    if (!deletePassword) return;
+    setDeleting(true);
+    try {
+      const res = await apiFetch("/api/mobile/account", {
+        method: "DELETE",
+        body: JSON.stringify({ password: deletePassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? "Não foi possível excluir a conta");
+      await logout();
+    } catch (error) {
+      showAlert("Erro", error instanceof Error ? error.message : undefined);
+      setDeletePassword("");
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -335,6 +373,56 @@ export default function MeusDadosScreen() {
           <Text className="font-semibold text-white">Salvar</Text>
         )}
       </Pressable>
+
+      <SectionTitle>Zona de risco</SectionTitle>
+      <View className="gap-3 rounded-2xl bg-coral/5 p-4">
+        <Text className="text-xs text-navy/60">
+          Excluir sua conta remove seus dados pessoais permanentemente. Essa ação não pode ser
+          desfeita.
+        </Text>
+
+        {showDeleteConfirm ? (
+          <View className="gap-2">
+            <Field
+              label="Confirme sua senha pra excluir"
+              value={deletePassword}
+              onChangeText={setDeletePassword}
+              placeholder="Sua senha"
+              secureTextEntry
+              autoCapitalize="none"
+            />
+            <View className="flex-row gap-2">
+              <Pressable
+                onPress={() => {
+                  setShowDeleteConfirm(false);
+                  setDeletePassword("");
+                }}
+                className="flex-1 items-center rounded-xl bg-navy/5 p-3"
+              >
+                <Text className="font-medium text-navy/70">Cancelar</Text>
+              </Pressable>
+              <Pressable
+                disabled={deleting || !deletePassword}
+                onPress={handleDeleteAccount}
+                className="flex-1 items-center rounded-xl bg-coral p-3 disabled:opacity-50"
+              >
+                {deleting ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text className="font-semibold text-white">Confirmar exclusão</Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        ) : (
+          <Pressable
+            onPress={confirmDeleteAccount}
+            className="items-center rounded-xl border border-coral/30 p-3"
+          >
+            <Text className="font-medium text-coral">Excluir minha conta</Text>
+          </Pressable>
+        )}
+      </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );

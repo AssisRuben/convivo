@@ -305,3 +305,20 @@ ALTER TABLE "Product" ALTER COLUMN "category" DROP DEFAULT;
 ALTER TABLE "Product" ALTER COLUMN "category" TYPE TEXT USING "category"::TEXT;
 ALTER TABLE "Product" ALTER COLUMN "category" DROP NOT NULL;
 DROP TYPE "ProductCategory";
+
+-- ============================================================
+-- 1h) Migration de Exclusão de Conta (LGPD)
+-- Equivalente a prisma/migrations/20260901000000_add_account_deletion
+-- Exclusão é anonimização, não DELETE — ver comentário no model User e
+-- deleteUserAccount em src/lib/userAccount.ts.
+--
+-- ATENÇÃO: as duas migrations mais recentes puxadas do remoto
+-- (20260830180000_add_pressure_goal_type e
+-- 20260830234500_add_cpf_verification) NÃO têm seção correspondente
+-- aqui neste arquivo — quem as aplicou não seguiu esse padrão, ou
+-- aplicou de outra forma. Confirme se elas já rodaram no banco antes
+-- de rodar esta seção, senão o schema.prisma não vai bater com o banco
+-- real (colunas cpfVerifiedAt/cpfVerificationAttempts/
+-- cpfVerificationLockedUntil e o valor PRESSAO do enum GoalType).
+-- ============================================================
+ALTER TABLE "User" ADD COLUMN "deletedAt" TIMESTAMP(3);

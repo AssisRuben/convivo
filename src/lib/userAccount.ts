@@ -116,8 +116,61 @@ export async function verifyUserCredentials(
   password: string
 ): Promise<User | null> {
   const user = await prisma.user.findUnique({ where: { email } });
-  if (!user) return null;
+  if (!user || user.deletedAt) return null;
 
   const valid = await bcrypt.compare(password, user.passwordHash);
   return valid ? user : null;
+}
+
+export type DeleteUserAccountResult = { ok: true } | { ok: false; error: string };
+
+/**
+ * Exclusão de conta (LGPD) — anonimiza em vez de apagar a linha, porque
+ * Order/WalletEntry/referredBy/vendedorId de OUTRAS pessoas apontam pra
+ * cá (ver comentário no model User). Exige a senha de novo — ação
+ * irreversível, não basta o token de sessão continuar válido.
+ */
+export async function deleteUserAccount(
+  userId: string,
+  password: string
+): Promise<DeleteUserAccountResult> {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user || user.deletedAt) {
+    return { ok: false, error: "Conta não encontrada" };
+  }
+
+  const valid = await bcrypt.compare(password, user.passwordHash);
+  if (!valid) {
+    return { ok: false, error: "Senha incorreta" };
+  }
+
+  const inertPasswordHash = await bcrypt.hash(generateCode() + generateCode(), 10);
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      deletedAt: new Date(),
+      name: "Usuário removido",
+      email: `deleted-${userId}@convivo.invalid`,
+      passwordHash: inertPasswordHash,
+      cpf: null,
+      cpfVerifiedAt: null,
+      cpfVerificationAttempts: 0,
+      cpfVerificationLockedUntil: null,
+      phone: null,
+      birthDate: null,
+      cep: null,
+      estado: null,
+      cidade: null,
+      logradouro: null,
+      numero: null,
+      bairro: null,
+      complemento: null,
+      heightCm: null,
+      conditions: [],
+      allergies: [],
+    },
+  });
+
+  return { ok: true };
 }
