@@ -1,0 +1,29 @@
+name: Deploy migrations
+
+# Só dispara quando uma migration nova entra em main — substitui colar
+# SQL manualmente no Supabase Editor, mas só a partir de agora: as
+# migrations já aplicadas manualmente antes disso não são reaplicadas
+# (`prisma migrate deploy` só roda o que ainda não está marcado como
+# aplicado na tabela _prisma_migrations do banco).
+on:
+  push:
+    branches: [main]
+    paths:
+      - "prisma/migrations/**"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
