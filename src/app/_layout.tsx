@@ -1,6 +1,6 @@
 import "../global.css";
 import { useEffect } from "react";
-import { Platform } from "react-native";
+import { Platform, Pressable, Text, View } from "react-native";
 import { Stack, router } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import Constants, { ExecutionEnvironment } from "expo-constants";
@@ -9,8 +9,28 @@ import { brandHeaderOptions, BackHeaderButton } from "@/components/AppHeader";
 import { ProfileDrawerProvider } from "@/lib/profileDrawer";
 import { ProfileDrawer } from "@/components/ProfileDrawer";
 import { CartProvider } from "@/lib/cartState";
+import { initMonitoring, Sentry } from "@/lib/monitoring";
 
 SplashScreen.preventAutoHideAsync();
+
+// O mais cedo possível — antes de qualquer outro código do app rodar,
+// pra pegar erro de inicialização também, não só o que acontece depois
+// que a árvore já montou.
+initMonitoring();
+
+function CrashFallback({ resetError }: { resetError: () => void }) {
+  return (
+    <View className="flex-1 items-center justify-center gap-3 bg-cream p-6">
+      <Text className="text-center text-lg font-semibold text-navy">Algo deu errado</Text>
+      <Text className="text-center text-sm text-navy/60">
+        Já registramos o problema. Tente de novo — se continuar, feche e abra o app.
+      </Text>
+      <Pressable onPress={resetError} className="mt-2 rounded-full bg-navy px-5 py-2.5">
+        <Text className="text-sm font-semibold text-white">Tentar de novo</Text>
+      </Pressable>
+    </View>
+  );
+}
 
 // Toque numa notificação (lembrete de rotina, aviso de remédio acabando)
 // leva direto pra tela relevante — só em dispositivo real, Expo push não
@@ -81,7 +101,7 @@ function RootNavigator() {
   );
 }
 
-export default function RootLayout() {
+function RootLayout() {
   return (
     <AuthProvider>
       <CartProvider>
@@ -90,5 +110,13 @@ export default function RootLayout() {
         </ProfileDrawerProvider>
       </CartProvider>
     </AuthProvider>
+  );
+}
+
+export default function RootLayoutWithCrashReporting() {
+  return (
+    <Sentry.ErrorBoundary fallback={CrashFallback}>
+      <RootLayout />
+    </Sentry.ErrorBoundary>
   );
 }
