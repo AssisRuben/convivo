@@ -72,7 +72,8 @@
     "test": "vitest run",
     "backfill:images": "tsx --env-file=.env.local scripts/backfill-product-images.ts",
     "build:server": "expo export -p web",
-    "start:server": "node server.js"
+    "start:server": "node server.js",
+    "eas-build-post-install": "./eas-build-post-install.sh"
   },
   "private": true
 }
