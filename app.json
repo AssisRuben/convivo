@@ -3,6 +3,12 @@
     "name": "Convivo",
     "slug": "convivo",
     "version": "1.0.0",
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/42253a5a-6440-4b4b-b0d7-02719c6fbc5b"
+    },
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "convivo",

@@ -7,8 +7,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
   type PressableProps,
   type ViewStyle,
@@ -49,12 +51,14 @@ function PulsingMark() {
     <Animated.View
       style={{
         transform: [{ scale }],
-        shadowColor: "#f59e0b",
+        shadowColor: "#e63946",
         shadowOffset: { width: 0, height: 0 },
         shadowOpacity: 0.6,
         shadowRadius: 16,
+        alignItems: "center",
+        justifyContent: "center",
       }}
-      className="h-16 w-16 items-center justify-center rounded-full bg-white/10"
+      className="h-16 w-16 rounded-full bg-white/10"
     >
       <Text style={{ fontSize: 30 }}>✨</Text>
     </Animated.View>
@@ -86,6 +90,7 @@ function PressableScale({
 
 export default function LoginScreen() {
   const { login } = useAuth();
+  const { height: windowHeight } = useWindowDimensions();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -124,124 +129,162 @@ export default function LoginScreen() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : undefined}
-      className="flex-1 bg-cream"
+      style={{ flex: 1 }}
     >
-      <LinearGradient
-        colors={["#0b1e3d", "#16305c", "#0b1e3d"]}
-        start={{ x: 0.1, y: 0 }}
-        end={{ x: 0.9, y: 1 }}
-        className="overflow-hidden pb-16 pt-24"
-        style={{ alignItems: "center" }}
+      {/* minHeight na dimensão real da janela em vez de só confiar em
+       * flex:1 — no web, sem a cadeia html/body/#root com altura 100%
+       * (fora do nosso controle direto), flex:1 não tem o que encher e o
+       * conteúdo encolhe pro topo, deixando vazio embaixo (era isso que
+       * causava o card grudado no topo com espaço morto atrás dele). */}
+      <ScrollView
+        className="bg-cream"
+        contentContainerStyle={{ minHeight: windowHeight, flexGrow: 1, alignItems: "center" }}
+        keyboardShouldPersistTaps="handled"
       >
-        {/* Faixa de brilho diagonal — mesmo acabamento usado no cartão
-         * fidelidade, reaproveitado aqui pra dar textura ao fundo escuro. */}
-        <View
-          style={{
-            position: "absolute",
-            top: -50,
-            right: -40,
-            width: 180,
-            height: 300,
-            backgroundColor: "rgba(255,255,255,0.06)",
-            transform: [{ rotate: "18deg" }],
-          }}
-        />
-        <View
-          style={{
-            position: "absolute",
-            bottom: -60,
-            left: -50,
-            width: 160,
-            height: 260,
-            backgroundColor: "rgba(46,196,182,0.08)",
-            transform: [{ rotate: "-12deg" }],
-          }}
-        />
-
-        <PulsingMark />
-        <Text className="mt-4 text-3xl font-extrabold tracking-tight text-white">Convivo</Text>
-        <Text className="mt-1 text-sm text-white/60">Cuidando de você, todo dia</Text>
-      </LinearGradient>
-
-      <Animated.View
-        style={{
-          opacity: cardOpacity,
-          transform: [{ translateY: cardTranslateY }],
-          marginTop: -32,
-          flex: 1,
-          justifyContent: "center",
-        }}
-        className="px-6"
-      >
-        <View
-          className="gap-3 rounded-3xl bg-card p-5"
-          style={{
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 8 },
-            shadowOpacity: 0.12,
-            shadowRadius: 20,
-            elevation: 6,
-          }}
+      {/* No navegador desktop o app renderia na largura cheia da janela
+       * (pensado só pra tela de celular) — sobrava um vazio enorme do
+       * lado, não embaixo como parecia num recorte estreito de print.
+       * maxWidth trava numa coluna de "tamanho de celular" centralizada;
+       * no celular de verdade (sempre mais estreito que 480) isso não
+       * muda nada, só evita o esparramado no desktop. */}
+      <View style={{ width: "100%", maxWidth: 480, flex: 1 }}>
+        <LinearGradient
+          colors={["#0b1e3d", "#16305c", "#0b1e3d"]}
+          start={{ x: 0.1, y: 0 }}
+          end={{ x: 0.9, y: 1 }}
+          style={{ alignItems: "center", overflow: "hidden", paddingTop: 96, paddingBottom: 64 }}
         >
-          <Text className="mb-1 text-lg font-bold text-navy">Entrar</Text>
+          {/* Faixa de brilho diagonal — mesmo acabamento usado no cartão
+           * fidelidade, reaproveitado aqui pra dar textura ao fundo escuro. */}
+          <View
+            style={{
+              position: "absolute",
+              top: -50,
+              right: -40,
+              width: 180,
+              height: 300,
+              backgroundColor: "rgba(255,255,255,0.06)",
+              transform: [{ rotate: "18deg" }],
+            }}
+          />
+          <View
+            style={{
+              position: "absolute",
+              bottom: -60,
+              left: -50,
+              width: 160,
+              height: 260,
+              backgroundColor: "rgba(230,57,70,0.08)",
+              transform: [{ rotate: "-12deg" }],
+            }}
+          />
 
-          <View className="flex-row items-center gap-2.5 rounded-xl border border-navy/10 bg-cream px-3.5">
-            <Ionicons name="mail-outline" size={18} color="#0b1e3d80" />
-            <TextInput
-              value={email}
-              onChangeText={setEmail}
-              placeholder="Email"
-              placeholderTextColor="#0b1e3d60"
-              autoCapitalize="none"
-              keyboardType="email-address"
-              className="flex-1 py-3.5 text-navy"
-            />
-          </View>
+          <PulsingMark />
+          <Text className="mt-4 text-3xl font-extrabold tracking-tight text-white">Convivo</Text>
+          <Text className="mt-1 text-sm text-white/60">Cuidando de você, todo dia</Text>
+        </LinearGradient>
 
-          <View className="flex-row items-center gap-2.5 rounded-xl border border-navy/10 bg-cream px-3.5">
-            <Ionicons name="lock-closed-outline" size={18} color="#0b1e3d80" />
-            <TextInput
-              value={password}
-              onChangeText={setPassword}
-              placeholder="Senha"
-              placeholderTextColor="#0b1e3d60"
-              secureTextEntry={!showPassword}
-              className="flex-1 py-3.5 text-navy"
-            />
-            <Pressable
-              onPress={() => setShowPassword((v) => !v)}
-              hitSlop={10}
-              accessibilityLabel={showPassword ? "Esconder senha" : "Mostrar senha"}
-            >
-              <Ionicons
-                name={showPassword ? "eye-off-outline" : "eye-outline"}
-                size={18}
-                color="#0b1e3d80"
+        <Animated.View
+          style={{
+            opacity: cardOpacity,
+            transform: [{ translateY: cardTranslateY }],
+            marginTop: -32,
+            flex: 1,
+            justifyContent: "center",
+          }}
+          className="px-6"
+        >
+          <View
+            className="gap-3 rounded-3xl bg-card p-5"
+            style={{
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 8 },
+              shadowOpacity: 0.12,
+              shadowRadius: 20,
+              elevation: 6,
+            }}
+          >
+            <Text className="mb-1 text-lg font-bold text-navy">Entrar</Text>
+
+            <View className="flex-row items-center gap-2.5 rounded-xl border border-navy/10 bg-cream px-3.5">
+              <Ionicons name="mail-outline" size={18} color="#0b1e3d80" />
+              <TextInput
+                value={email}
+                onChangeText={setEmail}
+                placeholder="Email"
+                placeholderTextColor="#0b1e3d60"
+                autoCapitalize="none"
+                keyboardType="email-address"
+                className="flex-1 py-3.5 text-navy"
               />
-            </Pressable>
+            </View>
+
+            <View className="flex-row items-center gap-2.5 rounded-xl border border-navy/10 bg-cream px-3.5">
+              <Ionicons name="lock-closed-outline" size={18} color="#0b1e3d80" />
+              <TextInput
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Senha"
+                placeholderTextColor="#0b1e3d60"
+                secureTextEntry={!showPassword}
+                className="flex-1 py-3.5 text-navy"
+              />
+              <Pressable
+                onPress={() => setShowPassword((v) => !v)}
+                hitSlop={10}
+                accessibilityLabel={showPassword ? "Esconder senha" : "Mostrar senha"}
+              >
+                <Ionicons
+                  name={showPassword ? "eye-off-outline" : "eye-outline"}
+                  size={18}
+                  color="#0b1e3d80"
+                />
+              </Pressable>
+            </View>
+
+            <PressableScale
+              disabled={loading}
+              onPress={handleSubmit}
+              style={{
+                marginTop: 10,
+                marginHorizontal: -4,
+                borderRadius: 999,
+                shadowColor: "#e63946",
+                shadowOffset: { width: 0, height: 6 },
+                shadowOpacity: 0.3,
+                shadowRadius: 12,
+                elevation: 5,
+              }}
+            >
+              <LinearGradient
+                colors={["#e63946", "#c1121f"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={{
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: 999,
+                  paddingVertical: 17,
+                  opacity: loading ? 0.7 : 1,
+                }}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text className="text-center text-base font-bold tracking-wide text-white">
+                    Entrar
+                  </Text>
+                )}
+              </LinearGradient>
+            </PressableScale>
           </View>
 
-          <PressableScale disabled={loading} onPress={handleSubmit} style={{ marginTop: 6 }}>
-            <LinearGradient
-              colors={["#0b1e3d", "#16305c"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              className="items-center rounded-xl py-3.5"
-              style={{ opacity: loading ? 0.7 : 1 }}
-            >
-              {loading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text className="font-semibold text-white">Entrar</Text>
-              )}
-            </LinearGradient>
-          </PressableScale>
-        </View>
-
-        <Link href="/cadastro" className="mt-6 text-center text-navy/60">
-          Não tem conta? <Text className="font-semibold text-coral">Criar conta</Text>
-        </Link>
-      </Animated.View>
+          <Link href="/cadastro" className="mt-6 text-center text-navy/60">
+            Não tem conta? <Text className="font-semibold text-coral">Criar conta</Text>
+          </Link>
+        </Animated.View>
+      </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
