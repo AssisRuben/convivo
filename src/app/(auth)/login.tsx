@@ -130,7 +130,8 @@ export default function LoginScreen() {
         colors={["#0b1e3d", "#16305c", "#0b1e3d"]}
         start={{ x: 0.1, y: 0 }}
         end={{ x: 0.9, y: 1 }}
-        className="items-center overflow-hidden pb-16 pt-24"
+        className="overflow-hidden pb-16 pt-24"
+        style={{ alignItems: "center" }}
       >
         {/* Faixa de brilho diagonal — mesmo acabamento usado no cartão
          * fidelidade, reaproveitado aqui pra dar textura ao fundo escuro. */}
@@ -167,8 +168,10 @@ export default function LoginScreen() {
           opacity: cardOpacity,
           transform: [{ translateY: cardTranslateY }],
           marginTop: -32,
+          flex: 1,
+          justifyContent: "center",
         }}
-        className="flex-1 px-6"
+        className="px-6"
       >
         <View
           className="gap-3 rounded-3xl bg-card p-5"
