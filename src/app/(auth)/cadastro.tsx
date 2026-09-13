@@ -5,10 +5,12 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   Text,
   TextInput,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/lib/auth";
 import { showAlert } from "@/lib/alert";
 
@@ -17,6 +19,7 @@ export default function CadastroScreen() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [referralCode, setReferralCode] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -34,7 +37,12 @@ export default function CadastroScreen() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : undefined}
-      className="flex-1 justify-center bg-cream px-6"
+      style={{ flex: 1 }}
+    >
+      <ScrollView
+      className="flex-1 bg-cream"
+      contentContainerStyle={{ flexGrow: 1, justifyContent: "center", paddingHorizontal: 24 }}
+      keyboardShouldPersistTaps="handled"
     >
       <Text className="mb-1 text-2xl font-bold text-navy">Criar conta</Text>
       <Text className="mb-8 text-navy/60">Leva menos de um minuto</Text>
@@ -54,13 +62,26 @@ export default function CadastroScreen() {
           keyboardType="email-address"
           className="rounded-xl border border-navy/10 bg-card p-3.5"
         />
-        <TextInput
-          value={password}
-          onChangeText={setPassword}
-          placeholder="Senha (mín. 6 caracteres)"
-          secureTextEntry
-          className="rounded-xl border border-navy/10 bg-card p-3.5"
-        />
+        <View className="flex-row items-center rounded-xl border border-navy/10 bg-card pr-3.5">
+          <TextInput
+            value={password}
+            onChangeText={setPassword}
+            placeholder="Senha (mín. 6 caracteres)"
+            secureTextEntry={!showPassword}
+            className="flex-1 p-3.5"
+          />
+          <Pressable
+            onPress={() => setShowPassword((v) => !v)}
+            hitSlop={10}
+            accessibilityLabel={showPassword ? "Esconder senha" : "Mostrar senha"}
+          >
+            <Ionicons
+              name={showPassword ? "eye-off-outline" : "eye-outline"}
+              size={18}
+              color="#0b1e3d80"
+            />
+          </Pressable>
+        </View>
         <TextInput
           value={referralCode}
           onChangeText={setReferralCode}
@@ -85,6 +106,7 @@ export default function CadastroScreen() {
       <Link href="/login" className="mt-6 text-center text-coral">
         Já tem conta? Entrar
       </Link>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }

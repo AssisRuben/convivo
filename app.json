@@ -10,7 +10,7 @@
       "url": "https://u.expo.dev/42253a5a-6440-4b4b-b0d7-02719c6fbc5b"
     },
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/image.png",
     "scheme": "convivo",
     "userInterfaceStyle": "automatic",
     "ios": {
@@ -25,7 +25,8 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "softwareKeyboardLayoutMode": "resize"
     },
     "web": {
       "output": "server",
