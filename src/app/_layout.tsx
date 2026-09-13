@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from "@/lib/auth";
 import { brandHeaderOptions, BackHeaderButton } from "@/components/AppHeader";
 import { ProfileDrawerProvider } from "@/lib/profileDrawer";
 import { ProfileDrawer } from "@/components/ProfileDrawer";
+import { OnboardingTour } from "@/components/OnboardingTour";
 import { CartProvider } from "@/lib/cartState";
 import { initMonitoring, Sentry } from "@/lib/monitoring";
 
@@ -119,6 +120,7 @@ function RootNavigator() {
         />
       </Stack>
       <ProfileDrawer />
+      <OnboardingTour />
     </>
   );
 }
