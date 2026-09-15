@@ -5,12 +5,12 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  ScrollView,
   Text,
   TextInput,
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { FlashList } from "@shopify/flash-list";
 import Svg, { Circle, Polyline } from "react-native-svg";
 import { apiFetch, type ApiHealthMeasurement, type ApiHealthMeasurementType } from "@/lib/api";
 import { showAlert } from "@/lib/alert";
@@ -161,6 +161,63 @@ function MultiLineChart({ title, series }: { title: string; series: ChartSeries[
   );
 }
 
+/** Card de um dia no histórico — fechado por padrão, só lista as
+ * medições daquele dia quando tocado. Evita renderizar toda medição de
+ * todo dia de uma vez (o que a FlashList sozinha não resolveria, já que
+ * o item é o dia, não a medição individual). */
+function DayGroupCard({
+  group,
+  expanded,
+  onToggle,
+  onDeleteMeasurement,
+}: {
+  group: DayGroup;
+  expanded: boolean;
+  onToggle: () => void;
+  onDeleteMeasurement: (id: string) => void;
+}) {
+  const count = group.measurements.length;
+  return (
+    <View className="mb-2 rounded-2xl bg-card p-3 shadow-sm">
+      <Pressable
+        onPress={onToggle}
+        className="flex-row items-center justify-between"
+        accessibilityRole="button"
+        accessibilityLabel={`${expanded ? "Fechar" : "Abrir"} medições de ${group.dateLabel}`}
+      >
+        <Text className="text-sm font-semibold text-navy">{group.dateLabel}</Text>
+        <View className="flex-row items-center gap-2">
+          <Text className="text-xs text-navy/40">
+            {count} {count === 1 ? "medição" : "medições"}
+          </Text>
+          <Ionicons name={expanded ? "chevron-up" : "chevron-down"} size={16} color="#0b1e3d80" />
+        </View>
+      </Pressable>
+
+      {expanded && (
+        <View className="mt-2 gap-1 border-t border-navy/5 pt-2">
+          {group.measurements.map((m) => (
+            <View key={m.id} className="flex-row items-center gap-2 py-1">
+              <Text className="flex-1 text-sm text-navy/70">
+                {TYPE_LABELS[m.type]}: {formatMeasurement(m)}{" "}
+                <Text className="text-xs text-navy/40">· {m.local}</Text>
+              </Text>
+              <Pressable
+                onPress={() => onDeleteMeasurement(m.id)}
+                accessibilityLabel="Remover medição"
+                hitSlop={12}
+                className="p-2.5"
+              >
+                <Ionicons name="trash-outline" size={15} color="#e63946" />
+              </Pressable>
+            </View>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
 export default function SaudeScreen() {
   const [measurements, setMeasurements] = useState<ApiHealthMeasurement[]>(
     () => readCachedSaude()?.measurements ?? []
@@ -176,6 +233,16 @@ export default function SaudeScreen() {
   const [gordura, setGordura] = useState("");
   const [glicemia, setGlicemia] = useState("");
   const [local, setLocal] = useState(LOCAL_OPTIONS[0]);
+  const [expandedDays, setExpandedDays] = useState<Set<string>>(() => new Set());
+
+  function toggleDay(dateKey: string) {
+    setExpandedDays((prev) => {
+      const next = new Set(prev);
+      if (next.has(dateKey)) next.delete(dateKey);
+      else next.add(dateKey);
+      return next;
+    });
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -289,12 +356,8 @@ export default function SaudeScreen() {
 
   const days = groupByDay(measurements);
 
-  return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      className="flex-1"
-    >
-      <ScrollView className="flex-1 bg-cream" contentContainerClassName="p-4 pb-24">
+  const header = (
+    <View>
       {(pesoPoints.length > 0 ||
         sistolicaPoints.length > 0 ||
         diastolicaPoints.length > 0 ||
@@ -398,34 +461,31 @@ export default function SaudeScreen() {
       </View>
 
       <Text className="mb-2 mt-5 text-sm font-semibold text-navy">Histórico</Text>
-      {days.length === 0 ? (
-        <Text className="text-sm text-navy/60">Nenhum registro ainda.</Text>
-      ) : (
-        <View className="gap-2">
-          {days.map((group) => (
-            <View key={group.dateKey} className="rounded-2xl bg-card p-3 shadow-sm">
-              <Text className="mb-1 text-sm font-semibold text-navy">{group.dateLabel}</Text>
-              {group.measurements.map((m) => (
-                <View key={m.id} className="flex-row items-center gap-2 py-1">
-                  <Text className="flex-1 text-sm text-navy/70">
-                    {TYPE_LABELS[m.type]}: {formatMeasurement(m)}{" "}
-                    <Text className="text-xs text-navy/40">· {m.local}</Text>
-                  </Text>
-                  <Pressable
-                    onPress={() => confirmDelete(m.id)}
-                    accessibilityLabel="Remover medição"
-                    hitSlop={12}
-                    className="p-2.5"
-                  >
-                    <Ionicons name="trash-outline" size={15} color="#e63946" />
-                  </Pressable>
-                </View>
-              ))}
-            </View>
-          ))}
-        </View>
-      )}
-      </ScrollView>
+    </View>
+  );
+
+  return (
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      className="flex-1"
+    >
+      <FlashList
+        className="flex-1 bg-cream"
+        data={days}
+        keyExtractor={(group) => group.dateKey}
+        renderItem={({ item }) => (
+          <DayGroupCard
+            group={item}
+            expanded={expandedDays.has(item.dateKey)}
+            onToggle={() => toggleDay(item.dateKey)}
+            onDeleteMeasurement={confirmDelete}
+          />
+        )}
+        ListHeaderComponent={header}
+        ListEmptyComponent={<Text className="text-sm text-navy/60">Nenhum registro ainda.</Text>}
+        contentContainerStyle={{ padding: 16, paddingBottom: 96 }}
+        keyboardShouldPersistTaps="handled"
+      />
     </KeyboardAvoidingView>
   );
 }
