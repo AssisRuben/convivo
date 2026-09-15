@@ -23,7 +23,9 @@ import { LoadingScreen } from "@/components/LoadingScreen";
 import { ROTINA_CACHE_KEY, fetchRotina } from "@/lib/tabPrefetch";
 import { getCached, loadCached, setCached } from "@/lib/tabDataCache";
 
-const cachedRotina = getCached<{ items: ApiChecklistItem[] }>(ROTINA_CACHE_KEY);
+function readCachedRotina() {
+  return getCached<{ items: ApiChecklistItem[] }>(ROTINA_CACHE_KEY);
+}
 
 type FormState = {
   id: string | null;
@@ -42,12 +44,15 @@ const EMPTY_FORM: FormState = {
 };
 
 export default function RotinaScreen() {
-  const [items, setItems] = useState<ApiChecklistItem[]>(cachedRotina?.items ?? []);
-  const [loading, setLoading] = useState(cachedRotina === undefined);
+  const [items, setItems] = useState<ApiChecklistItem[]>(
+    () => readCachedRotina()?.items ?? []
+  );
+  const [loading, setLoading] = useState(() => readCachedRotina() === undefined);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState | null>(null);
   const [saving, setSaving] = useState(false);
   const loadedOnce = useRef(false);
+  const hadCacheOnMount = useRef(readCachedRotina() !== undefined);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -63,7 +68,7 @@ export default function RotinaScreen() {
     useCallback(() => {
       if (loadedOnce.current) return;
       loadedOnce.current = true;
-      if (cachedRotina !== undefined) return; // já veio do cache/prefetch
+      if (hadCacheOnMount.current) return; // já veio do cache/prefetch
       load();
     }, [load])
   );

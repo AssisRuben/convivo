@@ -9,15 +9,18 @@ import { getCached, loadCached, setCached } from "@/lib/tabDataCache";
 
 const PAGE_SIZE = 10;
 
-const cachedInitial = getCached<{ items: ApiFeedItem[]; hasMore: boolean }>(FEED_INITIAL_CACHE_KEY);
+function readCachedInitial() {
+  return getCached<{ items: ApiFeedItem[]; hasMore: boolean }>(FEED_INITIAL_CACHE_KEY);
+}
 
 export default function FeedScreen() {
-  const [items, setItems] = useState<ApiFeedItem[]>(cachedInitial?.items ?? []);
-  const [loading, setLoading] = useState(cachedInitial === undefined);
+  const [items, setItems] = useState<ApiFeedItem[]>(() => readCachedInitial()?.items ?? []);
+  const [loading, setLoading] = useState(() => readCachedInitial() === undefined);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(cachedInitial?.hasMore ?? false);
+  const [hasMore, setHasMore] = useState(() => readCachedInitial()?.hasMore ?? false);
   const loadedOnce = useRef(false);
+  const hadCacheOnMount = useRef(readCachedInitial() !== undefined);
 
   const loadPage = useCallback(async (offset: number) => {
     const res = await apiFetch(`/api/mobile/feed?offset=${offset}&limit=${PAGE_SIZE}`);
@@ -40,7 +43,7 @@ export default function FeedScreen() {
     useCallback(() => {
       if (loadedOnce.current) return;
       loadedOnce.current = true;
-      if (cachedInitial !== undefined) return; // já veio do cache/prefetch
+      if (hadCacheOnMount.current) return; // já veio do cache/prefetch
       loadInitial();
     }, [loadInitial])
   );

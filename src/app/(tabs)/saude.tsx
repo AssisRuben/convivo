@@ -22,7 +22,9 @@ const CHART_WIDTH = 140;
 const CHART_HEIGHT = 80;
 const CHART_PADDING = 8;
 
-const cachedSaude = getCached<{ measurements: ApiHealthMeasurement[] }>(SAUDE_CACHE_KEY);
+function readCachedSaude() {
+  return getCached<{ measurements: ApiHealthMeasurement[] }>(SAUDE_CACHE_KEY);
+}
 
 const TYPE_LABELS: Record<ApiHealthMeasurementType, string> = {
   PRESSAO: "Pressão",
@@ -161,11 +163,12 @@ function MultiLineChart({ title, series }: { title: string; series: ChartSeries[
 
 export default function SaudeScreen() {
   const [measurements, setMeasurements] = useState<ApiHealthMeasurement[]>(
-    cachedSaude?.measurements ?? []
+    () => readCachedSaude()?.measurements ?? []
   );
-  const [loading, setLoading] = useState(cachedSaude === undefined);
+  const [loading, setLoading] = useState(() => readCachedSaude() === undefined);
   const [saving, setSaving] = useState(false);
   const loadedOnce = useRef(false);
+  const hadCacheOnMount = useRef(readCachedSaude() !== undefined);
 
   const [pesoKg, setPesoKg] = useState("");
   const [sistolica, setSistolica] = useState("");
@@ -188,7 +191,7 @@ export default function SaudeScreen() {
     useCallback(() => {
       if (loadedOnce.current) return;
       loadedOnce.current = true;
-      if (cachedSaude !== undefined) return; // já veio do cache/prefetch
+      if (hadCacheOnMount.current) return; // já veio do cache/prefetch
       load();
     }, [load])
   );
