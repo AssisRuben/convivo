@@ -153,6 +153,12 @@ export function ProfileDrawer() {
               label="Medicamentos"
               onNavigate={navigate}
             />
+            <MenuLink
+              href="/perfil/pilulas-sabedoria"
+              icon="bulb-outline"
+              label="Pílulas de sabedoria"
+              onNavigate={navigate}
+            />
             <MenuLink href="/perfil/metas" icon="flag-outline" label="Minhas metas" onNavigate={navigate} />
             <MenuLink
               href="/perfil/minhas-postagens"

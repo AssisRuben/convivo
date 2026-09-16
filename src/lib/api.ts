@@ -146,6 +146,13 @@ export type ApiLoyaltyProgress = {
   rewardPerCycleCents: number;
 };
 
+export type ApiWisdomProgress = {
+  chaptersRead: number;
+  streakDays: number;
+  totalChapters: number;
+  nextChapterAvailable: boolean;
+};
+
 export type ApiCareCategory =
   | "TREINO"
   | "ALIMENTACAO"
