@@ -285,7 +285,7 @@ export default function RotinaScreen() {
                   <View className="flex-1">
                     <Text
                       className={`text-sm font-medium ${
-                        item.completedToday ? "text-navy/40 line-through" : "text-navy"
+                        item.completedToday ? "text-navy/40" : "text-navy"
                       }`}
                     >
                       {item.title}
