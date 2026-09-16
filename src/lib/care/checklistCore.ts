@@ -41,17 +41,18 @@ export function validateRoutineInput(input: RoutineItemInput): string {
 }
 
 export async function listChecklistItemsForUser(userId: string): Promise<ChecklistItemView[]> {
+  // Uma query só (join via `include`) em vez de duas idas ao banco em
+  // sequência — cada round-trip custa caro contra o pooler remoto da
+  // Supabase, e essa rota já soma outro round-trip só pra autenticar
+  // (ver getApiUserId), então eliminar um daqui é sensível no tempo de
+  // resposta percebido ao abrir a aba.
   const items = await prisma.careChecklistItem.findMany({
     where: { userId, active: true },
     orderBy: { createdAt: "asc" },
+    include: {
+      completions: { where: { date: todayDate() }, select: { id: true } },
+    },
   });
-  if (items.length === 0) return [];
-
-  const completions = await prisma.careChecklistCompletion.findMany({
-    where: { itemId: { in: items.map((i) => i.id) }, date: todayDate() },
-    select: { itemId: true },
-  });
-  const completedIds = new Set(completions.map((c) => c.itemId));
 
   return items.map((item) => ({
     id: item.id,
@@ -59,7 +60,7 @@ export async function listChecklistItemsForUser(userId: string): Promise<Checkli
     category: item.category,
     timeOfDay: item.timeOfDay,
     daysOfWeek: item.daysOfWeek,
-    completedToday: completedIds.has(item.id),
+    completedToday: item.completions.length > 0,
   }));
 }
 

@@ -48,7 +48,6 @@ export default function RotinaScreen() {
     () => readCachedRotina()?.items ?? []
   );
   const [loading, setLoading] = useState(() => readCachedRotina() === undefined);
-  const [busyId, setBusyId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState | null>(null);
   const [saving, setSaving] = useState(false);
   const loadedOnce = useRef(false);
@@ -81,16 +80,39 @@ export default function RotinaScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items]);
 
+  // Marca/desmarca na hora, sem esperar o servidor — o banco fica longe
+  // (Supabase remota) e travar o clique até a resposta voltar tornava a
+  // rotina inteira sensação de "lenta". `latestToggleIntent` guarda a
+  // última intenção por item: se o usuário tocar de novo antes da
+  // primeira chamada terminar, a resposta antiga (agora desatualizada)
+  // não sobrescreve o estado mais novo — só desfaz/confirma quem ainda
+  // for a intenção mais recente quando a chamada dela voltar.
+  const latestToggleIntent = useRef<Map<string, boolean>>(new Map());
+
   async function toggleComplete(item: ApiChecklistItem) {
-    setBusyId(item.id);
+    const nextCompleted = !item.completedToday;
+    latestToggleIntent.current.set(item.id, nextCompleted);
+
+    setItems((prev) =>
+      prev.map((i) => (i.id === item.id ? { ...i, completedToday: nextCompleted } : i))
+    );
+
     try {
       const res = await apiFetch(`/api/mobile/rotina/${item.id}/complete`, {
-        method: item.completedToday ? "DELETE" : "POST",
+        method: nextCompleted ? "POST" : "DELETE",
       });
+      if (!res.ok) throw new Error();
       const data = await res.json();
-      if (res.ok) setItems(data.items ?? []);
-    } finally {
-      setBusyId(null);
+      if (latestToggleIntent.current.get(item.id) === nextCompleted) {
+        setItems(data.items ?? []);
+      }
+    } catch {
+      if (latestToggleIntent.current.get(item.id) === nextCompleted) {
+        setItems((prev) =>
+          prev.map((i) => (i.id === item.id ? { ...i, completedToday: !nextCompleted } : i))
+        );
+        showAlert("Não foi possível salvar", "Sua conexão pode estar instável — tente de novo.");
+      }
     }
   }
 
@@ -139,14 +161,9 @@ export default function RotinaScreen() {
         text: "Remover",
         style: "destructive",
         onPress: async () => {
-          setBusyId(item.id);
-          try {
-            const res = await apiFetch(`/api/mobile/rotina/${item.id}`, { method: "DELETE" });
-            const data = await res.json();
-            if (res.ok) setItems(data.items ?? []);
-          } finally {
-            setBusyId(null);
-          }
+          const res = await apiFetch(`/api/mobile/rotina/${item.id}`, { method: "DELETE" });
+          const data = await res.json();
+          if (res.ok) setItems(data.items ?? []);
         },
       },
     ]);
@@ -273,7 +290,6 @@ export default function RotinaScreen() {
                   className="flex-row items-center gap-3 rounded-2xl bg-card p-3 shadow-sm"
                 >
                   <Pressable
-                    disabled={busyId === item.id}
                     onPress={() => toggleComplete(item)}
                     className={`h-7 w-7 items-center justify-center rounded-full border-2 ${
                       item.completedToday ? "border-mint bg-mint" : "border-navy/20"
