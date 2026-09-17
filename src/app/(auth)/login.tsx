@@ -19,6 +19,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/lib/auth";
 import { showAlert } from "@/lib/alert";
+import { useAndroidKeyboardAvoidance } from "@/lib/useAndroidKeyboardAvoidance";
 
 /** Brilho pulsando devagar atrás do símbolo — dá vida ao topo sem chamar
  * atenção demais. `Animated` do core, não reanimated (ver PetAnimation.tsx
@@ -90,6 +91,7 @@ function PressableScale({
 
 export default function LoginScreen() {
   const { login } = useAuth();
+  useAndroidKeyboardAvoidance();
   const { height: windowHeight } = useWindowDimensions();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

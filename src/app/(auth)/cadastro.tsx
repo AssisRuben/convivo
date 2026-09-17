@@ -13,9 +13,11 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/lib/auth";
 import { showAlert } from "@/lib/alert";
+import { useAndroidKeyboardAvoidance } from "@/lib/useAndroidKeyboardAvoidance";
 
 export default function CadastroScreen() {
   const { register } = useAuth();
+  useAndroidKeyboardAvoidance();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

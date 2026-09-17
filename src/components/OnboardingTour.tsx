@@ -1,6 +1,7 @@
 import { useState } from "react";
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
@@ -148,6 +149,14 @@ export function OnboardingTour() {
 
   return (
     <Modal visible transparent animationType="fade" statusBarTranslucent onRequestClose={dismiss}>
+      {/* Modal do RN abre numa janela nativa própria — não herda o
+       * KeyboardAvoidingView do resto do app (login.tsx, _layout.tsx),
+       * então sem um aqui o teclado cobria o campo/botão "Continuar"
+       * direto, sem nada empurrar o card pra cima. */}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
+      >
       <View
         className="flex-1 items-center justify-center bg-black/50 px-6"
         style={Platform.OS === "web" ? { position: "fixed", inset: 0 } : undefined}
@@ -237,6 +246,7 @@ export function OnboardingTour() {
           <Dots step={step} />
         </View>
       </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

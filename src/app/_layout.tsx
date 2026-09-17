@@ -41,27 +41,6 @@ function CrashFallback({ resetError }: { resetError: () => void }) {
 // Go no Android (removido de lá, só funciona em development build) —
 // achado batendo o app real: crashava na inicialização antes mesmo de
 // chegar no `if (Platform.OS === "web")`.
-// No Android, o Expo tornou o edge-to-edge obrigatório (SDK 54+), o que
-// quebra o contrato nativo do `adjustResize`/`adjustPan` — o teclado passa
-// a cobrir o campo focado em vez de empurrar a tela, e nem o
-// `KeyboardAvoidingView` do React Native (que depende desse resize pra
-// detectar a altura do teclado) consegue compensar. Não tem solução só com
-// API núcleo; a lib resolve reagindo ao inset do teclado nativamente. Import
-// dinâmico + guarda de Expo Go pelo mesmo motivo do expo-notifications
-// abaixo: o módulo nativo não existe lá (só funciona em development build /
-// build de verdade), e no iOS o KeyboardAvoidingView de cada tela já
-// funciona bem sozinho, então nem precisa entrar aqui.
-function useAndroidKeyboardAvoidance() {
-  useEffect(() => {
-    if (Platform.OS !== "android") return;
-    if (Constants.executionEnvironment === ExecutionEnvironment.StoreClient) return;
-
-    import("react-native-avoid-softinput").then(({ AvoidSoftInput }) => {
-      AvoidSoftInput.setEnabled(true);
-    });
-  }, []);
-}
-
 function useNotificationTapNavigation() {
   useEffect(() => {
     if (Platform.OS === "web") return;
@@ -83,7 +62,6 @@ function useNotificationTapNavigation() {
 function RootNavigator() {
   const { isLoading } = useAuth();
   useNotificationTapNavigation();
-  useAndroidKeyboardAvoidance();
 
   useEffect(() => {
     if (!isLoading) SplashScreen.hideAsync();
