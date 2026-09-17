@@ -1,0 +1,25 @@
+name: Dispatch reminders
+
+# Não existe cron nativo no EasyPanel usado pra hospedar o backend — esse
+# workflow supre isso, chamando a rota que dispara os lembretes (rotina,
+# medicamento acabando, dicas de meta, e agora Pílulas de sabedoria /
+# Gotas de Fé). GitHub Actions não garante o minuto exato do "schedule"
+# (pode atrasar alguns minutos em repositórios pouco ativos) — a própria
+# rota já tem tolerância de alguns minutos pra compensar isso.
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Chama a rota de lembretes
+        run: |
+          curl -sS -X POST \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -w "\nHTTP %{http_code}\n" \
+            --max-time 30 \
+            --fail \
+            "https://convivo-convivo.xwew8a.easypanel.host/api/cron/dispatch-reminders"

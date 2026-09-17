@@ -3,7 +3,10 @@
     "allow": [
       "Bash(npx eas *)",
       "Bash(node --env-file=.env.local node_modules/prisma/build/index.js db push)",
-      "Bash(npx prisma *)"
+      "Bash(npx prisma *)",
+      "Bash(gh auth *)",
+      "Bash(gh secret *)",
+      "Bash(gh api *)"
     ]
   },
   "enabledPlugins": {

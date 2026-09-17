@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ComponentType } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -8,11 +8,37 @@ import {
   Text,
   TextInput,
   View,
+  type ViewProps,
 } from "react-native";
+import Constants, { ExecutionEnvironment } from "expo-constants";
 import { Ionicons } from "@expo/vector-icons";
 import { apiFetch } from "@/lib/api";
 import { showAlert } from "@/lib/alert";
 import { useOnboardingTourVisibility } from "@/lib/onboardingTour";
+
+/**
+ * No Android, `KeyboardAvoidingView` do React Native sofre do mesmo
+ * problema que fez o resto do app trocar pra react-native-avoid-softinput
+ * (edge-to-edge do SDK 54+ quebra a detecção de altura do teclado) — usar
+ * ela aqui só pra esse Modal não resolveria nada. A própria lib expõe um
+ * <AvoidSoftInputView> pra exatamente esse caso (conteúdo dentro de
+ * Modal, que não herda nada do resto do app).
+ *
+ * Carregado uma vez só, de forma síncrona, no nível do módulo — não
+ * dentro de um hook/effect — porque trocar o componente usado como
+ * wrapper DEPOIS da primeira renderização (ex: null → AvoidSoftInputView
+ * quando um import assíncrono resolve) faz o React desmontar e remontar
+ * tudo por baixo, perdendo o que a pessoa já tinha digitado no CPF/
+ * telefone. A guarda de Platform/Expo Go antes do require tem o mesmo
+ * efeito protetor do import dinâmico usado em outros lugares do app
+ * (expo-notifications, useAndroidKeyboardAvoidance): o módulo nativo só é
+ * carregado quando essas condições já são conhecidas como seguras.
+ */
+const AndroidAvoidSoftInputView: ComponentType<ViewProps> | null =
+  Platform.OS === "android" && Constants.executionEnvironment !== ExecutionEnvironment.StoreClient
+    ? // eslint-disable-next-line @typescript-eslint/no-require-imports -- precisa ser condicional/síncrono, ver comentário acima
+      (require("react-native-avoid-softinput").AvoidSoftInputView as ComponentType<ViewProps>)
+    : null;
 
 function onlyDigits(value: string): string {
   return value.replace(/\D/g, "");
@@ -113,6 +139,8 @@ export function OnboardingTour() {
 
   if (!visible) return null;
 
+  const KeyboardWrapper = AndroidAvoidSoftInputView ?? View;
+
   async function handleCpfContinue() {
     if (!cpf && !phone) {
       setStep(1);
@@ -147,21 +175,12 @@ export function OnboardingTour() {
 
   const info = step > 0 ? INFO_STEPS[step - 1] : null;
 
-  return (
-    <Modal visible transparent animationType="fade" statusBarTranslucent onRequestClose={dismiss}>
-      {/* Modal do RN abre numa janela nativa própria — não herda o
-       * KeyboardAvoidingView do resto do app (login.tsx, _layout.tsx),
-       * então sem um aqui o teclado cobria o campo/botão "Continuar"
-       * direto, sem nada empurrar o card pra cima. */}
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={{ flex: 1 }}
-      >
+  const modalBody = (
+    <View
+      className="flex-1 items-center justify-center bg-black/50 px-6"
+      style={Platform.OS === "web" ? { position: "fixed", inset: 0 } : undefined}
+    >
       <View
-        className="flex-1 items-center justify-center bg-black/50 px-6"
-        style={Platform.OS === "web" ? { position: "fixed", inset: 0 } : undefined}
-      >
-        <View
           className="w-full gap-4 rounded-3xl bg-card p-5"
           style={{
             maxWidth: 420,
@@ -246,7 +265,24 @@ export function OnboardingTour() {
           <Dots step={step} />
         </View>
       </View>
-      </KeyboardAvoidingView>
+  );
+
+  // Modal do RN abre numa janela nativa própria — não herda nenhum
+  // tratamento de teclado do resto do app, então sem isso aqui o teclado
+  // cobria o campo/botão "Continuar" direto. iOS usa o KeyboardAvoidingView
+  // normal (já funciona bem sozinho no resto do app); Android usa
+  // AvoidSoftInputView (ver hook acima) — o KeyboardAvoidingView do React
+  // Native sofreria do mesmo problema de edge-to-edge que fez o app
+  // inteiro trocar pra essa lib.
+  return (
+    <Modal visible transparent animationType="fade" statusBarTranslucent onRequestClose={dismiss}>
+      {Platform.OS === "ios" ? (
+        <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
+          {modalBody}
+        </KeyboardAvoidingView>
+      ) : (
+        <KeyboardWrapper style={{ flex: 1 }}>{modalBody}</KeyboardWrapper>
+      )}
     </Modal>
   );
 }

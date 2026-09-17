@@ -21,7 +21,7 @@ import { CARE_CATEGORIES, CARE_CATEGORY_META, WEEKDAY_LABELS } from "@/constants
 import { showAlert } from "@/lib/alert";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { ROTINA_CACHE_KEY, fetchRotina } from "@/lib/tabPrefetch";
-import { getCached, loadCached, setCached } from "@/lib/tabDataCache";
+import { getCached, invalidateCached, loadCached, setCached } from "@/lib/tabDataCache";
 
 function readCachedRotina() {
   return getCached<{ items: ApiChecklistItem[] }>(ROTINA_CACHE_KEY);
@@ -52,6 +52,11 @@ export default function RotinaScreen() {
   const [saving, setSaving] = useState(false);
   const loadedOnce = useRef(false);
   const hadCacheOnMount = useRef(readCachedRotina() !== undefined);
+  // "completedToday" é por data — sem isso, um app que fica dias sem ser
+  // fechado de vez (só minimizado) continuava mostrando o cache de
+  // "concluído hoje" de um dia que já passou, porque loadedOnce nunca
+  // deixava buscar de novo depois da primeira vez.
+  const lastCheckedDay = useRef<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -65,6 +70,17 @@ export default function RotinaScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      const today = new Date().toDateString();
+      const dayChanged = lastCheckedDay.current !== null && lastCheckedDay.current !== today;
+      lastCheckedDay.current = today;
+
+      if (dayChanged) {
+        invalidateCached(ROTINA_CACHE_KEY);
+        loadedOnce.current = true;
+        load();
+        return;
+      }
+
       if (loadedOnce.current) return;
       loadedOnce.current = true;
       if (hadCacheOnMount.current) return; // já veio do cache/prefetch
