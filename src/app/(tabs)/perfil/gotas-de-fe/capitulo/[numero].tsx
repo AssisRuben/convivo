@@ -11,8 +11,8 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { apiFetch, type ApiWisdomProgress } from "@/lib/api";
-import { WISDOM_CHAPTERS } from "@/constants/wisdomPills";
+import { apiFetch, type ApiFaithProgress } from "@/lib/api";
+import { FAITH_CHAPTERS } from "@/constants/faithDrops";
 import { showAlert } from "@/lib/alert";
 
 function isCloseToBottom({ layoutMeasurement, contentOffset, contentSize }: NativeScrollEvent) {
@@ -21,7 +21,7 @@ function isCloseToBottom({ layoutMeasurement, contentOffset, contentSize }: Nati
 }
 
 /** Markdown inline bem simples — **negrito**, *itálico* e ***os dois
- * juntos*** (ver constants/wisdomPills.ts). */
+ * juntos*** (ver constants/faithDrops.ts). */
 function RichText({ text, className }: { text: string; className?: string }) {
   const parts = text.split(/(\*\*\*[^*]+\*\*\*|\*\*[^*]+\*\*|\*[^*]+\*)/g).filter(Boolean);
   return (
@@ -54,22 +54,22 @@ function RichText({ text, className }: { text: string; className?: string }) {
   );
 }
 
-export default function PilulaLeituraScreen() {
+export default function GotaLeituraScreen() {
   const router = useRouter();
   const { numero } = useLocalSearchParams<{ numero: string }>();
-  const chapter = WISDOM_CHAPTERS.find((c) => c.number === Number(numero));
+  const chapter = FAITH_CHAPTERS.find((c) => c.number === Number(numero));
 
-  const [progress, setProgress] = useState<ApiWisdomProgress | null>(null);
+  const [progress, setProgress] = useState<ApiFaithProgress | null>(null);
   const [loading, setLoading] = useState(true);
   const [completing, setCompleting] = useState(false);
-  const [result, setResult] = useState<ApiWisdomProgress | null>(null);
+  const [result, setResult] = useState<ApiFaithProgress | null>(null);
   const triggeredRef = useRef(false);
   const scrollViewHeightRef = useRef(0);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiFetch("/api/mobile/wisdom");
+      const res = await apiFetch("/api/mobile/faith");
       if (res.ok) setProgress(await res.json());
     } finally {
       setLoading(false);
@@ -93,7 +93,7 @@ export default function PilulaLeituraScreen() {
     triggeredRef.current = true;
     setCompleting(true);
     try {
-      const res = await apiFetch("/api/mobile/wisdom/complete", {
+      const res = await apiFetch("/api/mobile/faith/complete", {
         method: "POST",
         body: JSON.stringify({ chapterNumber: chapter.number }),
       });
@@ -114,8 +114,6 @@ export default function PilulaLeituraScreen() {
   }
 
   function onContentSizeChange(_width: number, height: number) {
-    // Capítulo curto o bastante pra não precisar rolar — conta como lido
-    // na hora, sem esperar um scroll que nunca vai acontecer.
     if (scrollViewHeightRef.current > 0 && height <= scrollViewHeightRef.current) {
       handleReachedEnd();
     }
@@ -172,7 +170,7 @@ export default function PilulaLeituraScreen() {
         onScroll={onScroll}
         scrollEventThrottle={100}
       >
-        <Text className="text-xs font-semibold uppercase tracking-wide text-coral">
+        <Text className="text-xs font-semibold uppercase tracking-wide text-[#3b82f6]">
           Capítulo {chapter.number}
         </Text>
         <Text className="mt-1 text-2xl font-extrabold text-navy">{chapter.title}</Text>
@@ -189,7 +187,7 @@ export default function PilulaLeituraScreen() {
             }
             if (block.type === "quote") {
               return (
-                <View key={i} className="rounded-2xl bg-navy/5 p-4">
+                <View key={i} className="rounded-2xl bg-[#3b82f6]/5 p-4">
                   <RichText
                     text={block.text}
                     className="text-center text-base italic leading-6 text-navy"
@@ -197,12 +195,23 @@ export default function PilulaLeituraScreen() {
                 </View>
               );
             }
+            if (block.type === "footnote") {
+              return (
+                <RichText
+                  key={i}
+                  text={block.text}
+                  className="mt-2 text-xs italic leading-5 text-navy/40"
+                />
+              );
+            }
             if (block.type === "list") {
               return (
                 <View key={i} className="gap-2">
                   {block.items.map((item, j) => (
                     <View key={j} className="flex-row gap-2">
-                      <Text className="text-sm text-coral">{block.ordered ? `${j + 1}.` : "•"}</Text>
+                      <Text className="text-sm text-[#3b82f6]">
+                        {block.ordered ? `${j + 1}.` : "•"}
+                      </Text>
                       <RichText text={item} className="flex-1 text-base leading-6 text-navy/80" />
                     </View>
                   ))}
@@ -217,15 +226,13 @@ export default function PilulaLeituraScreen() {
       <Modal visible={result !== null} transparent animationType="fade">
         <View className="flex-1 items-center justify-center bg-black/50 px-8">
           <View className="w-full max-w-sm items-center gap-3 rounded-3xl bg-card p-6">
-            <View className="h-14 w-14 items-center justify-center rounded-full bg-[#f59e0b]/15">
-              <Ionicons name="sparkles" size={26} color="#f59e0b" />
+            <View className="h-14 w-14 items-center justify-center rounded-full bg-[#3b82f6]/15">
+              <Ionicons name="water" size={26} color="#3b82f6" />
             </View>
-            <Text className="text-center text-lg font-bold text-navy">
-              Sua sabedoria aumentou!
-            </Text>
+            <Text className="text-center text-lg font-bold text-navy">Sua fé aumentou!</Text>
             {result && (
               <Text className="text-center text-sm text-navy/60">
-                🔥 {result.streakDays} dia{result.streakDays > 1 ? "s seguidos" : " seguido"} de
+                🙏 {result.streakDays} dia{result.streakDays > 1 ? "s seguidos" : " seguido"} de
                 leitura
               </Text>
             )}

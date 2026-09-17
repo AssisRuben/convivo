@@ -1,4 +1,11 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(npx eas *)",
+      "Bash(node --env-file=.env.local node_modules/prisma/build/index.js db push)",
+      "Bash(npx prisma *)"
+    ]
+  },
   "enabledPlugins": {
     "expo@claude-plugins-official": true
   }

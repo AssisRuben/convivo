@@ -159,6 +159,12 @@ export function ProfileDrawer() {
               label="Pílulas de sabedoria"
               onNavigate={navigate}
             />
+            <MenuLink
+              href="/perfil/gotas-de-fe"
+              icon="water-outline"
+              label="Gotas de Fé"
+              onNavigate={navigate}
+            />
             <MenuLink href="/perfil/metas" icon="flag-outline" label="Minhas metas" onNavigate={navigate} />
             <MenuLink
               href="/perfil/minhas-postagens"

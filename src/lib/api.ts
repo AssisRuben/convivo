@@ -153,6 +153,13 @@ export type ApiWisdomProgress = {
   nextChapterAvailable: boolean;
 };
 
+export type ApiFaithProgress = {
+  chaptersRead: number;
+  streakDays: number;
+  totalChapters: number;
+  nextChapterAvailable: boolean;
+};
+
 export type ApiCareCategory =
   | "TREINO"
   | "ALIMENTACAO"
