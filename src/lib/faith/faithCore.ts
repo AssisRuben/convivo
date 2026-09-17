@@ -11,9 +11,9 @@ export type FaithProgressView = {
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
-// Mesmo interruptor temporário de wisdomCore.ts — liberado pra ler os 8
-// capítulos de uma vez agora, reversível trocando pra `true`.
-const DAILY_GATE_ENABLED = false;
+// Um capítulo por dia — combinado com o lembrete diário (ver
+// dispatchDueFaithReminders em lib/reminders/dispatchCore.ts).
+const DAILY_GATE_ENABLED = true;
 
 function daysBetween(a: Date, b: Date): number {
   return Math.round((b.getTime() - a.getTime()) / MS_PER_DAY);

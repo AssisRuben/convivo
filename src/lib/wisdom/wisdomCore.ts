@@ -14,12 +14,9 @@ export type WisdomProgressView = {
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
-// Liberado temporariamente pra ler os 8 capítulos de uma vez assim que a
-// trilha inteira foi escrita, em vez de esperar uma semana real. Volte
-// pra `true` quando quiser reativar o ritmo de "um capítulo por dia" —
-// o streak (computeNextStreak) continua contando normalmente dos dois
-// jeitos, isso só afasta o bloqueio de isNextChapterAvailable.
-const DAILY_GATE_ENABLED = false;
+// Um capítulo por dia — combinado com o lembrete diário (ver
+// dispatchDueWisdomReminders em lib/reminders/dispatchCore.ts).
+const DAILY_GATE_ENABLED = true;
 
 function daysBetween(a: Date, b: Date): number {
   return Math.round((b.getTime() - a.getTime()) / MS_PER_DAY);

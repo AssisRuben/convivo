@@ -4,6 +4,10 @@ import { sendPushToUser } from "@/lib/push/expoPush";
 import { estimateRunOutDate, daysBetween } from "@/lib/medications/medicationCore";
 import { dueTipIndexes } from "@/lib/goals/goalCore";
 import { pickTipForIndex } from "@/lib/goals/goalTips";
+import { isNextChapterAvailable as isNextWisdomChapterAvailable } from "@/lib/wisdom/wisdomCore";
+import { WISDOM_CHAPTERS } from "@/constants/wisdomPills";
+import { isNextChapterAvailable as isNextFaithChapterAvailable } from "@/lib/faith/faithCore";
+import { FAITH_CHAPTERS } from "@/constants/faithDrops";
 
 // O disparo não roda exatamente no minuto do horário cadastrado (depende
 // de com que frequência o cron externo chama essa rota) — essa tolerância
@@ -134,6 +138,82 @@ export async function dispatchDueGoalTips(now: Date = new Date()): Promise<numbe
       await prisma.goalTipDispatch.create({ data: { goalId: goal.id, tipIndex: index } });
       sent += 1;
     }
+  }
+
+  return sent;
+}
+
+// Horário fixo pro lembrete das trilhas de leitura diária (Pílulas de
+// sabedoria / Gotas de Fé) — diferente dos lembretes de rotina, não tem
+// horário configurável por usuário, é um empurrão único pela manhã.
+const DAILY_READING_REMINDER_MINUTES = 8 * 60; // 08:00
+
+/**
+ * Avisa quem já começou a trilha (tem WisdomProgress, ou seja, já leu
+ * pelo menos o capítulo 1) e ainda não terminou, que o capítulo de hoje
+ * está liberado. Idempotente via lastNotifiedDate — não manda de novo no
+ * mesmo dia se o cron rodar mais de uma vez.
+ */
+export async function dispatchDueWisdomReminders(now: Date = new Date()): Promise<number> {
+  if (Math.abs(minutesSinceMidnight(now) - DAILY_READING_REMINDER_MINUTES) > REMINDER_TOLERANCE_MINUTES) {
+    return 0;
+  }
+
+  const today = todayDate();
+  const rows = await prisma.wisdomProgress.findMany({
+    where: {
+      chaptersRead: { lt: WISDOM_CHAPTERS.length },
+      OR: [{ lastNotifiedDate: null }, { lastNotifiedDate: { not: today } }],
+    },
+  });
+
+  let sent = 0;
+  for (const row of rows) {
+    if (!isNextWisdomChapterAvailable(row.chaptersRead, row.lastReadDate, today)) continue;
+
+    await sendPushToUser(row.userId, {
+      title: "Sua pílula de sabedoria chegou 💊",
+      body: "O capítulo de hoje já está liberado — leva menos de 5 minutos.",
+      data: { screen: "pilulas-sabedoria" },
+    });
+    await prisma.wisdomProgress.update({
+      where: { userId: row.userId },
+      data: { lastNotifiedDate: today },
+    });
+    sent += 1;
+  }
+
+  return sent;
+}
+
+/** Mesma lógica de dispatchDueWisdomReminders, pra Gotas de Fé. */
+export async function dispatchDueFaithReminders(now: Date = new Date()): Promise<number> {
+  if (Math.abs(minutesSinceMidnight(now) - DAILY_READING_REMINDER_MINUTES) > REMINDER_TOLERANCE_MINUTES) {
+    return 0;
+  }
+
+  const today = todayDate();
+  const rows = await prisma.faithProgress.findMany({
+    where: {
+      chaptersRead: { lt: FAITH_CHAPTERS.length },
+      OR: [{ lastNotifiedDate: null }, { lastNotifiedDate: { not: today } }],
+    },
+  });
+
+  let sent = 0;
+  for (const row of rows) {
+    if (!isNextFaithChapterAvailable(row.chaptersRead, row.lastReadDate, today)) continue;
+
+    await sendPushToUser(row.userId, {
+      title: "Sua gota de fé chegou 🙏",
+      body: "O capítulo de hoje já está liberado — leva menos de 5 minutos.",
+      data: { screen: "gotas-de-fe" },
+    });
+    await prisma.faithProgress.update({
+      where: { userId: row.userId },
+      data: { lastNotifiedDate: today },
+    });
+    sent += 1;
   }
 
   return sent;

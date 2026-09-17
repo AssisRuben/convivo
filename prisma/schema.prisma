@@ -137,12 +137,15 @@ model LoyaltyStampCycle {
 // diferente de lastReadDate (ver wisdomCore.ts). streakDays conta dias
 // seguidos lendo (reseta pra 1 se pular um dia, não impede continuar).
 model WisdomProgress {
-  id           String    @id @default(cuid())
-  userId       String    @unique
-  chaptersRead Int       @default(0)
-  streakDays   Int       @default(0)
-  lastReadDate DateTime? @db.Date
-  updatedAt    DateTime  @updatedAt
+  id               String    @id @default(cuid())
+  userId           String    @unique
+  chaptersRead     Int       @default(0)
+  streakDays       Int       @default(0)
+  lastReadDate     DateTime? @db.Date
+  // Último dia em que o lembrete push foi disparado — evita notificar de
+  // novo no mesmo dia se o cron rodar mais de uma vez (dispatchDueWisdomReminders).
+  lastNotifiedDate DateTime? @db.Date
+  updatedAt        DateTime  @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
@@ -151,12 +154,13 @@ model WisdomProgress {
 // WisdomProgress acima, tabela própria porque é uma trilha de leitura
 // independente (streak e capítulo lido separados dos de sabedoria).
 model FaithProgress {
-  id           String    @id @default(cuid())
-  userId       String    @unique
-  chaptersRead Int       @default(0)
-  streakDays   Int       @default(0)
-  lastReadDate DateTime? @db.Date
-  updatedAt    DateTime  @updatedAt
+  id               String    @id @default(cuid())
+  userId           String    @unique
+  chaptersRead     Int       @default(0)
+  streakDays       Int       @default(0)
+  lastReadDate     DateTime? @db.Date
+  lastNotifiedDate DateTime? @db.Date
+  updatedAt        DateTime  @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

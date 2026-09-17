@@ -53,6 +53,8 @@ function useNotificationTapNavigation() {
         if (screen === "medicamentos") router.push("/perfil/medicamentos");
         else if (screen === "rotina") router.push("/rotina");
         else if (screen === "metas") router.push("/perfil/metas");
+        else if (screen === "pilulas-sabedoria") router.push("/perfil/pilulas-sabedoria");
+        else if (screen === "gotas-de-fe") router.push("/perfil/gotas-de-fe");
       });
     });
     return () => subscription?.remove();
