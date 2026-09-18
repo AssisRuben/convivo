@@ -18,6 +18,7 @@ import {
 } from "@/lib/api";
 import { CARE_CATEGORIES, CARE_CATEGORY_META, WEEKDAY_LABELS } from "@/constants/careCategories";
 import { showAlert } from "@/lib/alert";
+import { TimeField } from "@/components/TimeField";
 
 const METRIC_OPTIONS: { value: ApiGoalMetric; label: string; hint: string }[] = [
   { value: "PESO", label: "Peso", hint: "Ex: perder 10kg" },
@@ -159,11 +160,11 @@ export default function NovaMetaScreen() {
             })}
           </View>
 
-          <TextInput
+          <TimeField
             value={timeOfDay}
-            onChangeText={setTimeOfDay}
-            placeholder="Horário (opcional), ex: 19:00"
-            className="rounded-xl border border-navy/10 p-3"
+            onChange={setTimeOfDay}
+            placeholder="Horário (opcional)"
+            optional
           />
 
           <View className="flex-row flex-wrap gap-1.5">

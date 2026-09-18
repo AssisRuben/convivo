@@ -13,8 +13,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { apiFetch } from "@/lib/api";
 import { showAlert } from "@/lib/alert";
-
-const TIME_FORMAT = /^([01]\d|2[0-3]):[0-5]\d$/;
+import { TimeField } from "@/components/TimeField";
 
 export default function ConfigurarMedicamentoScreen() {
   const router = useRouter();
@@ -28,20 +27,11 @@ export default function ConfigurarMedicamentoScreen() {
   const [totalUnits, setTotalUnits] = useState(params.quantidade ?? "");
   const [unitsPerDose, setUnitsPerDose] = useState("1");
   const [horarios, setHorarios] = useState<string[]>([]);
-  const [horarioInput, setHorarioInput] = useState("");
   const [saving, setSaving] = useState(false);
 
-  function addHorario() {
-    if (!TIME_FORMAT.test(horarioInput)) {
-      showAlert("Horário inválido", "Use o formato HH:mm, ex: 08:00");
-      return;
-    }
-    if (horarios.includes(horarioInput)) {
-      setHorarioInput("");
-      return;
-    }
-    setHorarios((prev) => [...prev, horarioInput].sort());
-    setHorarioInput("");
+  function addHorario(value: string) {
+    if (!value) return;
+    setHorarios((prev) => (prev.includes(value) ? prev : [...prev, value].sort()));
   }
 
   function removeHorario(value: string) {
@@ -122,17 +112,12 @@ export default function ConfigurarMedicamentoScreen() {
 
       <View className="gap-2">
         <Text className="text-sm font-medium text-navy">Horários das doses</Text>
-        <View className="flex-row gap-2">
-          <TextInput
-            value={horarioInput}
-            onChangeText={setHorarioInput}
-            placeholder="HH:mm, ex: 08:00"
-            className="flex-1 rounded-xl border border-navy/10 bg-card p-3"
-          />
-          <Pressable onPress={addHorario} className="items-center justify-center rounded-xl bg-navy px-4">
-            <Ionicons name="add" size={20} color="#fff" />
-          </Pressable>
-        </View>
+        <TimeField
+          value=""
+          onChange={addHorario}
+          placeholder="Adicionar horário da dose"
+          className="bg-card"
+        />
         <View className="flex-row flex-wrap gap-2">
           {horarios.map((h) => (
             <Pressable

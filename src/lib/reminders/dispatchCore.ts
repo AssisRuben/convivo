@@ -14,8 +14,23 @@ import { FAITH_CHAPTERS } from "@/constants/faithDrops";
 // evita perder o lembrete se o cron rodar, por exemplo, a cada 5 minutos.
 const REMINDER_TOLERANCE_MINUTES = 5;
 
+// Horários de lembrete (timeOfDay) são em horário de Brasília, mas o
+// servidor roda em container (UTC) — getHours()/getDay() direto comparavam
+// o horário cadastrado com a hora UTC, então um lembrete das 13:15
+// disparava às 10:15 de Brasília e nunca no horário certo. O Brasil não tem
+// horário de verão desde 2019, então UTC-3 fixo é seguro.
+const BRASILIA_OFFSET_MS = 3 * 60 * 60 * 1000;
+
+export function brasiliaClock(date: Date): { minutes: number; weekday: number } {
+  const shifted = new Date(date.getTime() - BRASILIA_OFFSET_MS);
+  return {
+    minutes: shifted.getUTCHours() * 60 + shifted.getUTCMinutes(),
+    weekday: shifted.getUTCDay(),
+  };
+}
+
 function minutesSinceMidnight(date: Date): number {
-  return date.getHours() * 60 + date.getMinutes();
+  return brasiliaClock(date).minutes;
 }
 
 function parseTimeOfDay(value: string): number {
@@ -31,8 +46,7 @@ function parseTimeOfDay(value: string): number {
  */
 export async function dispatchDueRoutineReminders(now: Date = new Date()): Promise<number> {
   const today = todayDate();
-  const weekday = now.getDay();
-  const nowMinutes = minutesSinceMidnight(now);
+  const { minutes: nowMinutes, weekday } = brasiliaClock(now);
 
   const items = await prisma.careChecklistItem.findMany({
     where: { active: true, timeOfDay: { not: null } },

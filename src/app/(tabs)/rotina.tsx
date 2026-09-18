@@ -20,6 +20,7 @@ import {
 import { CARE_CATEGORIES, CARE_CATEGORY_META, WEEKDAY_LABELS } from "@/constants/careCategories";
 import { showAlert } from "@/lib/alert";
 import { LoadingScreen } from "@/components/LoadingScreen";
+import { TimeField } from "@/components/TimeField";
 import { ROTINA_CACHE_KEY, fetchRotina } from "@/lib/tabPrefetch";
 import { getCached, invalidateCached, loadCached, setCached } from "@/lib/tabDataCache";
 
@@ -239,11 +240,11 @@ export default function RotinaScreen() {
             })}
           </View>
 
-          <TextInput
+          <TimeField
             value={form.timeOfDay}
-            onChangeText={(v) => setForm((prev) => (prev ? { ...prev, timeOfDay: v } : prev))}
-            placeholder="Horário (opcional), ex: 08:00"
-            className="rounded-xl border border-navy/10 p-3"
+            onChange={(v) => setForm((prev) => (prev ? { ...prev, timeOfDay: v } : prev))}
+            placeholder="Horário (opcional)"
+            optional
           />
 
           <View className="flex-row flex-wrap gap-1.5">
