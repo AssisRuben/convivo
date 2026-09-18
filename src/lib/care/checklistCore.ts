@@ -94,17 +94,24 @@ export async function updateChecklistItemForUser(
   input: RoutineItemInput
 ): Promise<void> {
   const title = validateRoutineInput(input);
-  await requireOwnedItem(userId, id);
+  const existing = await requireOwnedItem(userId, id);
+  const newTime = input.timeOfDay || null;
 
   await prisma.careChecklistItem.update({
     where: { id },
     data: {
       title,
       category: input.category,
-      timeOfDay: input.timeOfDay || null,
+      timeOfDay: newTime,
       daysOfWeek: input.daysOfWeek,
     },
   });
+
+  // O disparo é idempotente por (item, dia) — sem isso, um lembrete que já
+  // saiu hoje no horário antigo impedia o novo horário de avisar de novo.
+  if (newTime !== existing.timeOfDay) {
+    await prisma.careReminderDispatch.deleteMany({ where: { itemId: id, date: todayDate() } });
+  }
 }
 
 export async function deactivateChecklistItemForUser(userId: string, id: string): Promise<void> {
