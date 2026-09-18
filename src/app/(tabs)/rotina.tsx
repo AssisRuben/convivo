@@ -178,9 +178,21 @@ export default function RotinaScreen() {
         text: "Remover",
         style: "destructive",
         onPress: async () => {
-          const res = await apiFetch(`/api/mobile/rotina/${item.id}`, { method: "DELETE" });
-          const data = await res.json();
-          if (res.ok) setItems(data.items ?? []);
+          // Some da tela na hora (mesma razão do toggleComplete: o banco
+          // é remoto) e só volta se o servidor recusar.
+          const snapshot = items;
+          setItems((prev) => prev.filter((i) => i.id !== item.id));
+          try {
+            const res = await apiFetch(`/api/mobile/rotina/${item.id}`, { method: "DELETE" });
+            if (!res.ok) throw new Error();
+          } catch {
+            setItems((prev) =>
+              prev.some((i) => i.id === item.id)
+                ? prev
+                : snapshot.filter((i) => i.id === item.id || prev.some((p) => p.id === i.id))
+            );
+            showAlert("Não foi possível remover", "Sua conexão pode estar instável — tente de novo.");
+          }
         },
       },
     ]);
