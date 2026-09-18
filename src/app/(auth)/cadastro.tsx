@@ -2,22 +2,19 @@ import { useState } from "react";
 import { Link } from "expo-router";
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   Text,
   TextInput,
   View,
 } from "react-native";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/lib/auth";
 import { showAlert } from "@/lib/alert";
-import { useAndroidKeyboardAvoidance } from "@/lib/useAndroidKeyboardAvoidance";
 
 export default function CadastroScreen() {
   const { register } = useAuth();
-  useAndroidKeyboardAvoidance();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -37,10 +34,7 @@ export default function CadastroScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      style={{ flex: 1 }}
-    >
+    <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
       <ScrollView
       className="flex-1 bg-cream"
       contentContainerStyle={{ flexGrow: 1, justifyContent: "center", paddingHorizontal: 24 }}

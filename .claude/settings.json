@@ -6,7 +6,8 @@
       "Bash(npx prisma *)",
       "Bash(gh auth *)",
       "Bash(gh secret *)",
-      "Bash(gh api *)"
+      "Bash(gh api *)",
+      "Bash(gh workflow *)"
     ]
   },
   "enabledPlugins": {

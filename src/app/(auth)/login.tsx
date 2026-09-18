@@ -4,8 +4,6 @@ import {
   ActivityIndicator,
   Animated,
   Easing,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -15,11 +13,11 @@ import {
   type PressableProps,
   type ViewStyle,
 } from "react-native";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/lib/auth";
 import { showAlert } from "@/lib/alert";
-import { useAndroidKeyboardAvoidance } from "@/lib/useAndroidKeyboardAvoidance";
 
 /** Brilho pulsando devagar atrás do símbolo — dá vida ao topo sem chamar
  * atenção demais. `Animated` do core, não reanimated (ver PetAnimation.tsx
@@ -91,7 +89,6 @@ function PressableScale({
 
 export default function LoginScreen() {
   const { login } = useAuth();
-  useAndroidKeyboardAvoidance();
   const { height: windowHeight } = useWindowDimensions();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -129,10 +126,7 @@ export default function LoginScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      style={{ flex: 1 }}
-    >
+    <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
       {/* minHeight na dimensão real da janela em vez de só confiar em
        * flex:1 — no web, sem a cadeia html/body/#root com altura 100%
        * (fora do nosso controle direto), flex:1 não tem o que encher e o

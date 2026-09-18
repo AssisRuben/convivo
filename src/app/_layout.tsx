@@ -4,6 +4,7 @@ import { Platform, Pressable, Text, View } from "react-native";
 import { Stack, router } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import Constants, { ExecutionEnvironment } from "expo-constants";
+import { KeyboardProvider } from "react-native-keyboard-controller";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { brandHeaderOptions, BackHeaderButton } from "@/components/AppHeader";
 import { ProfileDrawerProvider } from "@/lib/profileDrawer";
@@ -72,7 +73,7 @@ function RootNavigator() {
   if (isLoading) return null;
 
   return (
-    <>
+    <KeyboardProvider>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
@@ -101,7 +102,7 @@ function RootNavigator() {
       </Stack>
       <ProfileDrawer />
       <OnboardingTour />
-    </>
+    </KeyboardProvider>
   );
 }
 
