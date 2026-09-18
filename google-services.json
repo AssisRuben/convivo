@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "758369739922",
+    "project_id": "convivo-fb1c8",
+    "storage_bucket": "convivo-fb1c8.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:758369739922:android:0286f873567ad319e7b24b",
+        "android_client_info": {
+          "package_name": "com.conviva.loja"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDrY3M0lGZUPySOvpOP3nah8T2O0yqXjhs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

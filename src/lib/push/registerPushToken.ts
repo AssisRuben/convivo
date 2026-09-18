@@ -22,6 +22,16 @@ export async function registerPushToken(): Promise<void> {
   try {
     const Notifications = await import("expo-notifications");
 
+    // Sem isso o push recebido com o app aberto é descartado em silêncio.
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowBanner: true,
+        shouldShowList: true,
+        shouldPlaySound: true,
+        shouldSetBadge: false,
+      }),
+    });
+
     if (Platform.OS === "android") {
       await Notifications.setNotificationChannelAsync("default", {
         name: "Convivo",
@@ -35,15 +45,22 @@ export async function registerPushToken(): Promise<void> {
       const requested = await Notifications.requestPermissionsAsync();
       status = requested.status;
     }
-    if (status !== "granted") return;
+    if (status !== "granted") {
+      console.warn("[push] permissão de notificação negada");
+      return;
+    }
 
     const projectId = Constants.expoConfig?.extra?.eas?.projectId;
-    if (!projectId) return; // sem projeto EAS configurado ainda
+    if (!projectId) {
+      console.warn("[push] sem extra.eas.projectId no app.json");
+      return;
+    }
 
     const { data: token } = await Notifications.getExpoPushTokenAsync({ projectId });
     await apiFetch("/api/mobile/push-token", { method: "POST", body: JSON.stringify({ token }) });
-  } catch {
-    // Best-effort — sem permissão, sem EAS configurado, etc. não deve
-    // quebrar o fluxo de login.
+  } catch (error) {
+    // Best-effort — não deve quebrar o fluxo de login, mas o motivo fica no
+    // log (antes a falha do FCM era totalmente silenciosa).
+    console.warn("[push] falha ao registrar o token:", error);
   }
 }
