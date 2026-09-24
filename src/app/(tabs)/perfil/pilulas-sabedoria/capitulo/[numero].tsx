@@ -230,7 +230,7 @@ export default function PilulaLeituraScreen() {
               </Text>
             )}
             <Pressable
-              onPress={() => router.back()}
+              onPress={() => router.replace("/perfil/pilulas-sabedoria")}
               className="mt-2 w-full items-center rounded-full bg-coral p-3.5"
             >
               <Text className="font-bold text-white">Continuar</Text>

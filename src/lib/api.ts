@@ -146,6 +146,27 @@ export type ApiLoyaltyProgress = {
   rewardPerCycleCents: number;
 };
 
+export type ApiHomeNextDose = {
+  checklistItemId: string;
+  title: string;
+  timeOfDay: string;
+  overdue: boolean;
+};
+
+export type ApiHomeRepurchaseItem = {
+  medicationTrackingId: string;
+  productName: string;
+  codigoProduto: number | null;
+  daysUntilRunOut: number;
+};
+
+export type ApiHomeDashboard = {
+  nextDose: ApiHomeNextDose | null;
+  repurchaseReady: ApiHomeRepurchaseItem[];
+  loyalty: { stampsFilled: number; stampsTotal: number; totalRewardCents: number };
+  activePromotionsCount: number;
+};
+
 export type ApiWisdomProgress = {
   chaptersRead: number;
   streakDays: number;
@@ -154,10 +175,22 @@ export type ApiWisdomProgress = {
 };
 
 export type ApiFaithProgress = {
+  bookSlug: string;
   chaptersRead: number;
   streakDays: number;
   totalChapters: number;
   nextChapterAvailable: boolean;
+};
+
+export type ApiFaithBookSummary = {
+  slug: string;
+  title: string;
+  subtitle: string;
+  icon: string;
+  color: string;
+  chaptersRead: number;
+  totalChapters: number;
+  streakDays: number;
 };
 
 export type ApiCareCategory =

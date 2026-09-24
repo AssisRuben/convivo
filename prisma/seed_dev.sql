@@ -322,3 +322,35 @@ DROP TYPE "ProductCategory";
 -- cpfVerificationLockedUntil e o valor PRESSAO do enum GoalType).
 -- ============================================================
 ALTER TABLE "User" ADD COLUMN "deletedAt" TIMESTAMP(3);
+
+-- ============================================================
+-- 1i) Migration de Progresso por Livro em Gotas de Fé
+-- Equivalente a prisma/migrations/20260924000000_add_faith_book_progress
+--
+-- ATENÇÃO: a tabela FaithProgress em si (e WisdomProgress, e os campos
+-- de onboarding) vieram de fora do fluxo de migrations deste arquivo —
+-- não têm seção correspondente aqui, foram aplicadas de outra forma.
+-- Confirme que FaithProgress já existe no banco antes de rodar isto.
+-- ============================================================
+DO $$
+DECLARE
+  found_constraint text;
+BEGIN
+  SELECT conname INTO found_constraint
+  FROM pg_constraint
+  WHERE conrelid = '"FaithProgress"'::regclass
+    AND contype = 'u'
+    AND array_length(conkey, 1) = 1
+    AND conkey[1] = (
+      SELECT attnum FROM pg_attribute
+      WHERE attrelid = '"FaithProgress"'::regclass AND attname = 'userId'
+    );
+  IF found_constraint IS NOT NULL THEN
+    EXECUTE 'ALTER TABLE "FaithProgress" DROP CONSTRAINT ' || quote_ident(found_constraint);
+  END IF;
+END $$;
+
+ALTER TABLE "FaithProgress" ADD COLUMN "bookSlug" TEXT NOT NULL DEFAULT 'proverbios';
+ALTER TABLE "FaithProgress" ALTER COLUMN "bookSlug" DROP DEFAULT;
+
+CREATE UNIQUE INDEX "FaithProgress_userId_bookSlug_key" ON "FaithProgress"("userId", "bookSlug");

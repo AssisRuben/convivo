@@ -1,41 +1,19 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
 import { ActivityIndicator, FlatList, Pressable, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { apiFetch, type ApiFaithProgress } from "@/lib/api";
-import { FAITH_CHAPTERS } from "@/constants/faithDrops";
+import { apiFetch, type ApiFaithBookSummary } from "@/lib/api";
 
-type ChapterStatus = "read" | "available" | "waiting" | "locked";
-
-function statusFor(number: number, progress: ApiFaithProgress): ChapterStatus {
-  if (number <= progress.chaptersRead) return "read";
-  if (number === progress.chaptersRead + 1) {
-    return progress.nextChapterAvailable ? "available" : "waiting";
-  }
-  return "locked";
-}
-
-const STATUS_META: Record<
-  ChapterStatus,
-  { icon: keyof typeof Ionicons.glyphMap; color: string; label: string }
-> = {
-  read: { icon: "checkmark-circle", color: "#2ec4b6", label: "Lido" },
-  available: { icon: "water-outline", color: "#3b82f6", label: "Disponível hoje" },
-  waiting: { icon: "time-outline", color: "#0b1e3d60", label: "Disponível amanhã" },
-  locked: { icon: "lock-closed-outline", color: "#0b1e3d40", label: "Bloqueado" },
-};
-
-export default function GotasDeFeScreen() {
+export default function GotasDeFeHubScreen() {
   const router = useRouter();
-  const [progress, setProgress] = useState<ApiFaithProgress | null>(null);
+  const [books, setBooks] = useState<ApiFaithBookSummary[] | null>(null);
   const [loading, setLoading] = useState(true);
-  const loadedOnce = useRef(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const res = await apiFetch("/api/mobile/faith");
-      if (res.ok) setProgress(await res.json());
+      if (res.ok) setBooks((await res.json()).books ?? []);
     } finally {
       setLoading(false);
     }
@@ -43,12 +21,11 @@ export default function GotasDeFeScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      loadedOnce.current = true;
       load();
     }, [load])
   );
 
-  if (loading || !progress) {
+  if (loading || !books) {
     return (
       <View className="flex-1 items-center justify-center bg-cream">
         <ActivityIndicator color="#0b1e3d" />
@@ -59,57 +36,52 @@ export default function GotasDeFeScreen() {
   return (
     <FlatList
       className="flex-1 bg-cream"
-      data={FAITH_CHAPTERS}
-      keyExtractor={(item) => String(item.number)}
+      data={books}
+      keyExtractor={(item) => item.slug}
       contentContainerClassName="gap-3 p-4 pb-24"
       ListHeaderComponent={
-        <View className="mb-1 flex-row items-center gap-3 rounded-2xl bg-navy p-4">
-          <View className="h-12 w-12 items-center justify-center rounded-full bg-white/10">
-            <Ionicons name="water" size={22} color="#7dd3fc" />
-          </View>
-          <View className="flex-1">
-            <Text className="text-sm font-semibold text-white">
-              {progress.chaptersRead} de {progress.totalChapters} capítulos lidos
-            </Text>
-            <Text className="mt-0.5 text-xs text-white/60">
-              {progress.streakDays > 0
-                ? `🙏 ${progress.streakDays} dia${progress.streakDays > 1 ? "s seguidos" : " seguido"}`
-                : "Leia um capítulo por dia pra começar sua sequência"}
-            </Text>
-          </View>
-        </View>
+        <Text className="mb-1 text-xl font-bold text-navy">Gotas de Fé</Text>
       }
       renderItem={({ item }) => {
-        const status = statusFor(item.number, progress);
-        const meta = STATUS_META[status];
-        const disabled = status === "waiting" || status === "locked";
+        const emptyBook = item.totalChapters === 0;
+        const done = !emptyBook && item.chaptersRead >= item.totalChapters;
 
         return (
           <Pressable
-            disabled={disabled}
+            disabled={emptyBook}
             onPress={() =>
-              router.push({
-                pathname: "/perfil/gotas-de-fe/capitulo/[numero]",
-                params: { numero: String(item.number) },
-              })
+              router.push({ pathname: "/perfil/gotas-de-fe/[livro]/index", params: { livro: item.slug } })
             }
             className={`flex-row items-center gap-3 rounded-2xl bg-card p-4 shadow-sm ${
-              disabled ? "opacity-60" : ""
+              emptyBook ? "opacity-60" : ""
             }`}
           >
-            <View className="h-9 w-9 items-center justify-center rounded-full bg-navy/5">
-              <Text className="text-xs font-bold text-navy/60">{item.number}</Text>
+            <View
+              className="h-12 w-12 items-center justify-center rounded-full"
+              style={{ backgroundColor: `${item.color}20` }}
+            >
+              <Ionicons name={item.icon as keyof typeof Ionicons.glyphMap} size={22} color={item.color} />
             </View>
             <View className="flex-1">
               <Text className="text-sm font-semibold text-navy">{item.title}</Text>
-              <View className="mt-1 flex-row items-center gap-1.5">
-                <Ionicons name={meta.icon} size={13} color={meta.color} />
-                <Text className="text-xs" style={{ color: meta.color }}>
-                  {meta.label}
-                </Text>
-              </View>
+              <Text className="mt-0.5 text-xs text-navy/50">{item.subtitle}</Text>
+              {emptyBook ? (
+                <Text className="mt-1 text-xs font-medium text-navy/40">Em breve</Text>
+              ) : (
+                <View className="mt-1.5 flex-row items-center gap-1.5">
+                  {done ? (
+                    <Ionicons name="checkmark-circle" size={13} color="#2ec4b6" />
+                  ) : (
+                    <Ionicons name="book-outline" size={13} color={item.color} />
+                  )}
+                  <Text className="text-xs" style={{ color: done ? "#2ec4b6" : item.color }}>
+                    {item.chaptersRead} de {item.totalChapters} capítulos
+                    {item.streakDays > 0 ? ` · 🙏 ${item.streakDays}` : ""}
+                  </Text>
+                </View>
+              )}
             </View>
-            {!disabled && <Ionicons name="chevron-forward" size={16} color="#0b1e3d60" />}
+            {!emptyBook && <Ionicons name="chevron-forward" size={16} color="#0b1e3d60" />}
           </Pressable>
         );
       }}

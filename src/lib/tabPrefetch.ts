@@ -4,18 +4,25 @@ import {
   type ApiChecklistItem,
   type ApiFeedPage,
   type ApiHealthMeasurement,
+  type ApiHomeDashboard,
 } from "@/lib/api";
 import { loadCached } from "@/lib/tabDataCache";
 
 // Uma key de cache por aba principal — usadas tanto pelas telas (leitura/
 // escrita do próprio state) quanto pelo prefetch abaixo (escrita em
 // background). O tamanho de página do feed aqui precisa bater com
-// PAGE_SIZE em (tabs)/index.tsx — é só a carga inicial (offset 0) que
+// PAGE_SIZE em perfil/novidades.tsx — é só a carga inicial (offset 0) que
 // entra em cache; paginação seguinte não passa por aqui.
+export const HOME_CACHE_KEY = "home:dashboard";
 export const FEED_INITIAL_CACHE_KEY = "feed:initial";
 export const CATALOG_HOME_CACHE_KEY = "catalog:home";
 export const ROTINA_CACHE_KEY = "rotina:items";
 export const SAUDE_CACHE_KEY = "saude:measurements";
+
+export async function fetchHomeDashboard(): Promise<ApiHomeDashboard> {
+  const res = await apiFetch("/api/mobile/home");
+  return res.json();
+}
 
 export async function fetchFeedInitial(): Promise<ApiFeedPage> {
   const res = await apiFetch("/api/mobile/feed?offset=0&limit=10");
@@ -53,7 +60,7 @@ export async function fetchSaude(): Promise<{ measurements: ApiHealthMeasurement
  * focada (loadCached não guarda erro em cache, só sucesso).
  */
 export function prefetchAllTabs(): void {
-  loadCached(FEED_INITIAL_CACHE_KEY, fetchFeedInitial).catch(() => {});
+  loadCached(HOME_CACHE_KEY, fetchHomeDashboard).catch(() => {});
   loadCached(CATALOG_HOME_CACHE_KEY, fetchCatalogHome).catch(() => {});
   loadCached(ROTINA_CACHE_KEY, fetchRotina).catch(() => {});
   loadCached(SAUDE_CACHE_KEY, fetchSaude).catch(() => {});

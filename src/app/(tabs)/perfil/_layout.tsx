@@ -25,6 +25,7 @@ export default function PerfilLayout() {
       <Stack.Screen name="pedidos" />
       <Stack.Screen name="pedidos/[id]" options={backButtonOptions} />
       <Stack.Screen name="minhas-postagens" />
+      <Stack.Screen name="novidades" />
       <Stack.Screen name="fidelidade" />
       <Stack.Screen name="indicacao" />
       <Stack.Screen name="historico-compras" />

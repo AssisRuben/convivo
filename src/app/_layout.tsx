@@ -99,6 +99,15 @@ function RootNavigator() {
             headerLeft: BackHeaderButton,
           }}
         />
+        <Stack.Screen
+          name="ofertas"
+          options={{
+            ...brandHeaderOptions,
+            headerShown: true,
+            headerBackVisible: true,
+            headerLeft: BackHeaderButton,
+          }}
+        />
       </Stack>
       <ProfileDrawer />
       <OnboardingTour />

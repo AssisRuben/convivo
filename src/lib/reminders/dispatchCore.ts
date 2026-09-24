@@ -7,7 +7,7 @@ import { pickTipForIndex } from "@/lib/goals/goalTips";
 import { isNextChapterAvailable as isNextWisdomChapterAvailable } from "@/lib/wisdom/wisdomCore";
 import { WISDOM_CHAPTERS } from "@/constants/wisdomPills";
 import { isNextChapterAvailable as isNextFaithChapterAvailable } from "@/lib/faith/faithCore";
-import { FAITH_CHAPTERS } from "@/constants/faithDrops";
+import { getFaithBook } from "@/constants/faithDrops";
 
 // O disparo não roda exatamente no minuto do horário cadastrado (depende
 // de com que frequência o cron externo chama essa rota) — essa tolerância
@@ -207,24 +207,29 @@ export async function dispatchDueFaithReminders(now: Date = new Date()): Promise
   }
 
   const today = todayDate();
+  // Um lembrete por USUÁRIO, não por livro — se qualquer livro tiver
+  // capítulo disponível hoje, avisa uma vez só (evita duplicar
+  // notificação quando o usuário lê mais de um livro em paralelo).
   const rows = await prisma.faithProgress.findMany({
-    where: {
-      chaptersRead: { lt: FAITH_CHAPTERS.length },
-      OR: [{ lastNotifiedDate: null }, { lastNotifiedDate: { not: today } }],
-    },
+    where: { OR: [{ lastNotifiedDate: null }, { lastNotifiedDate: { not: today } }] },
   });
 
+  const notifiedUserIds = new Set<string>();
   let sent = 0;
   for (const row of rows) {
-    if (!isNextFaithChapterAvailable(row.chaptersRead, row.lastReadDate, today)) continue;
+    if (notifiedUserIds.has(row.userId)) continue;
+    const book = getFaithBook(row.bookSlug);
+    if (!book || row.chaptersRead >= book.chapters.length) continue;
+    if (!isNextFaithChapterAvailable(row.chaptersRead, row.lastReadDate, today, book.chapters.length)) continue;
 
     await sendPushToUser(row.userId, {
       title: "Sua gota de fé chegou 🙏",
       body: "O capítulo de hoje já está liberado — leva menos de 5 minutos.",
       data: { screen: "gotas-de-fe" },
     });
+    notifiedUserIds.add(row.userId);
     await prisma.faithProgress.update({
-      where: { userId: row.userId },
+      where: { userId_bookSlug: { userId: row.userId, bookSlug: row.bookSlug } },
       data: { lastNotifiedDate: today },
     });
     sent += 1;

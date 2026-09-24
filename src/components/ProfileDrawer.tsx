@@ -136,6 +136,12 @@ export function ProfileDrawer() {
               onNavigate={navigate}
             />
             <MenuLink
+              href="/perfil/novidades"
+              icon="newspaper-outline"
+              label="Novidades"
+              onNavigate={navigate}
+            />
+            <MenuLink
               href="/perfil/pedidos"
               icon="receipt-outline"
               label="Meus pedidos"

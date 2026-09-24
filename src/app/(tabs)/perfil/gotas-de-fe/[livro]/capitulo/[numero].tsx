@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { apiFetch, type ApiFaithProgress } from "@/lib/api";
-import { FAITH_CHAPTERS } from "@/constants/faithDrops";
+import { getFaithBook } from "@/constants/faithDrops";
 import { showAlert } from "@/lib/alert";
 
 function isCloseToBottom({ layoutMeasurement, contentOffset, contentSize }: NativeScrollEvent) {
@@ -56,8 +56,10 @@ function RichText({ text, className }: { text: string; className?: string }) {
 
 export default function GotaLeituraScreen() {
   const router = useRouter();
-  const { numero } = useLocalSearchParams<{ numero: string }>();
-  const chapter = FAITH_CHAPTERS.find((c) => c.number === Number(numero));
+  const { livro, numero } = useLocalSearchParams<{ livro: string; numero: string }>();
+  const book = getFaithBook(livro);
+  const chapter = book?.chapters.find((c) => c.number === Number(numero));
+  const accentColor = book?.color ?? "#3b82f6";
 
   const [progress, setProgress] = useState<ApiFaithProgress | null>(null);
   const [loading, setLoading] = useState(true);
@@ -69,12 +71,12 @@ export default function GotaLeituraScreen() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiFetch("/api/mobile/faith");
+      const res = await apiFetch(`/api/mobile/faith/${livro}`);
       if (res.ok) setProgress(await res.json());
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [livro]);
 
   useFocusEffect(
     useCallback(() => {
@@ -95,7 +97,7 @@ export default function GotaLeituraScreen() {
     try {
       const res = await apiFetch("/api/mobile/faith/complete", {
         method: "POST",
-        body: JSON.stringify({ chapterNumber: chapter.number }),
+        body: JSON.stringify({ bookSlug: livro, chapterNumber: chapter.number }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error ?? "Não foi possível salvar");
@@ -119,21 +121,21 @@ export default function GotaLeituraScreen() {
     }
   }
 
-  if (loading || !progress) {
-    return (
-      <View className="flex-1 items-center justify-center bg-cream">
-        <ActivityIndicator color="#0b1e3d" />
-      </View>
-    );
-  }
-
-  if (!chapter) {
+  if (!book || !chapter) {
     return (
       <View className="flex-1 items-center justify-center gap-3 bg-cream p-6">
         <Text className="text-center text-navy/60">Capítulo não encontrado.</Text>
         <Pressable onPress={() => router.back()} className="rounded-full bg-navy px-5 py-2.5">
           <Text className="text-sm font-semibold text-white">Voltar</Text>
         </Pressable>
+      </View>
+    );
+  }
+
+  if (loading || !progress) {
+    return (
+      <View className="flex-1 items-center justify-center bg-cream">
+        <ActivityIndicator color="#0b1e3d" />
       </View>
     );
   }
@@ -170,8 +172,8 @@ export default function GotaLeituraScreen() {
         onScroll={onScroll}
         scrollEventThrottle={100}
       >
-        <Text className="text-xs font-semibold uppercase tracking-wide text-[#3b82f6]">
-          Capítulo {chapter.number}
+        <Text className="text-xs font-semibold uppercase tracking-wide" style={{ color: accentColor }}>
+          {book.title} · Capítulo {chapter.number}
         </Text>
         <Text className="mt-1 text-2xl font-extrabold text-navy">{chapter.title}</Text>
         <Text className="mt-1 text-sm text-navy/60">{chapter.subtitle}</Text>
@@ -187,7 +189,7 @@ export default function GotaLeituraScreen() {
             }
             if (block.type === "quote") {
               return (
-                <View key={i} className="rounded-2xl bg-[#3b82f6]/5 p-4">
+                <View key={i} className="rounded-2xl p-4" style={{ backgroundColor: `${accentColor}0d` }}>
                   <RichText
                     text={block.text}
                     className="text-center text-base italic leading-6 text-navy"
@@ -209,7 +211,7 @@ export default function GotaLeituraScreen() {
                 <View key={i} className="gap-2">
                   {block.items.map((item, j) => (
                     <View key={j} className="flex-row gap-2">
-                      <Text className="text-sm text-[#3b82f6]">
+                      <Text className="text-sm" style={{ color: accentColor }}>
                         {block.ordered ? `${j + 1}.` : "•"}
                       </Text>
                       <RichText text={item} className="flex-1 text-base leading-6 text-navy/80" />
@@ -226,8 +228,11 @@ export default function GotaLeituraScreen() {
       <Modal visible={result !== null} transparent animationType="fade">
         <View className="flex-1 items-center justify-center bg-black/50 px-8">
           <View className="w-full max-w-sm items-center gap-3 rounded-3xl bg-card p-6">
-            <View className="h-14 w-14 items-center justify-center rounded-full bg-[#3b82f6]/15">
-              <Ionicons name="water" size={26} color="#3b82f6" />
+            <View
+              className="h-14 w-14 items-center justify-center rounded-full"
+              style={{ backgroundColor: `${accentColor}26` }}
+            >
+              <Ionicons name={book.icon as keyof typeof Ionicons.glyphMap} size={26} color={accentColor} />
             </View>
             <Text className="text-center text-lg font-bold text-navy">Sua fé aumentou!</Text>
             {result && (
@@ -237,7 +242,7 @@ export default function GotaLeituraScreen() {
               </Text>
             )}
             <Pressable
-              onPress={() => router.back()}
+              onPress={() => router.replace({ pathname: "/perfil/gotas-de-fe/[livro]/index", params: { livro } })}
               className="mt-2 w-full items-center rounded-full bg-coral p-3.5"
             >
               <Text className="font-bold text-white">Continuar</Text>

@@ -7,13 +7,16 @@ export async function POST(request: Request) {
     return Response.json({ error: "Não autenticado" }, { status: 401 });
   }
 
-  const body = (await request.json().catch(() => null)) as { chapterNumber?: number } | null;
-  if (!body?.chapterNumber) {
+  const body = (await request.json().catch(() => null)) as {
+    bookSlug?: string;
+    chapterNumber?: number;
+  } | null;
+  if (!body?.bookSlug || !body?.chapterNumber) {
     return Response.json({ error: "Dados inválidos" }, { status: 400 });
   }
 
   try {
-    const progress = await completeChapterForUser(userId, body.chapterNumber);
+    const progress = await completeChapterForUser(userId, body.bookSlug, body.chapterNumber);
     return Response.json(progress);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Não foi possível salvar";
