@@ -35,6 +35,9 @@ export default function PerfilLayout() {
       <Stack.Screen name="metas/index" />
       <Stack.Screen name="metas/nova" options={backButtonOptions} />
       <Stack.Screen name="metas/[id]" options={backButtonOptions} />
+      <Stack.Screen name="gotas-de-fe/index" />
+      <Stack.Screen name="gotas-de-fe/[livro]/index" options={backButtonOptions} />
+      <Stack.Screen name="gotas-de-fe/[livro]/capitulo/[numero]" options={backButtonOptions} />
     </Stack>
   );
 }
