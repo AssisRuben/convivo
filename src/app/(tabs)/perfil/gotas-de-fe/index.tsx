@@ -33,6 +33,14 @@ export default function GotasDeFeHubScreen() {
     );
   }
 
+  // Resumo somado dos livros — mesmo banner de Pílulas de sabedoria, só
+  // que aqui soma capítulos de todos os livros e mostra a maior sequência
+  // entre eles (streak é por livro, não faz sentido somar dias de leituras
+  // de livros diferentes, só destacar a melhor).
+  const totalRead = books.reduce((sum, b) => sum + b.chaptersRead, 0);
+  const totalChapters = books.reduce((sum, b) => sum + b.totalChapters, 0);
+  const bestStreak = Math.max(0, ...books.map((b) => b.streakDays));
+
   return (
     <FlatList
       className="flex-1 bg-cream"
@@ -40,7 +48,21 @@ export default function GotasDeFeHubScreen() {
       keyExtractor={(item) => item.slug}
       contentContainerClassName="gap-3 p-4 pb-24"
       ListHeaderComponent={
-        <Text className="mb-1 text-xl font-bold text-navy">Gotas de Fé</Text>
+        <View className="mb-1 flex-row items-center gap-3 rounded-2xl bg-navy p-4">
+          <View className="h-12 w-12 items-center justify-center rounded-full bg-white/10">
+            <Ionicons name="water" size={22} color="#7dd3fc" />
+          </View>
+          <View className="flex-1">
+            <Text className="text-sm font-semibold text-white">
+              {totalRead} de {totalChapters} capítulos lidos
+            </Text>
+            <Text className="mt-0.5 text-xs text-white/60">
+              {bestStreak > 0
+                ? `🙏 ${bestStreak} dia${bestStreak > 1 ? "s seguidos" : " seguido"}`
+                : "Leia um capítulo por dia pra começar sua sequência"}
+            </Text>
+          </View>
+        </View>
       }
       renderItem={({ item }) => {
         const emptyBook = item.totalChapters === 0;
