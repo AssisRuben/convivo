@@ -242,7 +242,7 @@ export default function GotaLeituraScreen() {
               </Text>
             )}
             <Pressable
-              onPress={() => router.replace({ pathname: "/perfil/gotas-de-fe/[livro]/index", params: { livro } })}
+              onPress={() => router.replace({ pathname: "/perfil/gotas-de-fe/[livro]", params: { livro } })}
               className="mt-2 w-full items-center rounded-full bg-coral p-3.5"
             >
               <Text className="font-bold text-white">Continuar</Text>

@@ -72,7 +72,7 @@ export default function GotasDeFeHubScreen() {
           <Pressable
             disabled={emptyBook}
             onPress={() =>
-              router.push({ pathname: "/perfil/gotas-de-fe/[livro]/index", params: { livro: item.slug } })
+              router.push({ pathname: "/perfil/gotas-de-fe/[livro]", params: { livro: item.slug } })
             }
             className={`flex-row items-center gap-3 rounded-2xl bg-card p-4 shadow-sm ${
               emptyBook ? "opacity-60" : ""
