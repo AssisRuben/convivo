@@ -2,7 +2,6 @@ import { useCallback, useRef, useState } from "react";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import {
   ActivityIndicator,
-  Modal,
   NativeScrollEvent,
   NativeSyntheticEvent,
   Pressable,
@@ -14,6 +13,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { apiFetch, type ApiFaithProgress } from "@/lib/api";
 import { getFaithBook } from "@/constants/faithDrops";
 import { showAlert } from "@/lib/alert";
+import { CelebrationModal } from "@/components/CelebrationModal";
 
 function isCloseToBottom({ layoutMeasurement, contentOffset, contentSize }: NativeScrollEvent) {
   const paddingToBottom = 32;
@@ -57,6 +57,13 @@ function RichText({ text, className }: { text: string; className?: string }) {
 export default function GotaLeituraScreen() {
   const router = useRouter();
   const { livro, numero } = useLocalSearchParams<{ livro: string; numero: string }>();
+
+  // Aberto por notificação/link direto não tem histórico — sem o fallback,
+  // voltar sairia de Gotas de Fé em vez de ir pra lista de capítulos.
+  function backToBook() {
+    if (router.canGoBack()) router.back();
+    else router.replace({ pathname: "/perfil/gotas-de-fe/[livro]", params: { livro } });
+  }
   const book = getFaithBook(livro);
   const chapter = book?.chapters.find((c) => c.number === Number(numero));
   const accentColor = book?.color ?? "#3b82f6";
@@ -125,7 +132,7 @@ export default function GotaLeituraScreen() {
     return (
       <View className="flex-1 items-center justify-center gap-3 bg-cream p-6">
         <Text className="text-center text-navy/60">Capítulo não encontrado.</Text>
-        <Pressable onPress={() => router.back()} className="rounded-full bg-navy px-5 py-2.5">
+        <Pressable onPress={backToBook} className="rounded-full bg-navy px-5 py-2.5">
           <Text className="text-sm font-semibold text-white">Voltar</Text>
         </Pressable>
       </View>
@@ -153,7 +160,7 @@ export default function GotaLeituraScreen() {
             ? "Esse capítulo libera amanhã — um por dia pra dar tempo de refletir."
             : "Esse capítulo ainda não foi liberado."}
         </Text>
-        <Pressable onPress={() => router.back()} className="rounded-full bg-navy px-5 py-2.5">
+        <Pressable onPress={backToBook} className="rounded-full bg-navy px-5 py-2.5">
           <Text className="text-sm font-semibold text-white">Voltar</Text>
         </Pressable>
       </View>
@@ -225,31 +232,19 @@ export default function GotaLeituraScreen() {
         </View>
       </ScrollView>
 
-      <Modal visible={result !== null} transparent animationType="fade">
-        <View className="flex-1 items-center justify-center bg-black/50 px-8">
-          <View className="w-full max-w-sm items-center gap-3 rounded-3xl bg-card p-6">
-            <View
-              className="h-14 w-14 items-center justify-center rounded-full"
-              style={{ backgroundColor: `${accentColor}26` }}
-            >
-              <Ionicons name={book.icon as keyof typeof Ionicons.glyphMap} size={26} color={accentColor} />
-            </View>
-            <Text className="text-center text-lg font-bold text-navy">Sua fé aumentou!</Text>
-            {result && (
-              <Text className="text-center text-sm text-navy/60">
-                🙏 {result.streakDays} dia{result.streakDays > 1 ? "s seguidos" : " seguido"} de
-                leitura
-              </Text>
-            )}
-            <Pressable
-              onPress={() => router.replace({ pathname: "/perfil/gotas-de-fe/[livro]", params: { livro } })}
-              className="mt-2 w-full items-center rounded-full bg-coral p-3.5"
-            >
-              <Text className="font-bold text-white">Continuar</Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
+      <CelebrationModal
+        visible={result !== null}
+        icon={book.icon as keyof typeof Ionicons.glyphMap}
+        color={accentColor}
+        title="Sua fé aumentou!"
+        message={`${book.title} · Capítulo ${chapter.number} concluído`}
+        streakDays={result?.streakDays}
+        streakEmoji="🙏"
+        onContinue={() => {
+          setResult(null);
+          backToBook();
+        }}
+      />
     </View>
   );
 }

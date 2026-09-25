@@ -20,6 +20,45 @@ export type WisdomChapter = {
   blocks: WisdomBlock[];
 };
 
+// Assuntos só agrupam a lista na tela — a progressão continua uma trilha
+// única, capítulo a capítulo. Faixas precisam cobrir WISDOM_CHAPTERS sem
+// buraco; capítulo novo entra no fim da faixa do assunto (ou num novo).
+export type WisdomTopic = {
+  title: string;
+  subtitle: string;
+  icon: string;
+  color: string;
+  firstChapter: number;
+  lastChapter: number;
+};
+
+export const WISDOM_TOPICS: WisdomTopic[] = [
+  {
+    title: "Decisões e Vieses",
+    subtitle: "Como o cérebro se engana ao decidir",
+    icon: "git-branch-outline",
+    color: "#3b82f6",
+    firstChapter: 1,
+    lastChapter: 8,
+  },
+  {
+    title: "Estoicismo",
+    subtitle: "Serenidade diante do que não depende de você",
+    icon: "shield-outline",
+    color: "#8b5cf6",
+    firstChapter: 9,
+    lastChapter: 15,
+  },
+  {
+    title: "Odisseia",
+    subtitle: "Lições da jornada de Ulisses",
+    icon: "boat-outline",
+    color: "#2ec4b6",
+    firstChapter: 16,
+    lastChapter: 25,
+  },
+];
+
 export const WISDOM_CHAPTERS: WisdomChapter[] = [
   {
     number: 1,

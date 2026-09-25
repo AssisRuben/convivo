@@ -53,7 +53,10 @@ export default function GotasDeFeLivroScreen() {
     return (
       <View className="flex-1 items-center justify-center gap-3 bg-cream p-6">
         <Text className="text-center text-navy/60">Livro não encontrado.</Text>
-        <Pressable onPress={() => router.back()} className="rounded-full bg-navy px-5 py-2.5">
+        <Pressable
+          onPress={() => (router.canGoBack() ? router.back() : router.replace("/perfil/gotas-de-fe"))}
+          className="rounded-full bg-navy px-5 py-2.5"
+        >
           <Text className="text-sm font-semibold text-white">Voltar</Text>
         </Pressable>
       </View>

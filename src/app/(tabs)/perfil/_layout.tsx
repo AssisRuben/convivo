@@ -35,11 +35,13 @@ export default function PerfilLayout() {
       <Stack.Screen name="metas/index" />
       <Stack.Screen name="metas/nova" options={backButtonOptions} />
       <Stack.Screen name="metas/[id]" options={backButtonOptions} />
+      {/* Gotas de Fé e Pílulas sem seta no header: a saída é o Continuar do
+          modal de conclusão e o voltar do sistema, sempre pra lista. */}
       <Stack.Screen name="gotas-de-fe/index" />
-      <Stack.Screen name="gotas-de-fe/[livro]/index" options={backButtonOptions} />
-      <Stack.Screen name="gotas-de-fe/[livro]/capitulo/[numero]" options={backButtonOptions} />
+      <Stack.Screen name="gotas-de-fe/[livro]/index" />
+      <Stack.Screen name="gotas-de-fe/[livro]/capitulo/[numero]" />
       <Stack.Screen name="pilulas-sabedoria/index" />
-      <Stack.Screen name="pilulas-sabedoria/capitulo/[numero]" options={backButtonOptions} />
+      <Stack.Screen name="pilulas-sabedoria/capitulo/[numero]" />
     </Stack>
   );
 }

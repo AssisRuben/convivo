@@ -1,9 +1,9 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
-import { ActivityIndicator, FlatList, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, SectionList, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { apiFetch, type ApiWisdomProgress } from "@/lib/api";
-import { WISDOM_CHAPTERS } from "@/constants/wisdomPills";
+import { WISDOM_CHAPTERS, WISDOM_TOPICS, type WisdomChapter, type WisdomTopic } from "@/constants/wisdomPills";
 
 type ChapterStatus = "read" | "available" | "waiting" | "locked";
 
@@ -25,11 +25,15 @@ const STATUS_META: Record<
   locked: { icon: "lock-closed-outline", color: "#0b1e3d40", label: "Bloqueado" },
 };
 
+const SECTIONS: (WisdomTopic & { data: WisdomChapter[] })[] = WISDOM_TOPICS.map((topic) => ({
+  ...topic,
+  data: WISDOM_CHAPTERS.filter((c) => c.number >= topic.firstChapter && c.number <= topic.lastChapter),
+}));
+
 export default function PilulasSabedoriaScreen() {
   const router = useRouter();
   const [progress, setProgress] = useState<ApiWisdomProgress | null>(null);
   const [loading, setLoading] = useState(true);
-  const loadedOnce = useRef(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -43,7 +47,6 @@ export default function PilulasSabedoriaScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      loadedOnce.current = true;
       load();
     }, [load])
   );
@@ -57,13 +60,15 @@ export default function PilulasSabedoriaScreen() {
   }
 
   return (
-    <FlatList
+    <SectionList
       className="flex-1 bg-cream"
-      data={WISDOM_CHAPTERS}
+      sections={SECTIONS}
       keyExtractor={(item) => String(item.number)}
-      contentContainerClassName="gap-3 p-4 pb-24"
+      contentContainerClassName="p-4 pb-24"
+      stickySectionHeadersEnabled={false}
+      ItemSeparatorComponent={() => <View className="h-3" />}
       ListHeaderComponent={
-        <View className="mb-1 flex-row items-center gap-3 rounded-2xl bg-navy p-4">
+        <View className="flex-row items-center gap-3 rounded-2xl bg-navy p-4">
           <View className="h-12 w-12 items-center justify-center rounded-full bg-white/10">
             <Ionicons name="bulb" size={22} color="#fde68a" />
           </View>
@@ -79,7 +84,32 @@ export default function PilulasSabedoriaScreen() {
           </View>
         </View>
       }
-      renderItem={({ item }) => {
+      renderSectionHeader={({ section }) => {
+        const total = section.data.length;
+        const read = section.data.filter((c) => c.number <= progress.chaptersRead).length;
+        const done = read === total;
+        return (
+          <View className="mb-3 mt-6 flex-row items-center gap-3">
+            <View
+              className="h-10 w-10 items-center justify-center rounded-full"
+              style={{ backgroundColor: `${section.color}20` }}
+            >
+              <Ionicons name={section.icon as keyof typeof Ionicons.glyphMap} size={20} color={section.color} />
+            </View>
+            <View className="flex-1">
+              <Text className="text-base font-bold text-navy">{section.title}</Text>
+              <Text className="text-xs text-navy/50">{section.subtitle}</Text>
+            </View>
+            <View className="flex-row items-center gap-1">
+              {done && <Ionicons name="checkmark-circle" size={14} color="#2ec4b6" />}
+              <Text className="text-xs font-semibold" style={{ color: done ? "#2ec4b6" : section.color }}>
+                {read}/{total}
+              </Text>
+            </View>
+          </View>
+        );
+      }}
+      renderItem={({ item, section }) => {
         const status = statusFor(item.number, progress);
         const meta = STATUS_META[status];
         const disabled = status === "waiting" || status === "locked";
@@ -97,8 +127,13 @@ export default function PilulasSabedoriaScreen() {
               disabled ? "opacity-60" : ""
             }`}
           >
-            <View className="h-9 w-9 items-center justify-center rounded-full bg-navy/5">
-              <Text className="text-xs font-bold text-navy/60">{item.number}</Text>
+            <View
+              className="h-9 w-9 items-center justify-center rounded-full"
+              style={{ backgroundColor: `${section.color}14` }}
+            >
+              <Text className="text-xs font-bold" style={{ color: section.color }}>
+                {item.number}
+              </Text>
             </View>
             <View className="flex-1">
               <Text className="text-sm font-semibold text-navy">{item.title}</Text>
