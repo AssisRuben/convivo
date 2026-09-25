@@ -168,10 +168,22 @@ export type ApiHomeDashboard = {
 };
 
 export type ApiWisdomProgress = {
+  topicSlug: string;
   chaptersRead: number;
   streakDays: number;
   totalChapters: number;
   nextChapterAvailable: boolean;
+};
+
+export type ApiWisdomTopicSummary = {
+  slug: string;
+  title: string;
+  subtitle: string;
+  icon: string;
+  color: string;
+  chaptersRead: number;
+  totalChapters: number;
+  streakDays: number;
 };
 
 export type ApiFaithProgress = {

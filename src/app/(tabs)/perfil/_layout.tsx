@@ -41,7 +41,8 @@ export default function PerfilLayout() {
       <Stack.Screen name="gotas-de-fe/[livro]/index" />
       <Stack.Screen name="gotas-de-fe/[livro]/capitulo/[numero]" />
       <Stack.Screen name="pilulas-sabedoria/index" />
-      <Stack.Screen name="pilulas-sabedoria/capitulo/[numero]" />
+      <Stack.Screen name="pilulas-sabedoria/[topico]/index" />
+      <Stack.Screen name="pilulas-sabedoria/[topico]/capitulo/[numero]" />
     </Stack>
   );
 }

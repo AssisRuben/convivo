@@ -86,7 +86,7 @@ model User {
   medicationTrackings  MedicationTracking[]
   expoPushTokens       ExpoPushToken[]
   goals                Goal[]
-  wisdomProgress       WisdomProgress?
+  wisdomProgress       WisdomProgress[]
   faithProgress        FaithProgress[]
 }
 
@@ -136,9 +136,15 @@ model LoyaltyStampCycle {
 // próximo capítulo a liberar; só libera de fato quando a data de hoje é
 // diferente de lastReadDate (ver wisdomCore.ts). streakDays conta dias
 // seguidos lendo (reseta pra 1 se pular um dia, não impede continuar).
+//
+// Mais de um TÓPICO agora (Decisões e Vieses, Estoicismo, Odisseia — ver
+// constants/wisdomPills.ts), cada um com sua própria sequência de
+// capítulos e progresso/streak independente, chaveado por
+// userId+topicSlug — mesmo desenho de FaithProgress em Gotas de Fé.
 model WisdomProgress {
   id               String    @id @default(cuid())
-  userId           String    @unique
+  userId           String
+  topicSlug        String
   chaptersRead     Int       @default(0)
   streakDays       Int       @default(0)
   lastReadDate     DateTime? @db.Date
@@ -148,6 +154,8 @@ model WisdomProgress {
   updatedAt        DateTime  @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, topicSlug])
 }
 
 // Progresso em "Gotas de Fé" (devocional diário) — mesma dinâmica de

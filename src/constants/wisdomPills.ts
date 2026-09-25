@@ -2,7 +2,13 @@
  * Conteúdo das "Pílulas de sabedoria" — um capítulo curto por dia.
  * Estruturado em blocos (em vez de markdown solto) pra cada tela de
  * leitura controlar tipografia e espaçamento sem precisar parsear texto.
- * Novos capítulos entram só adicionando ao array abaixo.
+ *
+ * Mais de um TÓPICO agora (Decisões e Vieses, Estoicismo, Odisseia — mesma
+ * dinâmica de FAITH_BOOKS em constants/faithDrops.ts), cada um com sua
+ * própria sequência de capítulos e progresso/streak independente (ver
+ * WisdomProgress no schema.prisma, chaveado por userId+topicSlug). A tela
+ * de "Pílulas de sabedoria" é um hub de tópicos; cada tópico tem sua
+ * própria lista de capítulos, numerada a partir de 1.
  */
 // Texto de paragraph/quote/list items aceita **negrito** e *itálico*
 // inline (markdown simplificado) — renderizado por <RichText> na tela de
@@ -20,46 +26,16 @@ export type WisdomChapter = {
   blocks: WisdomBlock[];
 };
 
-// Assuntos só agrupam a lista na tela — a progressão continua uma trilha
-// única, capítulo a capítulo. Faixas precisam cobrir WISDOM_CHAPTERS sem
-// buraco; capítulo novo entra no fim da faixa do assunto (ou num novo).
 export type WisdomTopic = {
+  slug: string;
   title: string;
   subtitle: string;
   icon: string;
   color: string;
-  firstChapter: number;
-  lastChapter: number;
+  chapters: WisdomChapter[];
 };
 
-export const WISDOM_TOPICS: WisdomTopic[] = [
-  {
-    title: "Decisões e Vieses",
-    subtitle: "Como o cérebro se engana ao decidir",
-    icon: "git-branch-outline",
-    color: "#3b82f6",
-    firstChapter: 1,
-    lastChapter: 8,
-  },
-  {
-    title: "Estoicismo",
-    subtitle: "Serenidade diante do que não depende de você",
-    icon: "shield-outline",
-    color: "#8b5cf6",
-    firstChapter: 9,
-    lastChapter: 15,
-  },
-  {
-    title: "Odisseia",
-    subtitle: "Lições da jornada de Ulisses",
-    icon: "boat-outline",
-    color: "#2ec4b6",
-    firstChapter: 16,
-    lastChapter: 25,
-  },
-];
-
-export const WISDOM_CHAPTERS: WisdomChapter[] = [
+export const DECISOES_VIESES_CHAPTERS: WisdomChapter[] = [
   {
     number: 1,
     title: "Os Dois Cérebros que Decidem por Você",
@@ -68,16 +44,19 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
       { type: "paragraph", text: "Imagine dois cenários." },
       {
         type: "paragraph",
-        text: "No primeiro, você está atravessando a rua e um carro surge em alta velocidade. Você não \"pensa\" — seu corpo já pulou para a calçada antes mesmo de você processar conscientemente o perigo.",
+        text: 'No primeiro, você está atravessando a rua e um carro surge em alta velocidade. Você não "pensa" — seu corpo já pulou para a calçada antes mesmo de você processar conscientemente o perigo.',
       },
       {
         type: "paragraph",
         text: "No segundo, você está lendo um contrato de fornecedor, tentando decidir se aquela cláusula de reajuste é vantajosa a longo prazo. Você lê devagar, recalcula, compara cenários, hesita.",
       },
-      { type: "paragraph", text: "Duas decisões. Dois cérebros completamente diferentes trabalhando." },
       {
         type: "paragraph",
-        text: "O psicólogo Daniel Kahneman passou a carreira estudando essa dualidade e a resumiu em dois sistemas. O Sistema 1 é rápido, automático, intuitivo — o que te tirou da frente do carro. O Sistema 2 é lento, deliberado, custoso — o que analisou o contrato. Um não é \"melhor\" que o outro; são ferramentas para problemas diferentes.",
+        text: "Duas decisões. Dois cérebros completamente diferentes trabalhando.",
+      },
+      {
+        type: "paragraph",
+        text: 'O psicólogo Daniel Kahneman passou a carreira estudando essa dualidade e a resumiu em dois sistemas. O Sistema 1 é rápido, automático, intuitivo — o que te tirou da frente do carro. O Sistema 2 é lento, deliberado, custoso — o que analisou o contrato. Um não é "melhor" que o outro; são ferramentas para problemas diferentes.',
       },
       {
         type: "paragraph",
@@ -85,7 +64,7 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
       },
       {
         type: "paragraph",
-        text: "Entender essa mecânica muda a pergunta que você faz de si mesmo. Ao invés de \"por que errei essa decisão?\", a pergunta certa vira: \"em que momento deixei o Sistema 1 decidir sozinho algo que exigia o Sistema 2?\"",
+        text: 'Entender essa mecânica muda a pergunta que você faz de si mesmo. Ao invés de "por que errei essa decisão?", a pergunta certa vira: "em que momento deixei o Sistema 1 decidir sozinho algo que exigia o Sistema 2?"',
       },
       { type: "heading", text: "O espelho que só mostra o que você quer ver" },
       {
@@ -94,7 +73,7 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
       },
       {
         type: "paragraph",
-        text: "Pense num empreendedor que acredita que seu novo produto vai bombar. Ele conversa com cinco potenciais clientes. Três demonstram entusiasmo educado, dois fazem objeções sérias sobre preço. Na cabeça dele, a conversa vira \"3 de 5 amaram\" — as objeções somem do resumo mental, porque não cabem na história que ele já queria contar.",
+        text: 'Pense num empreendedor que acredita que seu novo produto vai bombar. Ele conversa com cinco potenciais clientes. Três demonstram entusiasmo educado, dois fazem objeções sérias sobre preço. Na cabeça dele, a conversa vira "3 de 5 amaram" — as objeções somem do resumo mental, porque não cabem na história que ele já queria contar.',
       },
       {
         type: "paragraph",
@@ -107,11 +86,11 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
       },
       {
         type: "paragraph",
-        text: "Uma reforma que já consumiu o dobro do orçamento previsto, mas continua sendo bancada \"porque já gastamos tanto, não dá pra parar agora\". Um projeto que todo mundo sabe, silenciosamente, que não vai dar certo — mas ninguém encerra, porque encerrar significaria admitir que o investimento anterior foi em vão.",
+        text: 'Uma reforma que já consumiu o dobro do orçamento previsto, mas continua sendo bancada "porque já gastamos tanto, não dá pra parar agora". Um projeto que todo mundo sabe, silenciosamente, que não vai dar certo — mas ninguém encerra, porque encerrar significaria admitir que o investimento anterior foi em vão.',
       },
       {
         type: "paragraph",
-        text: "O erro lógico aqui é claro quando você o vê de fora: dinheiro gasto no passado é irrecuperável, quer você continue quer pare. A única pergunta racional é sobre o futuro — \"dado o que sei hoje, vale a pena continuar investindo a partir de agora?\" — e essa pergunta nunca deveria ter o passado como argumento.",
+        text: 'O erro lógico aqui é claro quando você o vê de fora: dinheiro gasto no passado é irrecuperável, quer você continue quer pare. A única pergunta racional é sobre o futuro — "dado o que sei hoje, vale a pena continuar investindo a partir de agora?" — e essa pergunta nunca deveria ter o passado como argumento.',
       },
       { type: "heading", text: "A ilusão da certeza" },
       {
@@ -120,7 +99,7 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
       },
       {
         type: "paragraph",
-        text: "O sintoma é fácil de reconhecer: alguém diz \"isso vai dar certo\" com convicção total, mas nunca escreveu, nem para si mesmo, uma lista honesta de por que poderia não dar certo. A confiança nasceu da ausência de contra-argumento, não da presença de evidência.",
+        text: 'O sintoma é fácil de reconhecer: alguém diz "isso vai dar certo" com convicção total, mas nunca escreveu, nem para si mesmo, uma lista honesta de por que poderia não dar certo. A confiança nasceu da ausência de contra-argumento, não da presença de evidência.',
       },
       {
         type: "paragraph",
@@ -133,7 +112,7 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
       },
       {
         type: "paragraph",
-        text: "A pergunta convencional antes de decidir é \"por que isso vai dar certo?\" — e essa pergunta, você já sabe, ativa exatamente o viés de confirmação, porque o cérebro corre atrás de razões para confirmar o que já quer fazer.",
+        text: 'A pergunta convencional antes de decidir é "por que isso vai dar certo?" — e essa pergunta, você já sabe, ativa exatamente o viés de confirmação, porque o cérebro corre atrás de razões para confirmar o que já quer fazer.',
       },
       { type: "paragraph", text: "O pré-mortem inverte a pergunta:" },
       {
@@ -142,11 +121,11 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
       },
       {
         type: "paragraph",
-        text: "A diferença parece pequena, mas é enorme na prática. Ao tratar o fracasso como fato consumado — não como possibilidade hipotética e desconfortável — o cérebro para de se defender e começa a investigar. As pessoas listam riscos reais que jamais mencionariam numa reunião de \"vamos avaliar os riscos\", porque ali ainda soa como admitir fraqueza antes de começar.",
+        text: 'A diferença parece pequena, mas é enorme na prática. Ao tratar o fracasso como fato consumado — não como possibilidade hipotética e desconfortável — o cérebro para de se defender e começa a investigar. As pessoas listam riscos reais que jamais mencionariam numa reunião de "vamos avaliar os riscos", porque ali ainda soa como admitir fraqueza antes de começar.',
       },
       {
         type: "paragraph",
-        text: "Imagine aplicar isso ao empreendedor do produto que \"vai bombar\": ao invés de perguntar por que vai dar certo, ele pergunta o que fez o produto fracassar em um ano. As respostas que emergem — \"o preço estava alto demais\", \"não validei com clientes reais, só com conhecidos\", \"o distribuidor atrasou a entrega\" — são exatamente os sinais que o viés de confirmação tinha apagado da conversa original.",
+        text: 'Imagine aplicar isso ao empreendedor do produto que "vai bombar": ao invés de perguntar por que vai dar certo, ele pergunta o que fez o produto fracassar em um ano. As respostas que emergem — "o preço estava alto demais", "não validei com clientes reais, só com conhecidos", "o distribuidor atrasou a entrega" — são exatamente os sinais que o viés de confirmação tinha apagado da conversa original.',
       },
       { type: "heading", text: "Síntese: o quadro mental" },
       {
@@ -155,7 +134,7 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
       },
       {
         type: "quote",
-        text: "Antes de qualquer decisão importante, pergunte: \"Isso que estou sentindo é convicção baseada em evidência, ou é só a ausência de ter procurado o contrário?\"",
+        text: 'Antes de qualquer decisão importante, pergunte: "Isso que estou sentindo é convicção baseada em evidência, ou é só a ausência de ter procurado o contrário?"',
       },
       {
         type: "paragraph",
@@ -179,7 +158,7 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
     blocks: [
       {
         type: "paragraph",
-        text: "Um vendedor de carros pede R$ 80 mil por um veículo que, na cabeça dele, vale R$ 60 mil. Você entra na negociação sabendo disso. Ainda assim, quando fecha em R$ 65 mil, sai satisfeito — \"consegui um baita desconto\". Só que o número de referência nunca foi o valor real do carro. Foi o número que o vendedor disse primeiro.",
+        text: 'Um vendedor de carros pede R$ 80 mil por um veículo que, na cabeça dele, vale R$ 60 mil. Você entra na negociação sabendo disso. Ainda assim, quando fecha em R$ 65 mil, sai satisfeito — "consegui um baita desconto". Só que o número de referência nunca foi o valor real do carro. Foi o número que o vendedor disse primeiro.',
       },
       {
         type: "paragraph",
@@ -205,11 +184,11 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
       { type: "heading", text: "Como as duas armadilhas se combinam" },
       {
         type: "paragraph",
-        text: "Ancoragem distorce o *ponto de partida*. Disponibilidade distorce a *percepção de risco*. Juntas, elas explicam boa parte das decisões ruins que parecem \"intuitivamente óbvias\" na hora, mas não resistem a uma análise fria.",
+        text: 'Ancoragem distorce o *ponto de partida*. Disponibilidade distorce a *percepção de risco*. Juntas, elas explicam boa parte das decisões ruins que parecem "intuitivamente óbvias" na hora, mas não resistem a uma análise fria.',
       },
       {
         type: "paragraph",
-        text: "Um exemplo comum: uma empresa recebe uma proposta inicial de fornecedor com valor inflado de propósito. Mesmo negociando para baixo, o valor final continua alto — porque a âncora definiu a faixa de referência. Ao mesmo tempo, o comprador lembra de uma vez em que trocou de fornecedor e \"deu errado\", e essa lembrança disponível pesa mais do que deveria na decisão de continuar com o fornecedor atual, mesmo caro.",
+        text: 'Um exemplo comum: uma empresa recebe uma proposta inicial de fornecedor com valor inflado de propósito. Mesmo negociando para baixo, o valor final continua alto — porque a âncora definiu a faixa de referência. Ao mesmo tempo, o comprador lembra de uma vez em que trocou de fornecedor e "deu errado", e essa lembrança disponível pesa mais do que deveria na decisão de continuar com o fornecedor atual, mesmo caro.',
       },
       { type: "heading", text: "Como se defender" },
       {
@@ -217,7 +196,7 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
         ordered: true,
         items: [
           "**Antes de ouvir qualquer proposta, gere sua própria estimativa independente.** Pesquise o valor de mercado, calcule seu próprio número, antes de saber o que o outro lado está pedindo. Isso quebra o efeito da âncora antes que ela seja plantada.",
-          "**Desconfie de decisões baseadas em \"um caso que eu lembro\".** Pergunte: qual é a taxa real, os dados agregados — não a exceção que ficou marcada na memória.",
+          '**Desconfie de decisões baseadas em "um caso que eu lembro".** Pergunte: qual é a taxa real, os dados agregados — não a exceção que ficou marcada na memória.',
           "**Numa negociação, considere falar primeiro** (se você tiver informação razoável) — quem ancora, geralmente ganha vantagem estrutural na conversa.",
         ],
       },
@@ -249,28 +228,31 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
       { type: "heading", text: "Onde a aversão à perda se esconde" },
       {
         type: "paragraph",
-        text: "**No mercado financeiro**, ela explica o \"efeito disposição\": investidores seguram ações que estão perdendo valor por tempo demais (esperando \"recuperar\", evitando reconhecer a perda formalmente) e vendem ações que estão ganhando valor cedo demais (com medo de perder o ganho já obtido) — exatamente o oposto do que a lógica de longo prazo recomendaria.",
+        text: '**No mercado financeiro**, ela explica o "efeito disposição": investidores seguram ações que estão perdendo valor por tempo demais (esperando "recuperar", evitando reconhecer a perda formalmente) e vendem ações que estão ganhando valor cedo demais (com medo de perder o ganho já obtido) — exatamente o oposto do que a lógica de longo prazo recomendaria.',
       },
       {
         type: "paragraph",
-        text: "**Na gestão de equipes**, ela explica por que mudanças organizacionais encontram tanta resistência. Um novo processo pode trazer ganhos reais de eficiência — mas as pessoas sentem, com mais força, o que estão \"perdendo\" da rotina antiga (controle, familiaridade, status) do que o ganho futuro incerto. Resistência a mudança raramente é preguiça; geralmente é aversão à perda operando.",
+        text: '**Na gestão de equipes**, ela explica por que mudanças organizacionais encontram tanta resistência. Um novo processo pode trazer ganhos reais de eficiência — mas as pessoas sentem, com mais força, o que estão "perdendo" da rotina antiga (controle, familiaridade, status) do que o ganho futuro incerto. Resistência a mudança raramente é preguiça; geralmente é aversão à perda operando.',
       },
       {
         type: "paragraph",
-        text: "**Em precificação**, empresas aprenderam a explorar isso: \"você está perdendo R$ 200 se não aproveitar essa promoção hoje\" converte muito mais do que \"você pode ganhar R$ 200 de desconto\" — mesmo sendo matematicamente a mesma oferta. O cérebro reage de forma diferente à mesma informação, dependendo de como ela é enquadrada como ganho ou como perda.",
+        text: '**Em precificação**, empresas aprenderam a explorar isso: "você está perdendo R$ 200 se não aproveitar essa promoção hoje" converte muito mais do que "você pode ganhar R$ 200 de desconto" — mesmo sendo matematicamente a mesma oferta. O cérebro reage de forma diferente à mesma informação, dependendo de como ela é enquadrada como ganho ou como perda.',
       },
-      { type: "heading", text: "O lado traiçoeiro: decisões movidas por medo de perder, não por lógica" },
+      {
+        type: "heading",
+        text: "O lado traiçoeiro: decisões movidas por medo de perder, não por lógica",
+      },
       {
         type: "paragraph",
-        text: "O problema não é sentir aversão à perda — isso é parte da natureza humana. O problema é quando essa aversão **substitui** a análise racional. Alguém mantém um funcionário de baixa performance porque demitir \"parece uma perda\" (do investimento em treiná-lo), quando manter na verdade custa mais caro a longo prazo. Alguém não muda de fornecedor, de carreira, de estratégia — porque o medo de perder o que já tem pesa mais do que a avaliação honesta do que poderia ganhar.",
+        text: 'O problema não é sentir aversão à perda — isso é parte da natureza humana. O problema é quando essa aversão **substitui** a análise racional. Alguém mantém um funcionário de baixa performance porque demitir "parece uma perda" (do investimento em treiná-lo), quando manter na verdade custa mais caro a longo prazo. Alguém não muda de fornecedor, de carreira, de estratégia — porque o medo de perder o que já tem pesa mais do que a avaliação honesta do que poderia ganhar.',
       },
       { type: "heading", text: "Como neutralizar" },
       {
         type: "list",
         ordered: true,
         items: [
-          "**Reformule a pergunta em termos de custo de oportunidade.** Ao invés de \"o que eu perco se mudar?\", pergunte \"o que eu já estou perdendo, todo dia, por não mudar?\" — isso equilibra a balança emocional.",
-          "**Separe a decisão da história emocional por trás dela.** Um investimento ruim continua ruim independente de quanto você já \"sofreu\" nele — isso conecta com a falácia do custo afundado do capítulo anterior.",
+          '**Reformule a pergunta em termos de custo de oportunidade.** Ao invés de "o que eu perco se mudar?", pergunte "o que eu já estou perdendo, todo dia, por não mudar?" — isso equilibra a balança emocional.',
+          '**Separe a decisão da história emocional por trás dela.** Um investimento ruim continua ruim independente de quanto você já "sofreu" nele — isso conecta com a falácia do custo afundado do capítulo anterior.',
           "**Quando for propor uma mudança para outras pessoas, enquadre o que elas ganham, não só o que muda.** Aversão à perda não desaparece — mas o enquadramento certo reduz a resistência automática.",
         ],
       },
@@ -281,7 +263,7 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
         items: [
           "Existe algo (um investimento, uma relação profissional, um hábito) que você mantém mais por medo de perder do que por ainda fazer sentido?",
           "Pense numa mudança que você quer propor a alguém. Como reformular a proposta destacando o que a pessoa ganha, em vez do que muda?",
-          "Da próxima vez que sentir forte resistência a uma decisão, pergunte: \"isso é aversão à perda falando, ou é análise real de risco?\"",
+          'Da próxima vez que sentir forte resistência a uma decisão, pergunte: "isso é aversão à perda falando, ou é análise real de risco?"',
         ],
       },
     ],
@@ -297,7 +279,7 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
       },
       {
         type: "paragraph",
-        text: "A resposta intuitiva da maioria das pessoas é \"99%\". A resposta correta, na maioria dos cenários reais, costuma ser muito menor — às vezes abaixo de 10%. A diferença está numa informação que o cérebro ignora sistematicamente: a **taxa base**, ou seja, quão rara a doença é na população em geral. Se a doença afeta 1 em cada 10.000 pessoas, mesmo um teste muito preciso vai gerar mais falsos positivos do que verdadeiros positivos, simplesmente porque há muito mais gente saudável sendo testada do que gente doente.",
+        text: 'A resposta intuitiva da maioria das pessoas é "99%". A resposta correta, na maioria dos cenários reais, costuma ser muito menor — às vezes abaixo de 10%. A diferença está numa informação que o cérebro ignora sistematicamente: a **taxa base**, ou seja, quão rara a doença é na população em geral. Se a doença afeta 1 em cada 10.000 pessoas, mesmo um teste muito preciso vai gerar mais falsos positivos do que verdadeiros positivos, simplesmente porque há muito mais gente saudável sendo testada do que gente doente.',
       },
       {
         type: "paragraph",
@@ -306,17 +288,20 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
       { type: "heading", text: "Onde isso aparece nos negócios" },
       {
         type: "paragraph",
-        text: "Um vendedor teve um mês espetacular. A empresa toda quer saber \"o que ele fez de diferente\" para replicar o sucesso — sem considerar que parte desse resultado pode ser simplesmente variação estatística normal, não competência excepcional replicável.",
+        text: 'Um vendedor teve um mês espetacular. A empresa toda quer saber "o que ele fez de diferente" para replicar o sucesso — sem considerar que parte desse resultado pode ser simplesmente variação estatística normal, não competência excepcional replicável.',
       },
       {
         type: "paragraph",
-        text: "Isso conecta com outro fenômeno próximo: a **regressão à média**. Desempenhos extremos — muito bons ou muito ruins — tendem a se normalizar ao longo do tempo, simplesmente por estatística, não porque algo mudou de fato. Um time que teve um trimestre excepcional provavelmente vai ter um trimestre \"normal\" a seguir — não porque piorou, mas porque o trimestre excepcional já continha uma boa dose de sorte que não se repete.",
+        text: 'Isso conecta com outro fenômeno próximo: a **regressão à média**. Desempenhos extremos — muito bons ou muito ruins — tendem a se normalizar ao longo do tempo, simplesmente por estatística, não porque algo mudou de fato. Um time que teve um trimestre excepcional provavelmente vai ter um trimestre "normal" a seguir — não porque piorou, mas porque o trimestre excepcional já continha uma boa dose de sorte que não se repete.',
       },
       {
         type: "paragraph",
         text: "O erro clássico de gestão: elogiar excessivamente o mês bom (achando que descobriu a fórmula do sucesso) e punir excessivamente o mês ruim seguinte (achando que houve queda de performance) — quando, estatisticamente, os dois foram só o pêndulo normal voltando ao centro.",
       },
-      { type: "heading", text: "Por que o cérebro prefere a história à estatística" },
+      {
+        type: "heading",
+        text: "Por que o cérebro prefere a história à estatística",
+      },
       {
         type: "paragraph",
         text: "Uma taxa base é abstrata, sem rosto, sem narrativa. Um caso específico — aquele vendedor, aquele cliente que cancelou, aquele mês excepcional — é vívido, tem nome, tem enredo. O cérebro humano é, antes de tudo, uma máquina de contar e absorver histórias, não uma calculadora. Por isso, entre um número frio e um caso emocionante, a história quase sempre vence — mesmo quando o número é a informação mais confiável.",
@@ -350,29 +335,29 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
     blocks: [
       {
         type: "paragraph",
-        text: "Numa reunião, alguém propõe reduzir o número de etapas de aprovação de um processo. Um colega responde: \"então você quer que a gente aprove qualquer coisa sem nenhum controle?\" Ninguém disse isso. A proposta era reduzir etapas redundantes, não eliminar controle. Mas a versão distorcida é mais fácil de atacar — e é nela que o debate vai se concentrar, se ninguém perceber o truque.",
+        text: 'Numa reunião, alguém propõe reduzir o número de etapas de aprovação de um processo. Um colega responde: "então você quer que a gente aprove qualquer coisa sem nenhum controle?" Ninguém disse isso. A proposta era reduzir etapas redundantes, não eliminar controle. Mas a versão distorcida é mais fácil de atacar — e é nela que o debate vai se concentrar, se ninguém perceber o truque.',
       },
       {
         type: "paragraph",
-        text: "Isso é o **espantalho** (*strawman*): distorcer o argumento do outro para uma versão mais fraca e exagerada, mais fácil de derrubar, e atacar essa versão em vez do argumento real. É uma das falácias mais comuns em qualquer discussão — profissional, política, familiar — porque funciona muito bem para \"vencer\" a discussão sem realmente refutar nada.",
+        text: 'Isso é o **espantalho** (*strawman*): distorcer o argumento do outro para uma versão mais fraca e exagerada, mais fácil de derrubar, e atacar essa versão em vez do argumento real. É uma das falácias mais comuns em qualquer discussão — profissional, política, familiar — porque funciona muito bem para "vencer" a discussão sem realmente refutar nada.',
       },
-      { type: "heading", text: "\"Porque foi o chefe que disse\"" },
+      { type: "heading", text: '"Porque foi o chefe que disse"' },
       {
         type: "paragraph",
         text: "A segunda falácia comum é o **apelo à autoridade**: aceitar uma afirmação como verdadeira só porque veio de alguém com posição, título ou experiência — sem avaliar o mérito do argumento em si.",
       },
       {
         type: "paragraph",
-        text: "Autoridade é um bom indício, não uma prova. Um especialista pode estar errado; um argumento fraco não fica forte só porque quem disse tem cargo alto. O problema aparece quando \"foi o diretor que decidiu\" vira o fim da discussão, em vez do começo de uma avaliação — porque, dessa forma, decisões ruins nunca são questionadas, só obedecidas.",
+        text: 'Autoridade é um bom indício, não uma prova. Um especialista pode estar errado; um argumento fraco não fica forte só porque quem disse tem cargo alto. O problema aparece quando "foi o diretor que decidiu" vira o fim da discussão, em vez do começo de uma avaliação — porque, dessa forma, decisões ruins nunca são questionadas, só obedecidas.',
       },
-      { type: "heading", text: "\"Ou isso, ou aquilo\"" },
+      { type: "heading", text: '"Ou isso, ou aquilo"' },
       {
         type: "paragraph",
         text: "A terceira é o **falso dilema**: apresentar apenas duas opções como se fossem as únicas possíveis, quando na verdade existe um espectro de alternativas.",
       },
       {
         type: "paragraph",
-        text: "\"Ou cortamos custos, ou vamos falir\" ignora dezenas de posições intermediárias — renegociar contratos, aumentar receita, redesenhar processos. O falso dilema é sedutor porque simplifica a decisão e cria urgência — mas simplifica demais, e urgência artificial é uma ótima forma de empurrar decisões ruins.",
+        text: '"Ou cortamos custos, ou vamos falir" ignora dezenas de posições intermediárias — renegociar contratos, aumentar receita, redesenhar processos. O falso dilema é sedutor porque simplifica a decisão e cria urgência — mas simplifica demais, e urgência artificial é uma ótima forma de empurrar decisões ruins.',
       },
       { type: "heading", text: "Por que essas falácias funcionam tão bem" },
       {
@@ -385,8 +370,8 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
         ordered: true,
         items: [
           "**Ao discordar de alguém, repita o argumento original nas suas palavras antes de rebater.** Se a outra pessoa concordar que você entendeu certo, você está atacando o argumento real, não um espantalho.",
-          "**Separe \"quem disse\" de \"o que foi dito\".** Pergunte: esse argumento se sustentaria mesmo se viesse de alguém sem cargo nenhum?",
-          "**Quando alguém apresentar só duas opções, pergunte em voz alta: \"que outras opções existem entre essas duas?\"** — isso sozinho já quebra a maioria dos falsos dilemas.",
+          '**Separe "quem disse" de "o que foi dito".** Pergunte: esse argumento se sustentaria mesmo se viesse de alguém sem cargo nenhum?',
+          '**Quando alguém apresentar só duas opções, pergunte em voz alta: "que outras opções existem entre essas duas?"** — isso sozinho já quebra a maioria dos falsos dilemas.',
         ],
       },
       { type: "heading", text: "Para refletir e aplicar" },
@@ -408,11 +393,11 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
     blocks: [
       {
         type: "paragraph",
-        text: "Um cliente que sempre respondeu rápido demora três dias para responder um e-mail. A reação automática de muita gente é: \"ele desistiu do negócio\". Mas essa conclusão ignora uma pergunta essencial: **quão provável era isso antes** de você ver esse sinal, e **quanto esse sinal específico realmente deveria mudar** essa probabilidade?",
+        text: 'Um cliente que sempre respondeu rápido demora três dias para responder um e-mail. A reação automática de muita gente é: "ele desistiu do negócio". Mas essa conclusão ignora uma pergunta essencial: **quão provável era isso antes** de você ver esse sinal, e **quanto esse sinal específico realmente deveria mudar** essa probabilidade?',
       },
       {
         type: "paragraph",
-        text: "Isso é o núcleo do **raciocínio bayesiano**: a ideia de que devemos atualizar nossas crenças de forma *proporcional* à força da nova evidência, sem nunca ignorar completamente o que já sabíamos antes (a crença prévia, ou \"prior\").",
+        text: 'Isso é o núcleo do **raciocínio bayesiano**: a ideia de que devemos atualizar nossas crenças de forma *proporcional* à força da nova evidência, sem nunca ignorar completamente o que já sabíamos antes (a crença prévia, ou "prior").',
       },
       { type: "heading", text: "Os três ingredientes, sem fórmula matemática" },
       {
@@ -425,7 +410,7 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
         items: [
           "**Qual era minha crença antes desse sinal?** (O cliente tinha um histórico de 20 interações rápidas e positivas — a crença prévia de que o negócio está bem encaminhado é forte.)",
           "**Quão forte é essa nova evidência, de verdade?** (Um atraso de três dias tem várias explicações banais — viagem, final de semana, prioridade interna — e é um sinal fraco comparado a 20 interações positivas anteriores.)",
-          "**Quanto essa evidência deveria, racionalmente, mover minha crença original?** (Pouco. Talvez de \"95% que o negócio avança\" para \"85%\" — não para \"o negócio morreu\", como o pânico sugere.)",
+          '**Quanto essa evidência deveria, racionalmente, mover minha crença original?** (Pouco. Talvez de "95% que o negócio avança" para "85%" — não para "o negócio morreu", como o pânico sugere.)',
         ],
       },
       {
@@ -444,7 +429,7 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
       { type: "heading", text: "Onde isso rende mais" },
       {
         type: "paragraph",
-        text: "Esse tipo de raciocínio é especialmente valioso em decisões com informação incompleta e incerteza real — negociações em andamento, avaliação de desempenho de equipe, decisões de investimento, diagnóstico de problemas técnicos. Em vez de \"isso prova que está tudo bem\" ou \"isso prova que está tudo errado\", a pergunta madura é sempre: \"o quanto isso muda o que eu já sabia?\"",
+        text: 'Esse tipo de raciocínio é especialmente valioso em decisões com informação incompleta e incerteza real — negociações em andamento, avaliação de desempenho de equipe, decisões de investimento, diagnóstico de problemas técnicos. Em vez de "isso prova que está tudo bem" ou "isso prova que está tudo errado", a pergunta madura é sempre: "o quanto isso muda o que eu já sabia?"',
       },
       { type: "heading", text: "Como aplicar" },
       {
@@ -453,7 +438,7 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
         items: [
           "**Antes de reagir a uma informação nova, escreva (mentalmente ou no papel) qual era sua crença antes dela.**",
           "**Classifique a força do sinal**: é um dado isolado e explicável por várias causas, ou é parte de um padrão consistente?",
-          "**Ajuste sua crença de forma proporcional — não binária.** Raramente uma única informação deveria levar de \"tudo bem\" direto para \"tudo perdido\", ou vice-versa.",
+          '**Ajuste sua crença de forma proporcional — não binária.** Raramente uma única informação deveria levar de "tudo bem" direto para "tudo perdido", ou vice-versa.',
         ],
       },
       { type: "heading", text: "Para refletir e aplicar" },
@@ -463,7 +448,7 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
         items: [
           "Pense numa vez em que você reagiu de forma extrema a um sinal fraco e isolado. O que sua crença anterior, mais sólida, dizia?",
           "Existe alguma crença forte que você mantém hoje apesar de evidências recentes consistentes na direção contrária?",
-          "Na próxima situação incerta, tente escrever: \"antes disso eu achava X%; esse sinal muda para Y%\" — e veja se o ajuste que você fez de cabeça é exagerado ou proporcional.",
+          'Na próxima situação incerta, tente escrever: "antes disso eu achava X%; esse sinal muda para Y%" — e veja se o ajuste que você fez de cabeça é exagerado ou proporcional.',
         ],
       },
     ],
@@ -475,7 +460,7 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
     blocks: [
       {
         type: "paragraph",
-        text: "Numa sala de reunião, o líder apresenta uma proposta com entusiasmo visível. Ele pergunta se alguém tem objeções. Silêncio. Todo mundo concorda com a cabeça. A decisão é aprovada por unanimidade. Meses depois, o projeto fracassa — e, em conversas individuais, quase todo mundo admite que tinha dúvidas na hora da reunião, mas não quis ser \"o chato\" que trava o consenso.",
+        text: 'Numa sala de reunião, o líder apresenta uma proposta com entusiasmo visível. Ele pergunta se alguém tem objeções. Silêncio. Todo mundo concorda com a cabeça. A decisão é aprovada por unanimidade. Meses depois, o projeto fracassa — e, em conversas individuais, quase todo mundo admite que tinha dúvidas na hora da reunião, mas não quis ser "o chato" que trava o consenso.',
       },
       {
         type: "paragraph",
@@ -487,13 +472,13 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
         items: [
           "**Ilusão de unanimidade**: silêncio é interpretado como concordância, quando na verdade é só desconforto de discordar em público.",
           "**Autocensura**: cada pessoa guarda suas dúvidas para si, assumindo (errado) que é a única que discorda.",
-          "**Pressão sobre dissidentes**: quem levanta uma objeção é sutilmente visto como \"não estar no time\", o que ensina todo mundo a ficar quieto da próxima vez.",
+          '**Pressão sobre dissidentes**: quem levanta uma objeção é sutilmente visto como "não estar no time", o que ensina todo mundo a ficar quieto da próxima vez.',
           "**Excesso de confiança coletiva**: o grupo, reforçando-se mutuamente, desenvolve uma convicção mais forte do que qualquer evidência real sustentaria — o inverso do Capítulo 1, mas em versão coletiva.",
         ],
       },
       {
         type: "paragraph",
-        text: "O perigo do groupthink é que ele não parece disfuncional de dentro. Parece harmonia, eficiência, \"estarmos todos alinhados\". É exatamente por parecer saudável que ele é tão difícil de perceber enquanto acontece.",
+        text: 'O perigo do groupthink é que ele não parece disfuncional de dentro. Parece harmonia, eficiência, "estarmos todos alinhados". É exatamente por parecer saudável que ele é tão difícil de perceber enquanto acontece.',
       },
       { type: "heading", text: "Por que grupos são especialmente vulneráveis" },
       {
@@ -509,10 +494,10 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
         type: "list",
         ordered: true,
         items: [
-          "**Designe formalmente um \"advogado do diabo\"** — alguém com a tarefa explícita de argumentar contra a decisão favorita do grupo, mesmo que pessoalmente concorde com ela. Isso remove o custo social de discordar, porque a discordância virou papel, não opinião pessoal.",
+          '**Designe formalmente um "advogado do diabo"** — alguém com a tarefa explícita de argumentar contra a decisão favorita do grupo, mesmo que pessoalmente concorde com ela. Isso remove o custo social de discordar, porque a discordância virou papel, não opinião pessoal.',
           "**Colete opiniões individuais antes da discussão em grupo**, por escrito ou anonimamente. Isso evita que a opinião de quem fala primeiro ancore (veja o Capítulo 2) a opinião de todo mundo.",
           "**O líder deve declarar sua posição por último, não primeiro.** Quando quem lidera fala primeiro, a reunião inteira vira busca por confirmação, não avaliação real.",
-          "**Trate silêncio como ausência de informação, nunca como concordância.** Pergunte diretamente: \"alguém vê um jeito disso dar errado?\" — em vez de \"alguém discorda?\".",
+          '**Trate silêncio como ausência de informação, nunca como concordância.** Pergunte diretamente: "alguém vê um jeito disso dar errado?" — em vez de "alguém discorda?".',
         ],
       },
       { type: "heading", text: "Para refletir e aplicar" },
@@ -522,7 +507,7 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
         items: [
           "Lembra de uma decisão em grupo que, em retrospecto, todo mundo tinha dúvidas mas ninguém falou? O que impediu a fala?",
           "Da próxima vez que liderar uma discussão, você consegue falar por último?",
-          "Que decisão futura sua poderia se beneficiar de um \"advogado do diabo\" formal antes de ser fechada?",
+          'Que decisão futura sua poderia se beneficiar de um "advogado do diabo" formal antes de ser fechada?',
         ],
       },
     ],
@@ -576,7 +561,7 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
       },
       {
         type: "paragraph",
-        text: "Isso não elimina o risco — mas tira a decisão do terreno emocional (\"tenho um bom pressentimento\") e coloca em números comparáveis entre opções diferentes.",
+        text: 'Isso não elimina o risco — mas tira a decisão do terreno emocional ("tenho um bom pressentimento") e coloca em números comparáveis entre opções diferentes.',
       },
       { type: "heading", text: "Ferramenta 3 — Árvore de decisão" },
       {
@@ -604,8 +589,11 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
       },
     ],
   },
+];
+
+export const ESTOICISMO_CHAPTERS: WisdomChapter[] = [
   {
-    number: 9,
+    number: 1,
     title: "Dicotomia do Controle",
     subtitle: "O que depende de você, e o que não depende",
     blocks: [
@@ -628,7 +616,7 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
       { type: "heading", text: "O que realmente está sob seu controle" },
       {
         type: "paragraph",
-        text: "Vale a pena detalhar o que exatamente está sob nosso controle, porque a linha é mais fina do que parece à primeira vista. Epicteto listava como verdadeiramente nossos: os julgamentos que fazemos sobre as coisas, os desejos que alimentamos, as aversões que cultivamos, os impulsos para agir e as escolhas de assentir ou recusar. Tudo o mais — o corpo, a propriedade, a reputação, os cargos, as pessoas que amamos — é classificado por ele como \"não nosso\", no sentido de que não depende da nossa vontade para acontecer ou permanecer.",
+        text: 'Vale a pena detalhar o que exatamente está sob nosso controle, porque a linha é mais fina do que parece à primeira vista. Epicteto listava como verdadeiramente nossos: os julgamentos que fazemos sobre as coisas, os desejos que alimentamos, as aversões que cultivamos, os impulsos para agir e as escolhas de assentir ou recusar. Tudo o mais — o corpo, a propriedade, a reputação, os cargos, as pessoas que amamos — é classificado por ele como "não nosso", no sentido de que não depende da nossa vontade para acontecer ou permanecer.',
       },
       { type: "heading", text: "Agir sem se apegar ao resultado" },
       {
@@ -637,11 +625,11 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
       },
       {
         type: "paragraph",
-        text: "Os estoicos faziam uma distinção útil entre \"causas principais\" e \"causas auxiliares\". A causa principal de uma ação é a sua escolha, sua intenção, seu julgamento — isso é totalmente seu. As causas auxiliares são as condições externas, as circunstâncias, as outras pessoas — isso não é seu. Uma flecha pode ser lançada com perfeição, mas o vento pode desviá-la. O arqueiro estoico se concentra na perfeição do lançamento, não no capricho do vento.",
+        text: 'Os estoicos faziam uma distinção útil entre "causas principais" e "causas auxiliares". A causa principal de uma ação é a sua escolha, sua intenção, seu julgamento — isso é totalmente seu. As causas auxiliares são as condições externas, as circunstâncias, as outras pessoas — isso não é seu. Uma flecha pode ser lançada com perfeição, mas o vento pode desviá-la. O arqueiro estoico se concentra na perfeição do lançamento, não no capricho do vento.',
       },
       {
         type: "paragraph",
-        text: "A pergunta que a dicotomia propõe não é \"como faço isso dar certo?\", mas sim: \"isso que estou tentando controlar está realmente sob meu comando?\". Se estiver, aja. Se não estiver, solte. Não porque o resultado não importa, mas porque segurá-lo com força não o torna mais provável — só torna você mais cansado.",
+        text: 'A pergunta que a dicotomia propõe não é "como faço isso dar certo?", mas sim: "isso que estou tentando controlar está realmente sob meu comando?". Se estiver, aja. Se não estiver, solte. Não porque o resultado não importa, mas porque segurá-lo com força não o torna mais provável — só torna você mais cansado.',
       },
       { type: "heading", text: "O evento e o julgamento sobre o evento" },
       {
@@ -658,18 +646,18 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
       },
       {
         type: "paragraph",
-        text: "Isso não significa negar a dor ou fingir que nada importa. Significa reconhecer que entre o evento e a reação existe um espaço — e nesse espaço mora a nossa liberdade. Os estoicos chamavam isso de \"proaíresis\", a faculdade de escolha. É a única coisa que ninguém pode tirar de você, nem mesmo um imperador, nem mesmo a morte. Um escravo pode ser acorrentado, mas não pode ser impedido de escolher como interpreta suas correntes. É por isso que Epicteto, escravo, era mais livre do que muitos senadores romanos.",
+        text: 'Isso não significa negar a dor ou fingir que nada importa. Significa reconhecer que entre o evento e a reação existe um espaço — e nesse espaço mora a nossa liberdade. Os estoicos chamavam isso de "proaíresis", a faculdade de escolha. É a única coisa que ninguém pode tirar de você, nem mesmo um imperador, nem mesmo a morte. Um escravo pode ser acorrentado, mas não pode ser impedido de escolher como interpreta suas correntes. É por isso que Epicteto, escravo, era mais livre do que muitos senadores romanos.',
       },
     ],
   },
   {
-    number: 10,
+    number: 2,
     title: "Virtude Como Único Bem Verdadeiro",
     subtitle: "O que o fogo não pode queimar",
     blocks: [
       {
         type: "paragraph",
-        text: "Existe uma pergunta que os estoicos fazem e que soa estranha aos ouvidos modernos: o que é, de fato, um bem? A resposta comum seria saúde, dinheiro, amor, sucesso. Mas os estoicos apontavam uma fissura nessa lista: todos esses \"bens\" podem ser tirados de você. A saúde falha, o dinheiro some, o amor acaba, o sucesso vira memória. Se um bem pode ser perdido sem que você tenha feito nada de errado, ele não é bem de verdade — é circunstância.",
+        text: 'Existe uma pergunta que os estoicos fazem e que soa estranha aos ouvidos modernos: o que é, de fato, um bem? A resposta comum seria saúde, dinheiro, amor, sucesso. Mas os estoicos apontavam uma fissura nessa lista: todos esses "bens" podem ser tirados de você. A saúde falha, o dinheiro some, o amor acaba, o sucesso vira memória. Se um bem pode ser perdido sem que você tenha feito nada de errado, ele não é bem de verdade — é circunstância.',
       },
       {
         type: "paragraph",
@@ -687,7 +675,7 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
       { type: "heading", text: "Indiferentes preferíveis" },
       {
         type: "paragraph",
-        text: "Isso não significa indiferença ao mundo. Significa reordenar a hierarquia. Saúde é preferível à doença, riqueza à pobreza — os estoicos chamavam essas coisas de \"indiferentes preferíveis\" (proegmena). Mas são preferências, não bens. Você trabalha por elas, mas não depende delas para estar bem. A diferença é sutil e decisiva: quem faz da virtude o único bem pode perder tudo e ainda assim não perder a si mesmo.",
+        text: 'Isso não significa indiferença ao mundo. Significa reordenar a hierarquia. Saúde é preferível à doença, riqueza à pobreza — os estoicos chamavam essas coisas de "indiferentes preferíveis" (proegmena). Mas são preferências, não bens. Você trabalha por elas, mas não depende delas para estar bem. A diferença é sutil e decisiva: quem faz da virtude o único bem pode perder tudo e ainda assim não perder a si mesmo.',
       },
       {
         type: "paragraph",
@@ -709,7 +697,7 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
     ],
   },
   {
-    number: 11,
+    number: 3,
     title: "Premeditatio Malorum",
     subtitle: "Ensaiar a adversidade antes que ela chegue",
     blocks: [
@@ -754,7 +742,7 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
     ],
   },
   {
-    number: 12,
+    number: 4,
     title: "O Presente Como Único Tempo Real",
     subtitle: "Por que viver no passado ou no futuro é viver no exílio",
     blocks: [
@@ -794,12 +782,12 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
       },
       {
         type: "paragraph",
-        text: "Os estoicos chamavam isso de \"viver no exílio\" — estar ausente de onde se está. A cura não é uma técnica complicada: é simplesmente trazer a atenção de volta para o que está acontecendo agora. Não para o que aconteceu, não para o que pode acontecer, mas para o que está acontecendo. E agir sobre isso, se for o caso. Se não for, aceitar. O presente é o único lugar onde a vida pode ser vivida — e o único lugar onde a virtude pode ser praticada.",
+        text: 'Os estoicos chamavam isso de "viver no exílio" — estar ausente de onde se está. A cura não é uma técnica complicada: é simplesmente trazer a atenção de volta para o que está acontecendo agora. Não para o que aconteceu, não para o que pode acontecer, mas para o que está acontecendo. E agir sobre isso, se for o caso. Se não for, aceitar. O presente é o único lugar onde a vida pode ser vivida — e o único lugar onde a virtude pode ser praticada.',
       },
     ],
   },
   {
-    number: 13,
+    number: 5,
     title: "Amor Fati",
     subtitle: "A diferença entre aceitar e amar o que acontece",
     blocks: [
@@ -809,11 +797,11 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
       },
       {
         type: "paragraph",
-        text: "Nietzsche cunhou a expressão, mas a raiz é estoica. Epicteto dizia que não devemos desejar que os acontecimentos sigam nosso desejo, mas desejar que sigam como seguem — e assim a vida fluirá bem. Não se trata de gostar da dor ou fingir que a perda é boa. Trata-se de parar de brigar com o fato consumado. A energia gasta em \"isso não deveria ter acontecido\" é energia que não sobra para \"o que faço a partir disso?\".",
+        text: 'Nietzsche cunhou a expressão, mas a raiz é estoica. Epicteto dizia que não devemos desejar que os acontecimentos sigam nosso desejo, mas desejar que sigam como seguem — e assim a vida fluirá bem. Não se trata de gostar da dor ou fingir que a perda é boa. Trata-se de parar de brigar com o fato consumado. A energia gasta em "isso não deveria ter acontecido" é energia que não sobra para "o que faço a partir disso?".',
       },
       {
         type: "paragraph",
-        text: "Amor fati não é conformismo. É a percepção de que o universo não está conspirando contra você nem a favor — ele simplesmente é. E dentro desse \"simplesmente é\", você ainda escolhe como responder. Amar o destino é parar de exigir que ele peça licença antes de acontecer.",
+        text: 'Amor fati não é conformismo. É a percepção de que o universo não está conspirando contra você nem a favor — ele simplesmente é. E dentro desse "simplesmente é", você ainda escolhe como responder. Amar o destino é parar de exigir que ele peça licença antes de acontecer.',
       },
       { type: "heading", text: "O cão amarrado à carroça" },
       {
@@ -848,9 +836,10 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
     ],
   },
   {
-    number: 14,
+    number: 6,
     title: "Dever e Função Social",
-    subtitle: "Por que Marco Aurélio via o poder como obrigação, não privilégio",
+    subtitle:
+      "Por que Marco Aurélio via o poder como obrigação, não privilégio",
     blocks: [
       {
         type: "paragraph",
@@ -889,13 +878,13 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
     ],
   },
   {
-    number: 15,
+    number: 7,
     title: "Aceitação da Morte",
     subtitle: "Por que encarar a morte de frente é libertador, não mórbido",
     blocks: [
       {
         type: "paragraph",
-        text: "Você vai morrer. Os estoicos não achavam isso mórbido — achavam libertador. Sêneca dizia que quem aprendeu a morrer desaprendeu a servir. A morte, encarada de frente, esvazia o poder de muita coisa que nos escraviza: o medo da opinião alheia, a corrida por status, a ansiedade sobre o futuro. Nada disso sobrevive à pergunta \"e se eu morrer amanhã?\".",
+        text: 'Você vai morrer. Os estoicos não achavam isso mórbido — achavam libertador. Sêneca dizia que quem aprendeu a morrer desaprendeu a servir. A morte, encarada de frente, esvazia o poder de muita coisa que nos escraviza: o medo da opinião alheia, a corrida por status, a ansiedade sobre o futuro. Nada disso sobrevive à pergunta "e se eu morrer amanhã?".',
       },
       {
         type: "paragraph",
@@ -938,8 +927,11 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
       },
     ],
   },
+];
+
+export const ODISSEIA_CHAPTERS: WisdomChapter[] = [
   {
-    number: 16,
+    number: 1,
     title: "Partida e Nostalgia de Ítaca",
     subtitle: "O herói mais esperto da guerra ainda não sabe voltar pra casa",
     blocks: [
@@ -959,16 +951,19 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
       { type: "heading", text: "A glória como parte do que ele quer" },
       {
         type: "paragraph",
-        text: "Há uma passagem famosa no canto IX em que Odisseu interrompe sua narrativa para elogiar a própria astúcia. Ele conta como enganou Polifemo, como escapou, como venceu. E o faz com um prazer evidente, quase infantil. Odisseu não quer apenas chegar; ele quer chegar como o herói de uma história que valha a pena ser contada. Cada monstro vencido é material para o kleos — a glória imortal que os poetas cantam. Odisseu não \"sofre\" suas aventuras; ele as coleciona.",
+        text: 'Há uma passagem famosa no canto IX em que Odisseu interrompe sua narrativa para elogiar a própria astúcia. Ele conta como enganou Polifemo, como escapou, como venceu. E o faz com um prazer evidente, quase infantil. Odisseu não quer apenas chegar; ele quer chegar como o herói de uma história que valha a pena ser contada. Cada monstro vencido é material para o kleos — a glória imortal que os poetas cantam. Odisseu não "sofre" suas aventuras; ele as coleciona.',
       },
       {
         type: "paragraph",
         text: "Isso cria uma tensão que atravessa toda a epopeia. Odisseu quer voltar para Ítaca, mas também quer que a volta valha a pena. E essas duas coisas — o desejo de casa e o desejo de glória — nem sempre apontam para a mesma direção. Às vezes, a glória exige desvios. E Odisseu, quase sempre, escolhe o interessante.",
       },
-      { type: "heading", text: "O caçador que ainda se mede pelo mundo heroico" },
+      {
+        type: "heading",
+        text: "O caçador que ainda se mede pelo mundo heroico",
+      },
       {
         type: "paragraph",
-        text: "Na décima rapsódia, Odisseu caça um cervo enorme na ilha de Circe. Homero descreve em detalhes como ele torce galhos de oliveira para fazer uma corda, como carrega o animal nos ombros até o acampamento. A cena é a caracterização de um homem que ainda se mede pelos padrões do mundo heroico. Ele não caça porque está com fome; caça porque é um caçador. Voltar para Ítaca, para ele, não é apenas voltar para casa: é voltar para o lugar onde ele é Odisseu, o de muitos ardis, o que não pode ser reduzido a \"ninguém\".",
+        text: 'Na décima rapsódia, Odisseu caça um cervo enorme na ilha de Circe. Homero descreve em detalhes como ele torce galhos de oliveira para fazer uma corda, como carrega o animal nos ombros até o acampamento. A cena é a caracterização de um homem que ainda se mede pelos padrões do mundo heroico. Ele não caça porque está com fome; caça porque é um caçador. Voltar para Ítaca, para ele, não é apenas voltar para casa: é voltar para o lugar onde ele é Odisseu, o de muitos ardis, o que não pode ser reduzido a "ninguém".',
       },
       { type: "heading", text: "Nostalgia de si mesmo" },
       {
@@ -983,7 +978,7 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
     ],
   },
   {
-    number: 17,
+    number: 2,
     title: "O Ciclope — Hybris e Astúcia",
     subtitle: "A inteligência vence a força, mas não vence a vaidade",
     blocks: [
@@ -1011,7 +1006,7 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
       },
       {
         type: "paragraph",
-        text: "Odisseu se apresenta como \"Ninguém\" (Outis). É um truque de linguagem, não de força. Quando Polifemo grita aos outros Ciclopes que \"Ninguém\" o está ferindo, a própria palavra o trai. Odisseu cega o gigante com uma estaca de oliveira endurecida no fogo — uma arma que é também um símbolo: a oliveira é a árvore de Atena, a deusa da sabedoria. A inteligência vence a força.",
+        text: 'Odisseu se apresenta como "Ninguém" (Outis). É um truque de linguagem, não de força. Quando Polifemo grita aos outros Ciclopes que "Ninguém" o está ferindo, a própria palavra o trai. Odisseu cega o gigante com uma estaca de oliveira endurecida no fogo — uma arma que é também um símbolo: a oliveira é a árvore de Atena, a deusa da sabedoria. A inteligência vence a força.',
       },
       {
         type: "paragraph",
@@ -1029,12 +1024,12 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
       { type: "heading", text: "Um espelho, não um monstro absoluto" },
       {
         type: "paragraph",
-        text: "Há ainda um detalhe que muitas vezes passa despercebido. Polifemo, ao contrário dos outros monstros que Odisseu encontra, não é uma criatura mágica nem um deus. Ele é um pastor, com ovelhas, queijo, uma vida simples. O que o torna monstruoso não é sua natureza, mas sua escolha. Isso significa que Polifemo não é um \"outro\" absoluto — é uma possibilidade humana. Qualquer um pode escolher viver como Polifemo. O Ciclope não é apenas um monstro; é um espelho.",
+        text: 'Há ainda um detalhe que muitas vezes passa despercebido. Polifemo, ao contrário dos outros monstros que Odisseu encontra, não é uma criatura mágica nem um deus. Ele é um pastor, com ovelhas, queijo, uma vida simples. O que o torna monstruoso não é sua natureza, mas sua escolha. Isso significa que Polifemo não é um "outro" absoluto — é uma possibilidade humana. Qualquer um pode escolher viver como Polifemo. O Ciclope não é apenas um monstro; é um espelho.',
       },
     ],
   },
   {
-    number: 18,
+    number: 3,
     title: "Éolo — A Tempestade Autoinfligida",
     subtitle: "A destruição que vem de dentro do próprio navio",
     blocks: [
@@ -1045,7 +1040,7 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
       { type: "heading", text: "A costa à vista" },
       {
         type: "paragraph",
-        text: "Nove dias se passam. No décimo, a costa de Ítaca aparece. Odisseu diz: \"Já podemos ver os fogos acesos.\" Depois de vinte anos, o lar está ali, a poucas horas de distância. É o momento mais tenso de toda a epopeia — não porque haja um monstro à frente, mas porque não há. O perigo não está no mar; está no navio.",
+        text: 'Nove dias se passam. No décimo, a costa de Ítaca aparece. Odisseu diz: "Já podemos ver os fogos acesos." Depois de vinte anos, o lar está ali, a poucas horas de distância. É o momento mais tenso de toda a epopeia — não porque haja um monstro à frente, mas porque não há. O perigo não está no mar; está no navio.',
       },
       {
         type: "paragraph",
@@ -1067,7 +1062,7 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
       },
       {
         type: "paragraph",
-        text: "Mas Odisseu resiste. A frota volta ao ponto de partida, e Éolo desta vez o expulsa, declarando que Odisseu é \"odiado pelos deuses\". Éolo não diz que Odisseu errou; diz que Odisseu é odiado. O erro foi dos companheiros, mas a punição é de Odisseu. O líder responde pelos liderados. Sempre.",
+        text: 'Mas Odisseu resiste. A frota volta ao ponto de partida, e Éolo desta vez o expulsa, declarando que Odisseu é "odiado pelos deuses". Éolo não diz que Odisseu errou; diz que Odisseu é odiado. O erro foi dos companheiros, mas a punição é de Odisseu. O líder responde pelos liderados. Sempre.',
       },
       { type: "heading", text: "O saco como metáfora do inconsciente" },
       {
@@ -1077,18 +1072,18 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
     ],
   },
   {
-    number: 19,
+    number: 4,
     title: "Circe — Transformação e Apetite",
     subtitle: "O que sobra de um homem quando ele só quer comer e dormir",
     blocks: [
       {
         type: "paragraph",
-        text: "O palácio de Circe fica na ilha de Eeia, cercado por uma floresta densa. Lobos e leões vagueiam diante da porta — já foram homens, transformados em feras por suas poções. Ela tece em seu tear e canta com voz de deusa, e sua \"hospitalidade\" consiste em transformar os hóspedes em porcos.",
+        text: 'O palácio de Circe fica na ilha de Eeia, cercado por uma floresta densa. Lobos e leões vagueiam diante da porta — já foram homens, transformados em feras por suas poções. Ela tece em seu tear e canta com voz de deusa, e sua "hospitalidade" consiste em transformar os hóspedes em porcos.',
       },
       { type: "heading", text: "O chiqueiro da hospitalidade invertida" },
       {
         type: "paragraph",
-        text: "Odisseu envia vinte e dois companheiros para explorar. Circe os recebe com queijo, farinha, mel claro e vinho, misturando à comida \"uma droga terrível, para que esquecessem a terra natal\". Depois toca cada um com sua varinha e os tranca no chiqueiro. Eles têm cabeça, voz, cerdas e forma de porcos, mas a mente permanece como antes. Os homens não perdem a consciência; perdem a forma. É a metáfora perfeita da condição humana quando dominada pelo apetite: você sabe que poderia ser mais, mas está reduzido ao que come.",
+        text: 'Odisseu envia vinte e dois companheiros para explorar. Circe os recebe com queijo, farinha, mel claro e vinho, misturando à comida "uma droga terrível, para que esquecessem a terra natal". Depois toca cada um com sua varinha e os tranca no chiqueiro. Eles têm cabeça, voz, cerdas e forma de porcos, mas a mente permanece como antes. Os homens não perdem a consciência; perdem a forma. É a metáfora perfeita da condição humana quando dominada pelo apetite: você sabe que poderia ser mais, mas está reduzido ao que come.',
       },
       {
         type: "paragraph",
@@ -1121,7 +1116,7 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
     ],
   },
   {
-    number: 20,
+    number: 5,
     title: "A Descida ao Hades — Confronto com a Mortalidade",
     subtitle: "O que a morte ensina sobre por que vale a pena viver",
     blocks: [
@@ -1169,7 +1164,7 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
     ],
   },
   {
-    number: 21,
+    number: 6,
     title: "Sereias, Cila e Caríbdis — Escolher Entre Dois Males",
     subtitle: "Quando não existe a opção boa, só a menos ruim",
     blocks: [
@@ -1203,7 +1198,7 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
       { type: "heading", text: "O cálculo trágico da liderança" },
       {
         type: "paragraph",
-        text: "\"Escolher entre dois males\" tornou-se um problema clássico da filosofia política e da ética. Não é escolher entre o bem e o mal, mas entre qual mal é menor. Odisseu escolhe Cila porque perde seis em vez de todos. É uma escolha racional, mas não é uma escolha feliz. A racionalidade não elimina o sofrimento; apenas o distribui. A partir de Cila, ele sabe que não é onipotente.",
+        text: '"Escolher entre dois males" tornou-se um problema clássico da filosofia política e da ética. Não é escolher entre o bem e o mal, mas entre qual mal é menor. Odisseu escolhe Cila porque perde seis em vez de todos. É uma escolha racional, mas não é uma escolha feliz. A racionalidade não elimina o sofrimento; apenas o distribui. A partir de Cila, ele sabe que não é onipotente.',
       },
       { type: "heading", text: "Duas formas de perigo" },
       {
@@ -1213,7 +1208,7 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
     ],
   },
   {
-    number: 22,
+    number: 7,
     title: "Calipso — A Tentação da Imortalidade Confortável",
     subtitle: "Escolher ser humano quando a eternidade está à disposição",
     blocks: [
@@ -1269,7 +1264,7 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
     ],
   },
   {
-    number: 23,
+    number: 8,
     title: "Os Feácios — Hospitalidade (Xenia)",
     subtitle: "O único povo que trata Odisseu como gente, não como presa",
     blocks: [
@@ -1295,7 +1290,7 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
       { type: "heading", text: "O preço da generosidade" },
       {
         type: "paragraph",
-        text: "Mas a história dos feácios tem um final sombrio. Quando finalmente levam Odisseu a Ítaca, Poseidon pune o povo por essa \"ajuda excessiva\": transforma o navio deles em pedra e sela o porto da cidade. Os feácios fizeram tudo certo — receberam o estrangeiro, honraram a xenia, ajudaram o necessitado — e foram destruídos por isso. A mensagem é que a justiça não é uma garantia. Às vezes, fazer o bem custa caro.",
+        text: 'Mas a história dos feácios tem um final sombrio. Quando finalmente levam Odisseu a Ítaca, Poseidon pune o povo por essa "ajuda excessiva": transforma o navio deles em pedra e sela o porto da cidade. Os feácios fizeram tudo certo — receberam o estrangeiro, honraram a xenia, ajudaram o necessitado — e foram destruídos por isso. A mensagem é que a justiça não é uma garantia. Às vezes, fazer o bem custa caro.',
       },
       { type: "heading", text: "Uma utopia que não sobrevive ao mundo real" },
       {
@@ -1305,7 +1300,7 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
     ],
   },
   {
-    number: 24,
+    number: 9,
     title: "O Retorno Disfarçado a Ítaca",
     subtitle: "Precisar virar ninguém de novo pra poder ser alguém outra vez",
     blocks: [
@@ -1321,12 +1316,12 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
       { type: "heading", text: "Transformado em mendigo" },
       {
         type: "paragraph",
-        text: "Atena revela sua forma verdadeira e ri. Mas não o ajuda a vencer de imediato: primeiro o transforma num mendigo andrajoso, careca, enrugado. Odisseu precisa voltar ao próprio palácio como \"ninguém\", e usar mais uma vez a mētis — agora não contra monstros, mas contra pessoas. Odisseu passou vinte anos tentando voltar a ser Odisseu. Agora, ao chegar, precisa deixar de ser Odisseu outra vez.",
+        text: 'Atena revela sua forma verdadeira e ri. Mas não o ajuda a vencer de imediato: primeiro o transforma num mendigo andrajoso, careca, enrugado. Odisseu precisa voltar ao próprio palácio como "ninguém", e usar mais uma vez a mētis — agora não contra monstros, mas contra pessoas. Odisseu passou vinte anos tentando voltar a ser Odisseu. Agora, ao chegar, precisa deixar de ser Odisseu outra vez.',
       },
       { type: "heading", text: "A hospitalidade de Eumeu" },
       {
         type: "paragraph",
-        text: "Ele vai primeiro à cabana do velho porqueiro Eumeu. Eumeu não o reconhece, mas mesmo assim lhe dá comida e cama — a xenia em sua forma mais pura: bondade a um completo estranho. Odisseu não pode revelar quem é, mas começa a contar uma história inventada sobre \"Odisseu\", uma história em que ele voltará. O mentiroso diz a verdade sem saber; o crédulo ouve a mentira sem desconfiar.",
+        text: 'Ele vai primeiro à cabana do velho porqueiro Eumeu. Eumeu não o reconhece, mas mesmo assim lhe dá comida e cama — a xenia em sua forma mais pura: bondade a um completo estranho. Odisseu não pode revelar quem é, mas começa a contar uma história inventada sobre "Odisseu", uma história em que ele voltará. O mentiroso diz a verdade sem saber; o crédulo ouve a mentira sem desconfiar.',
       },
       { type: "heading", text: "Argos, o cão que esperou" },
       {
@@ -1345,13 +1340,13 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
     ],
   },
   {
-    number: 25,
+    number: 10,
     title: "Reconhecimento Final e Vingança",
     subtitle: "O segredo que só os dois sabem, e o sangue que restaura a ordem",
     blocks: [
       {
         type: "paragraph",
-        text: "Homero dedica um canto inteiro ao reconhecimento entre Odisseu e Penélope. Não é um simples \"voltei\". Penélope não acredita em ninguém. Vinte anos de espera e cento e oito pretendentes a cercando a tornaram cautelosa com tudo.",
+        text: 'Homero dedica um canto inteiro ao reconhecimento entre Odisseu e Penélope. Não é um simples "voltei". Penélope não acredita em ninguém. Vinte anos de espera e cento e oito pretendentes a cercando a tornaram cautelosa com tudo.',
       },
       { type: "heading", text: "O teste da cicatriz" },
       {
@@ -1385,8 +1380,39 @@ export const WISDOM_CHAPTERS: WisdomChapter[] = [
       { type: "heading", text: "Uma reconstrução, não um retorno" },
       {
         type: "paragraph",
-        text: "Ítaca volta a ser de Odisseu. Mas não é um final de conto de fadas. Ele ainda terá que partir de novo, conforme a profecia de Tirésias, e só então voltar a Ítaca para esperar a morte \"vinda do mar\". Odisseu não volta para Ítaca; ele constrói uma nova Ítaca, com sangue e astúcia. A vida não termina quando você chega em casa. A vida continua. E Odisseu, o homem de muitos ardis, continua sendo o homem que não pode ficar parado.",
+        text: 'Ítaca volta a ser de Odisseu. Mas não é um final de conto de fadas. Ele ainda terá que partir de novo, conforme a profecia de Tirésias, e só então voltar a Ítaca para esperar a morte "vinda do mar". Odisseu não volta para Ítaca; ele constrói uma nova Ítaca, com sangue e astúcia. A vida não termina quando você chega em casa. A vida continua. E Odisseu, o homem de muitos ardis, continua sendo o homem que não pode ficar parado.',
       },
     ],
   },
 ];
+
+export const WISDOM_TOPICS: WisdomTopic[] = [
+  {
+    slug: "decisoes-vieses",
+    title: "Decisões e Vieses",
+    subtitle: "Como o cérebro se engana ao decidir",
+    icon: "git-branch-outline",
+    color: "#3b82f6",
+    chapters: DECISOES_VIESES_CHAPTERS,
+  },
+  {
+    slug: "estoicismo",
+    title: "Estoicismo",
+    subtitle: "Serenidade diante do que não depende de você",
+    icon: "shield-outline",
+    color: "#8b5cf6",
+    chapters: ESTOICISMO_CHAPTERS,
+  },
+  {
+    slug: "odisseia",
+    title: "Odisseia",
+    subtitle: "Lições da jornada de Ulisses",
+    icon: "boat-outline",
+    color: "#2ec4b6",
+    chapters: ODISSEIA_CHAPTERS,
+  },
+];
+
+export function getWisdomTopic(slug: string): WisdomTopic | undefined {
+  return WISDOM_TOPICS.find((topic) => topic.slug === slug);
+}

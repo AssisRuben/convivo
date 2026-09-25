@@ -5,7 +5,7 @@ import { estimateRunOutDate, daysBetween } from "@/lib/medications/medicationCor
 import { dueTipIndexes } from "@/lib/goals/goalCore";
 import { pickTipForIndex } from "@/lib/goals/goalTips";
 import { isNextChapterAvailable as isNextWisdomChapterAvailable } from "@/lib/wisdom/wisdomCore";
-import { WISDOM_CHAPTERS } from "@/constants/wisdomPills";
+import { getWisdomTopic } from "@/constants/wisdomPills";
 import { isNextChapterAvailable as isNextFaithChapterAvailable } from "@/lib/faith/faithCore";
 import { getFaithBook } from "@/constants/faithDrops";
 
@@ -163,10 +163,10 @@ export async function dispatchDueGoalTips(now: Date = new Date()): Promise<numbe
 const DAILY_READING_REMINDER_MINUTES = 8 * 60; // 08:00
 
 /**
- * Avisa quem já começou a trilha (tem WisdomProgress, ou seja, já leu
- * pelo menos o capítulo 1) e ainda não terminou, que o capítulo de hoje
- * está liberado. Idempotente via lastNotifiedDate — não manda de novo no
- * mesmo dia se o cron rodar mais de uma vez.
+ * Avisa quem já começou algum tópico (tem WisdomProgress, ou seja, já leu
+ * pelo menos o capítulo 1 dele) e ainda não terminou, que o capítulo de
+ * hoje está liberado. Idempotente via lastNotifiedDate — não manda de novo
+ * no mesmo dia se o cron rodar mais de uma vez.
  */
 export async function dispatchDueWisdomReminders(now: Date = new Date()): Promise<number> {
   if (Math.abs(minutesSinceMidnight(now) - DAILY_READING_REMINDER_MINUTES) > REMINDER_TOLERANCE_MINUTES) {
@@ -174,24 +174,29 @@ export async function dispatchDueWisdomReminders(now: Date = new Date()): Promis
   }
 
   const today = todayDate();
+  // Um lembrete por USUÁRIO, não por tópico — se qualquer tópico tiver
+  // capítulo disponível hoje, avisa uma vez só (evita duplicar
+  // notificação quando o usuário lê mais de um tópico em paralelo).
   const rows = await prisma.wisdomProgress.findMany({
-    where: {
-      chaptersRead: { lt: WISDOM_CHAPTERS.length },
-      OR: [{ lastNotifiedDate: null }, { lastNotifiedDate: { not: today } }],
-    },
+    where: { OR: [{ lastNotifiedDate: null }, { lastNotifiedDate: { not: today } }] },
   });
 
+  const notifiedUserIds = new Set<string>();
   let sent = 0;
   for (const row of rows) {
-    if (!isNextWisdomChapterAvailable(row.chaptersRead, row.lastReadDate, today)) continue;
+    if (notifiedUserIds.has(row.userId)) continue;
+    const topic = getWisdomTopic(row.topicSlug);
+    if (!topic || row.chaptersRead >= topic.chapters.length) continue;
+    if (!isNextWisdomChapterAvailable(row.chaptersRead, row.lastReadDate, today, topic.chapters.length)) continue;
 
     await sendPushToUser(row.userId, {
       title: "Sua pílula de sabedoria chegou 💊",
       body: "O capítulo de hoje já está liberado — leva menos de 5 minutos.",
       data: { screen: "pilulas-sabedoria" },
     });
+    notifiedUserIds.add(row.userId);
     await prisma.wisdomProgress.update({
-      where: { userId: row.userId },
+      where: { userId_topicSlug: { userId: row.userId, topicSlug: row.topicSlug } },
       data: { lastNotifiedDate: today },
     });
     sent += 1;
