@@ -230,7 +230,13 @@ export default function PilulaLeituraScreen() {
               </Text>
             )}
             <Pressable
-              onPress={() => router.replace("/perfil/pilulas-sabedoria")}
+              onPress={() => {
+                // Fecha o modal antes de navegar — no web o Modal do RN pode
+                // continuar por cima da tela seguinte se sair ainda visível.
+                setResult(null);
+                if (router.canGoBack()) router.back();
+                else router.replace("/perfil/pilulas-sabedoria");
+              }}
               className="mt-2 w-full items-center rounded-full bg-coral p-3.5"
             >
               <Text className="font-bold text-white">Continuar</Text>

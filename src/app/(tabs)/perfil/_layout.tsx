@@ -38,6 +38,8 @@ export default function PerfilLayout() {
       <Stack.Screen name="gotas-de-fe/index" />
       <Stack.Screen name="gotas-de-fe/[livro]/index" options={backButtonOptions} />
       <Stack.Screen name="gotas-de-fe/[livro]/capitulo/[numero]" options={backButtonOptions} />
+      <Stack.Screen name="pilulas-sabedoria/index" />
+      <Stack.Screen name="pilulas-sabedoria/capitulo/[numero]" options={backButtonOptions} />
     </Stack>
   );
 }
