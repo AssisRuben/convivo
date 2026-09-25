@@ -35,9 +35,9 @@ export async function fetchCatalogHome(): Promise<ApiCatalogHome> {
   return res.json();
 }
 
-export async function fetchRotina(): Promise<{ items: ApiChecklistItem[] }> {
+export async function fetchRotina(): Promise<{ items: ApiChecklistItem[]; streakDays: number }> {
   const res = await apiFetch("/api/mobile/rotina");
-  if (!res.ok) return { items: [] };
+  if (!res.ok) return { items: [], streakDays: 0 };
   return res.json();
 }
 

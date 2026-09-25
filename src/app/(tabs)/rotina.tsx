@@ -23,11 +23,12 @@ import { CARE_CATEGORIES, CARE_CATEGORY_META, WEEKDAY_LABELS } from "@/constants
 import { showAlert } from "@/lib/alert";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { TimeField } from "@/components/TimeField";
+import { CelebrationModal } from "@/components/CelebrationModal";
 import { ROTINA_CACHE_KEY, fetchRotina } from "@/lib/tabPrefetch";
 import { getCached, invalidateCached, loadCached, setCached } from "@/lib/tabDataCache";
 
 function readCachedRotina() {
-  return getCached<{ items: ApiChecklistItem[] }>(ROTINA_CACHE_KEY);
+  return getCached<{ items: ApiChecklistItem[]; streakDays: number }>(ROTINA_CACHE_KEY);
 }
 
 type FormState = {
@@ -68,12 +69,14 @@ export default function RotinaScreen() {
   const [items, setItems] = useState<ApiChecklistItem[]>(
     () => readCachedRotina()?.items ?? []
   );
+  const [streakDays, setStreakDays] = useState(() => readCachedRotina()?.streakDays ?? 0);
   const [loading, setLoading] = useState(() => readCachedRotina() === undefined);
   const [form, setForm] = useState<FormState | null>(null);
   const [saving, setSaving] = useState(false);
   const [detailItem, setDetailItem] = useState<ApiChecklistItem | null>(null);
   const [detail, setDetail] = useState<ApiRoutineItemDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [celebration, setCelebration] = useState<number | null>(null);
   const loadedOnce = useRef(false);
   const hadCacheOnMount = useRef(readCachedRotina() !== undefined);
   // "completedToday" é por data — sem isso, um app que fica dias sem ser
@@ -87,6 +90,7 @@ export default function RotinaScreen() {
     try {
       const data = await loadCached(ROTINA_CACHE_KEY, fetchRotina);
       setItems(data.items ?? []);
+      setStreakDays(data.streakDays ?? 0);
     } finally {
       setLoading(false);
     }
@@ -116,9 +120,9 @@ export default function RotinaScreen() {
   // mutação (completar, salvar, remover) sem precisar sincronizar em
   // cada handler.
   useEffect(() => {
-    if (!loading) setCached(ROTINA_CACHE_KEY, { items });
+    if (!loading) setCached(ROTINA_CACHE_KEY, { items, streakDays });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items]);
+  }, [items, streakDays]);
 
   // Marca/desmarca na hora, sem esperar o servidor — o banco fica longe
   // (Supabase remota) e travar o clique até a resposta voltar tornava a
@@ -131,6 +135,9 @@ export default function RotinaScreen() {
 
   async function toggleComplete(item: ApiChecklistItem) {
     const nextCompleted = !item.completedToday;
+    // Nenhum outro cuidado feito hoje ainda — essa marcação é a primeira
+    // do dia, vale comemorar (só quando está marcando, não desmarcando).
+    const isFirstOfDay = nextCompleted && items.every((i) => i.id === item.id || !i.completedToday);
     latestToggleIntent.current.set(item.id, nextCompleted);
 
     setItems((prev) =>
@@ -145,6 +152,8 @@ export default function RotinaScreen() {
       const data = await res.json();
       if (latestToggleIntent.current.get(item.id) === nextCompleted) {
         setItems(data.items ?? []);
+        setStreakDays(data.streakDays ?? 0);
+        if (isFirstOfDay) setCelebration(data.streakDays ?? 0);
       }
     } catch {
       if (latestToggleIntent.current.get(item.id) === nextCompleted) {
@@ -258,6 +267,20 @@ export default function RotinaScreen() {
           <Text className="text-sm font-medium text-mint">Novo cuidado</Text>
         </Pressable>
       </View>
+
+      {streakDays > 0 && (
+        <View className="mb-4 flex-row items-center gap-3 rounded-2xl bg-navy p-4">
+          <View className="h-12 w-12 items-center justify-center rounded-full bg-white/10">
+            <Ionicons name="flame" size={22} color="#f59e0b" />
+          </View>
+          <View className="flex-1">
+            <Text className="text-sm font-semibold text-white">
+              {streakDays} dia{streakDays > 1 ? "s seguidos" : " seguido"} cuidando de você
+            </Text>
+            <Text className="mt-0.5 text-xs text-white/60">Marque pelo menos um cuidado hoje pra manter</Text>
+          </View>
+        </View>
+      )}
 
       {form && (
         <View className="mb-4 gap-3 rounded-2xl bg-card p-4 shadow-sm">
@@ -477,6 +500,18 @@ export default function RotinaScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      <CelebrationModal
+        visible={celebration !== null}
+        icon="flame"
+        color="#f59e0b"
+        title="Primeiro cuidado do dia!"
+        message="Você já garantiu mais um dia na sua sequência."
+        streakDays={celebration ?? undefined}
+        streakEmoji="🔥"
+        streakLabel="cuidando de você"
+        onContinue={() => setCelebration(null)}
+      />
     </KeyboardAvoidingView>
   );
 }

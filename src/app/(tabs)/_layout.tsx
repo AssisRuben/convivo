@@ -1,10 +1,20 @@
 import { useEffect } from "react";
 import { Redirect, Tabs } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/lib/auth";
 import { brandHeaderOptions } from "@/components/AppHeader";
 import { useProfileDrawer } from "@/lib/profileDrawer";
 import { prefetchAllTabs } from "@/lib/tabPrefetch";
+import { TabIcon } from "@/components/TabIcon";
+
+// Uma cor de destaque por aba, em vez da mesma cor pra todas — cada ícone
+// ganha sua "bolha" nessa cor quando ativo (ver TabIcon.tsx).
+const TAB_COLORS = {
+  home: "#e63946",
+  produtos: "#f59e0b",
+  saude: "#3b82f6",
+  rotina: "#2ec4b6",
+  perfil: "#8b5cf6",
+};
 
 export default function TabsLayout() {
   const { token } = useAuth();
@@ -24,16 +34,18 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         ...brandHeaderOptions,
-        tabBarActiveTintColor: "#e63946",
         tabBarInactiveTintColor: "#0b1e3d99",
+        tabBarLabelStyle: { fontSize: 12, fontWeight: "600" },
+        tabBarStyle: { height: 62, paddingBottom: 8, paddingTop: 6 },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
           tabBarLabel: "Home",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home-outline" size={size} color={color} />
+          tabBarActiveTintColor: TAB_COLORS.home,
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon name="home-outline" filledName="home" focused={focused} color={color} activeColor={TAB_COLORS.home} />
           ),
         }}
       />
@@ -41,8 +53,15 @@ export default function TabsLayout() {
         name="catalogo"
         options={{
           title: "Produtos",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="bag-handle-outline" size={size} color={color} />
+          tabBarActiveTintColor: TAB_COLORS.produtos,
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon
+              name="bag-handle-outline"
+              filledName="bag-handle"
+              focused={focused}
+              color={color}
+              activeColor={TAB_COLORS.produtos}
+            />
           ),
         }}
       />
@@ -50,8 +69,9 @@ export default function TabsLayout() {
         name="saude"
         options={{
           title: "Saúde",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="pulse-outline" size={size} color={color} />
+          tabBarActiveTintColor: TAB_COLORS.saude,
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon name="heart-outline" filledName="heart" focused={focused} color={color} activeColor={TAB_COLORS.saude} />
           ),
         }}
       />
@@ -59,8 +79,15 @@ export default function TabsLayout() {
         name="rotina"
         options={{
           title: "Rotina",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="checkmark-done-outline" size={size} color={color} />
+          tabBarActiveTintColor: TAB_COLORS.rotina,
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon
+              name="checkmark-done-circle-outline"
+              filledName="checkmark-done-circle"
+              focused={focused}
+              color={color}
+              activeColor={TAB_COLORS.rotina}
+            />
           ),
         }}
       />
@@ -69,8 +96,15 @@ export default function TabsLayout() {
         options={{
           title: "Perfil",
           headerShown: false,
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person-outline" size={size} color={color} />
+          tabBarActiveTintColor: TAB_COLORS.perfil,
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon
+              name="person-circle-outline"
+              filledName="person-circle"
+              focused={focused}
+              color={color}
+              activeColor={TAB_COLORS.perfil}
+            />
           ),
         }}
         listeners={{

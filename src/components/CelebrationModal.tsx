@@ -63,6 +63,7 @@ export function CelebrationModal({
   message,
   streakDays,
   streakEmoji,
+  streakLabel = "de leitura",
   onContinue,
 }: {
   visible: boolean;
@@ -72,6 +73,7 @@ export function CelebrationModal({
   message?: string;
   streakDays?: number;
   streakEmoji: string;
+  streakLabel?: string;
   onContinue: () => void;
 }) {
   const { width, height } = useWindowDimensions();
@@ -139,7 +141,7 @@ export function CelebrationModal({
             <View className="mt-1 flex-row items-center gap-2 rounded-full px-4 py-2" style={{ backgroundColor: `${color}1a` }}>
               <Text className="text-lg">{streakEmoji}</Text>
               <Text className="text-sm font-bold" style={{ color }}>
-                {streakDays} dia{streakDays > 1 ? "s seguidos" : " seguido"} de leitura
+                {streakDays} dia{streakDays > 1 ? "s seguidos" : " seguido"} {streakLabel}
               </Text>
             </View>
           )}

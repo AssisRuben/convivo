@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
+import { Animated, ActivityIndicator, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { apiFetch, type ApiHomeDashboard } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -28,33 +28,47 @@ const SAUDE_TYPE_LABELS: Record<string, string> = {
   GLICEMIA: "Glicemia",
 };
 
+const useNativeDriver = Platform.OS !== "web";
+
 function QuickAction({
   icon,
   label,
+  color,
   onPress,
   badge,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
+  color: string;
   onPress: () => void;
   badge?: number;
 }) {
+  // Bolha colorida + leve "pulo" ao tocar — deixa a ação mais viva do que
+  // o círculo cinza uniforme que tinha antes.
+  const [scale] = useState(() => new Animated.Value(1));
+
+  function animateTo(value: number) {
+    Animated.spring(scale, { toValue: value, friction: 5, tension: 120, useNativeDriver }).start();
+  }
+
   return (
     <Pressable
       onPress={onPress}
+      onPressIn={() => animateTo(0.9)}
+      onPressOut={() => animateTo(1)}
       className="flex-1 items-center gap-2 rounded-2xl bg-card p-4 shadow-sm"
     >
-      <View>
-        <View className="h-10 w-10 items-center justify-center rounded-full bg-navy/5">
-          <Ionicons name={icon} size={20} color="#0b1e3d" />
+      <Animated.View style={{ transform: [{ scale }] }}>
+        <View className="h-12 w-12 items-center justify-center rounded-full" style={{ backgroundColor: `${color}22` }}>
+          <Ionicons name={icon} size={24} color={color} />
         </View>
         {Boolean(badge) && (
-          <View className="absolute -right-1 -top-1 h-4 w-4 items-center justify-center rounded-full bg-coral">
-            <Text className="text-[9px] font-bold text-white">{badge}</Text>
+          <View className="absolute -right-1 -top-1 h-5 w-5 items-center justify-center rounded-full bg-coral">
+            <Text className="text-[10px] font-bold text-white">{badge}</Text>
           </View>
         )}
-      </View>
-      <Text className="text-xs font-medium text-navy">{label}</Text>
+      </Animated.View>
+      <Text className="text-sm font-bold text-navy">{label}</Text>
     </Pressable>
   );
 }
@@ -328,23 +342,27 @@ export default function HomeScreen() {
         <Text className="text-base font-bold text-navy">Ações Rápidas</Text>
         <View className="flex-row gap-3">
           <QuickAction
-            icon="star-outline"
+            icon="star"
+            color="#f59e0b"
             label="Pontos"
             onPress={() => router.push("/perfil/fidelidade")}
           />
           <QuickAction
-            icon="pricetag-outline"
+            icon="pricetag"
+            color="#e63946"
             label="Ofertas"
             badge={dashboard.activePromotionsCount || undefined}
             onPress={() => router.push("/ofertas")}
           />
           <QuickAction
-            icon="newspaper-outline"
+            icon="newspaper"
+            color="#3b82f6"
             label="Notícia"
             onPress={() => router.push("/perfil/novidades")}
           />
           <QuickAction
-            icon="medkit-outline"
+            icon="medkit"
+            color="#2ec4b6"
             label="Recompra"
             onPress={() => router.push("/perfil/medicamentos")}
           />

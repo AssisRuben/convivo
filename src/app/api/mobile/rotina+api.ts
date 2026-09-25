@@ -1,6 +1,7 @@
 import { getApiUserId } from "@/lib/apiAuth";
 import {
   createChecklistItemForUser,
+  getOverallRoutineStreak,
   listChecklistItemsForUser,
   type RoutineItemInput,
 } from "@/lib/care/checklistCore";
@@ -11,8 +12,11 @@ export async function GET(request: Request) {
     return Response.json({ error: "Não autenticado" }, { status: 401 });
   }
 
-  const items = await listChecklistItemsForUser(userId);
-  return Response.json({ items });
+  const [items, streakDays] = await Promise.all([
+    listChecklistItemsForUser(userId),
+    getOverallRoutineStreak(userId),
+  ]);
+  return Response.json({ items, streakDays });
 }
 
 export async function POST(request: Request) {
@@ -28,8 +32,11 @@ export async function POST(request: Request) {
 
   try {
     await createChecklistItemForUser(userId, body);
-    const items = await listChecklistItemsForUser(userId);
-    return Response.json({ items });
+    const [items, streakDays] = await Promise.all([
+      listChecklistItemsForUser(userId),
+      getOverallRoutineStreak(userId),
+    ]);
+    return Response.json({ items, streakDays });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Não foi possível salvar";
     return Response.json({ error: message }, { status: 400 });

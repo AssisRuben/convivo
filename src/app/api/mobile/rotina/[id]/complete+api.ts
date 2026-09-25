@@ -1,6 +1,7 @@
 import { getApiUserId } from "@/lib/apiAuth";
 import {
   completeChecklistItemForUser,
+  getOverallRoutineStreak,
   listChecklistItemsForUser,
   uncompleteChecklistItemForUser,
 } from "@/lib/care/checklistCore";
@@ -13,8 +14,11 @@ export async function POST(request: Request, { id }: Record<string, string>) {
 
   try {
     await completeChecklistItemForUser(userId, id);
-    const items = await listChecklistItemsForUser(userId);
-    return Response.json({ items });
+    const [items, streakDays] = await Promise.all([
+      listChecklistItemsForUser(userId),
+      getOverallRoutineStreak(userId),
+    ]);
+    return Response.json({ items, streakDays });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Não foi possível marcar";
     return Response.json({ error: message }, { status: 400 });
@@ -29,8 +33,11 @@ export async function DELETE(request: Request, { id }: Record<string, string>) {
 
   try {
     await uncompleteChecklistItemForUser(userId, id);
-    const items = await listChecklistItemsForUser(userId);
-    return Response.json({ items });
+    const [items, streakDays] = await Promise.all([
+      listChecklistItemsForUser(userId),
+      getOverallRoutineStreak(userId),
+    ]);
+    return Response.json({ items, streakDays });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Não foi possível desmarcar";
     return Response.json({ error: message }, { status: 400 });

@@ -40,6 +40,51 @@ export function validateRoutineInput(input: RoutineItemInput): string {
   return title;
 }
 
+// Bem acima do maior degrau de conquista (GOAL_LADDERS.ROTINA, até 120) —
+// sem custo de rodar em toda carga da aba, é uma query só (ver abaixo),
+// não N round-trips por dia como currentRoutineStreak em achievements.ts.
+const OVERALL_STREAK_LOOKBACK_DAYS = 400;
+
+/** Parte pura de getOverallRoutineStreak — testável sem Prisma. */
+export function computeOverallStreakFromDates(doneDateKeys: Set<string>, today: Date): number {
+  let streak = 0;
+  let cursor = today;
+  for (let i = 0; i < OVERALL_STREAK_LOOKBACK_DAYS; i++) {
+    const key = cursor.toISOString().slice(0, 10);
+    if (!doneDateKeys.has(key)) break;
+    streak += 1;
+    cursor = new Date(cursor.getTime() - 24 * 60 * 60 * 1000);
+  }
+  return streak;
+}
+
+/**
+ * "Dias seguidos cuidando de você" — diferente do degrau de conquista
+ * (currentRoutineStreak em timeline/achievements.ts, que exige TODOS os
+ * cuidados ativos feitos no dia, um marco raro de 30+ dias), esse é o
+ * streak "amigável" mostrado no topo da aba: basta ter marcado QUALQUER
+ * cuidado naquele dia. Sobe assim que a pessoa marca o primeiro item do
+ * dia — é o que dispara a comemoração no cliente.
+ */
+export async function getOverallRoutineStreak(userId: string): Promise<number> {
+  const activeItems = await prisma.careChecklistItem.findMany({
+    where: { userId, active: true },
+    select: { id: true },
+  });
+  if (activeItems.length === 0) return 0;
+  const activeIds = activeItems.map((i) => i.id);
+
+  const today = todayDate();
+  const since = new Date(today.getTime() - OVERALL_STREAK_LOOKBACK_DAYS * 24 * 60 * 60 * 1000);
+  const completions = await prisma.careChecklistCompletion.findMany({
+    where: { itemId: { in: activeIds }, date: { gte: since } },
+    select: { date: true },
+  });
+
+  const doneDates = new Set(completions.map((c) => c.date.toISOString().slice(0, 10)));
+  return computeOverallStreakFromDates(doneDates, today);
+}
+
 export async function listChecklistItemsForUser(userId: string): Promise<ChecklistItemView[]> {
   // Uma query só (join via `include`) em vez de duas idas ao banco em
   // sequência — cada round-trip custa caro contra o pooler remoto da
