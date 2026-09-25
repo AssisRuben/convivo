@@ -4,6 +4,9 @@ import { estimateRunOutDate, daysBetween } from "@/lib/medications/medicationCor
 import { todayDate } from "@/lib/timeline/format";
 import { getLoyaltyProgress } from "@/lib/loyalty/loyaltyCore";
 import { getActivePromotions } from "@/lib/catalog/catalogDb";
+import { getWisdomTopicsSummaryForUser } from "@/lib/wisdom/wisdomCore";
+import { getFaithBooksSummaryForUser } from "@/lib/faith/faithCore";
+import type { HealthMeasurementType } from "@/lib/generated/prisma/client";
 
 export type HomeNextDose = {
   checklistItemId: string;
@@ -25,11 +28,32 @@ export type HomeLoyaltySummary = {
   totalRewardCents: number;
 };
 
+export type HomeTrailSummary = {
+  chaptersRead: number;
+  totalChapters: number;
+  bestStreak: number;
+};
+
+export type HomeRotinaSummary = {
+  doneToday: number;
+  totalToday: number;
+};
+
+export type HomeSaudeSummary = {
+  type: HealthMeasurementType;
+  measuredAt: string;
+  daysAgo: number;
+} | null;
+
 export type HomeDashboardView = {
   nextDose: HomeNextDose | null;
   repurchaseReady: HomeRepurchaseItem[];
   loyalty: HomeLoyaltySummary;
   activePromotionsCount: number;
+  wisdom: HomeTrailSummary;
+  faith: HomeTrailSummary;
+  rotina: HomeRotinaSummary;
+  saude: HomeSaudeSummary;
 };
 
 // Mesmo limiar de urgência que o alerta push de recompra usa (ver
@@ -114,12 +138,61 @@ async function getRepurchaseReady(userId: string): Promise<HomeRepurchaseItem[]>
   return ready.sort((a, b) => a.daysUntilRunOut - b.daysUntilRunOut);
 }
 
+// Mesmo cálculo do banner "resumo somado" dos hubs de Pílulas/Gotas
+// (streak é por tópico/livro, não faz sentido somar dias de sequências
+// diferentes, só destacar a melhor).
+function summarizeTrail(items: { chaptersRead: number; totalChapters: number; streakDays: number }[]): HomeTrailSummary {
+  return {
+    chaptersRead: items.reduce((sum, i) => sum + i.chaptersRead, 0),
+    totalChapters: items.reduce((sum, i) => sum + i.totalChapters, 0),
+    bestStreak: Math.max(0, ...items.map((i) => i.streakDays)),
+  };
+}
+
+/** "X de Y cuidados feitos hoje" — todas as categorias, não só medicamento. */
+async function getRotinaSummary(userId: string, now: Date): Promise<HomeRotinaSummary> {
+  const { weekday } = brasiliaClock(now);
+  const today = todayDate();
+
+  const items = await prisma.careChecklistItem.findMany({
+    where: { userId, active: true },
+    include: { completions: { where: { date: today }, select: { id: true } } },
+  });
+
+  const scheduledToday = items.filter(
+    (item) => item.daysOfWeek.length === 0 || item.daysOfWeek.includes(weekday)
+  );
+  const doneToday = scheduledToday.filter((item) => item.completions.length > 0).length;
+
+  return { doneToday, totalToday: scheduledToday.length };
+}
+
+/** Última medição de saúde registrada, pra mostrar "há quantos dias". */
+async function getSaudeSummary(userId: string, now: Date): Promise<HomeSaudeSummary> {
+  const last = await prisma.healthMeasurement.findFirst({
+    where: { userId },
+    orderBy: { measuredAt: "desc" },
+    select: { type: true, measuredAt: true },
+  });
+  if (!last) return null;
+
+  return {
+    type: last.type,
+    measuredAt: last.measuredAt.toISOString(),
+    daysAgo: Math.max(0, daysBetween(last.measuredAt, now)),
+  };
+}
+
 export async function getHomeDashboardForUser(userId: string, now: Date = new Date()): Promise<HomeDashboardView> {
-  const [nextDose, repurchaseReady, loyalty, promotions] = await Promise.all([
+  const [nextDose, repurchaseReady, loyalty, promotions, wisdomTopics, faithBooks, rotina, saude] = await Promise.all([
     getNextDose(userId, now),
     getRepurchaseReady(userId),
     getLoyaltyProgress(userId),
     getActivePromotions(1),
+    getWisdomTopicsSummaryForUser(userId),
+    getFaithBooksSummaryForUser(userId),
+    getRotinaSummary(userId, now),
+    getSaudeSummary(userId, now),
   ]);
 
   return {
@@ -133,5 +206,9 @@ export async function getHomeDashboardForUser(userId: string, now: Date = new Da
     // getActivePromotions(1) só pra saber "tem alguma?" sem carregar a
     // lista inteira aqui — a tela de Ofertas busca a lista completa à parte.
     activePromotionsCount: promotions.length,
+    wisdom: summarizeTrail(wisdomTopics),
+    faith: summarizeTrail(faithBooks),
+    rotina,
+    saude,
   };
 }

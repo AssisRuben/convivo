@@ -160,11 +160,44 @@ export type ApiHomeRepurchaseItem = {
   daysUntilRunOut: number;
 };
 
+export type ApiRoutineNextOccurrence = {
+  daysAhead: number;
+  minutesUntil: number;
+};
+
+export type ApiRoutineItemDetail = {
+  streakDays: number;
+  completedToday: boolean;
+  timeOfDay: string | null;
+  next: ApiRoutineNextOccurrence | null;
+};
+
+export type ApiHomeTrailSummary = {
+  chaptersRead: number;
+  totalChapters: number;
+  bestStreak: number;
+};
+
+export type ApiHomeRotinaSummary = {
+  doneToday: number;
+  totalToday: number;
+};
+
+export type ApiHomeSaudeSummary = {
+  type: "PRESSAO" | "PESO" | "GORDURA" | "GLICEMIA";
+  measuredAt: string;
+  daysAgo: number;
+} | null;
+
 export type ApiHomeDashboard = {
   nextDose: ApiHomeNextDose | null;
   repurchaseReady: ApiHomeRepurchaseItem[];
   loyalty: { stampsFilled: number; stampsTotal: number; totalRewardCents: number };
   activePromotionsCount: number;
+  wisdom: ApiHomeTrailSummary;
+  faith: ApiHomeTrailSummary;
+  rotina: ApiHomeRotinaSummary;
+  saude: ApiHomeSaudeSummary;
 };
 
 export type ApiWisdomProgress = {

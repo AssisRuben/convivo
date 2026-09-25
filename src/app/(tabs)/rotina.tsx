@@ -3,6 +3,7 @@ import { useFocusEffect } from "expo-router";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -15,6 +16,7 @@ import {
   apiFetch,
   type ApiCareCategory,
   type ApiChecklistItem,
+  type ApiRoutineItemDetail,
   type RoutineItemInput,
 } from "@/lib/api";
 import { CARE_CATEGORIES, CARE_CATEGORY_META, WEEKDAY_LABELS } from "@/constants/careCategories";
@@ -44,6 +46,24 @@ const EMPTY_FORM: FormState = {
   daysOfWeek: [],
 };
 
+/** "há 2h30", "amanhã", "em 3 dias" — pra caber no modal de detalhe sem números soltos. */
+function formatMinutesUntil(daysAhead: number, minutesUntil: number): string {
+  if (daysAhead === 0 && minutesUntil < 0) {
+    const overdue = -minutesUntil;
+    const h = Math.floor(overdue / 60);
+    const m = overdue % 60;
+    return `Atrasado hoje há ${h > 0 ? `${h}h` : ""}${m > 0 ? `${m}min` : h > 0 ? "" : "menos de 1min"}`;
+  }
+  if (daysAhead === 0) {
+    const h = Math.floor(minutesUntil / 60);
+    const m = minutesUntil % 60;
+    if (h === 0 && m === 0) return "Agora";
+    return `Em ${h > 0 ? `${h}h` : ""}${m > 0 ? `${m}min` : ""}`;
+  }
+  if (daysAhead === 1) return "Amanhã";
+  return `Em ${daysAhead} dias`;
+}
+
 export default function RotinaScreen() {
   const [items, setItems] = useState<ApiChecklistItem[]>(
     () => readCachedRotina()?.items ?? []
@@ -51,6 +71,9 @@ export default function RotinaScreen() {
   const [loading, setLoading] = useState(() => readCachedRotina() === undefined);
   const [form, setForm] = useState<FormState | null>(null);
   const [saving, setSaving] = useState(false);
+  const [detailItem, setDetailItem] = useState<ApiChecklistItem | null>(null);
+  const [detail, setDetail] = useState<ApiRoutineItemDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
   const loadedOnce = useRef(false);
   const hadCacheOnMount = useRef(readCachedRotina() !== undefined);
   // "completedToday" é por data — sem isso, um app que fica dias sem ser
@@ -130,6 +153,18 @@ export default function RotinaScreen() {
         );
         showAlert("Não foi possível salvar", "Sua conexão pode estar instável — tente de novo.");
       }
+    }
+  }
+
+  async function openDetail(item: ApiChecklistItem) {
+    setDetailItem(item);
+    setDetail(null);
+    setDetailLoading(true);
+    try {
+      const res = await apiFetch(`/api/mobile/rotina/${item.id}/detalhes`);
+      if (res.ok) setDetail(await res.json());
+    } finally {
+      setDetailLoading(false);
     }
   }
 
@@ -327,7 +362,7 @@ export default function RotinaScreen() {
                     {item.completedToday && <Ionicons name="checkmark" size={16} color="#fff" />}
                   </Pressable>
 
-                  <View className="flex-1">
+                  <Pressable className="flex-1" onPress={() => openDetail(item)}>
                     <Text
                       className={`text-sm font-medium ${
                         item.completedToday ? "text-navy/40" : "text-navy"
@@ -342,7 +377,7 @@ export default function RotinaScreen() {
                         ? "Todo dia"
                         : item.daysOfWeek.map((d) => WEEKDAY_LABELS[d]).join(", ")}
                     </Text>
-                  </View>
+                  </Pressable>
 
                   <Pressable
                     onPress={() =>
@@ -375,6 +410,73 @@ export default function RotinaScreen() {
         );
       })}
       </ScrollView>
+
+      <Modal
+        visible={detailItem !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDetailItem(null)}
+      >
+        <Pressable
+          className="flex-1 items-center justify-center bg-black/40 p-6"
+          onPress={() => setDetailItem(null)}
+        >
+          <Pressable className="w-full max-w-sm gap-4 rounded-2xl bg-cream p-5" onPress={() => {}}>
+            {detailLoading || !detail || !detailItem ? (
+              <View className="items-center py-6">
+                <ActivityIndicator color="#0b1e3d" />
+              </View>
+            ) : (
+              <>
+                <Text className="text-lg font-bold text-navy">{detailItem.title}</Text>
+
+                <View className="flex-row items-center gap-3 rounded-2xl bg-card p-4">
+                  <View className="h-11 w-11 items-center justify-center rounded-full bg-coral/10">
+                    <Ionicons name="flame" size={20} color="#e63946" />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-sm font-semibold text-navy">
+                      {detail.streakDays > 0
+                        ? `${detail.streakDays} dia${detail.streakDays > 1 ? "s" : ""} seguidos`
+                        : "Nenhuma sequência ainda"}
+                    </Text>
+                    <Text className="text-xs text-navy/50">
+                      {detail.streakDays > 0
+                        ? "Continue marcando pra não perder o ritmo"
+                        : "Marque hoje pra começar sua sequência"}
+                    </Text>
+                  </View>
+                </View>
+
+                <View className="flex-row items-center gap-3 rounded-2xl bg-card p-4">
+                  <View className="h-11 w-11 items-center justify-center rounded-full bg-mint/15">
+                    <Ionicons name="time" size={20} color="#2ec4b6" />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-sm font-semibold text-navy">
+                      {detail.next
+                        ? formatMinutesUntil(detail.next.daysAhead, detail.next.minutesUntil)
+                        : detail.completedToday
+                          ? "Já feito hoje"
+                          : "Sem horário fixo"}
+                    </Text>
+                    <Text className="text-xs text-navy/50">
+                      {detail.timeOfDay ? `Horário: ${detail.timeOfDay}` : "Marque quando lembrar"}
+                    </Text>
+                  </View>
+                </View>
+
+                <Pressable
+                  onPress={() => setDetailItem(null)}
+                  className="items-center rounded-full bg-navy py-3"
+                >
+                  <Text className="text-sm font-semibold text-white">Fechar</Text>
+                </Pressable>
+              </>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }

@@ -21,6 +21,13 @@ function firstName(fullName: string | undefined): string {
   return fullName?.split(" ")[0] ?? "";
 }
 
+const SAUDE_TYPE_LABELS: Record<string, string> = {
+  PRESSAO: "Pressão",
+  PESO: "Peso",
+  GORDURA: "% Gordura",
+  GLICEMIA: "Glicemia",
+};
+
 function QuickAction({
   icon,
   label,
@@ -243,6 +250,79 @@ export default function HomeScreen() {
         </View>
         <Ionicons name="chevron-forward" size={16} color="#0b1e3d60" />
       </Pressable>
+
+      <View className="gap-2">
+        <Text className="text-base font-bold text-navy">Minhas trilhas</Text>
+        <View className="flex-row gap-3">
+          <Pressable
+            onPress={() => router.push("/perfil/pilulas-sabedoria")}
+            className="flex-1 gap-1.5 rounded-2xl bg-card p-3.5 shadow-sm"
+          >
+            <View className="flex-row items-center gap-1.5">
+              <Ionicons name="bulb" size={16} color="#f59e0b" />
+              <Text className="text-xs font-semibold text-navy">Pílulas de sabedoria</Text>
+            </View>
+            <Text className="text-xs text-navy/50">
+              {dashboard.wisdom.chaptersRead} de {dashboard.wisdom.totalChapters} capítulos
+            </Text>
+            {dashboard.wisdom.bestStreak > 0 && (
+              <Text className="text-xs font-medium text-coral">🔥 {dashboard.wisdom.bestStreak} dias</Text>
+            )}
+          </Pressable>
+          <Pressable
+            onPress={() => router.push("/perfil/gotas-de-fe")}
+            className="flex-1 gap-1.5 rounded-2xl bg-card p-3.5 shadow-sm"
+          >
+            <View className="flex-row items-center gap-1.5">
+              <Ionicons name="water" size={16} color="#3b82f6" />
+              <Text className="text-xs font-semibold text-navy">Gotas de Fé</Text>
+            </View>
+            <Text className="text-xs text-navy/50">
+              {dashboard.faith.chaptersRead} de {dashboard.faith.totalChapters} capítulos
+            </Text>
+            {dashboard.faith.bestStreak > 0 && (
+              <Text className="text-xs font-medium text-mint">🙏 {dashboard.faith.bestStreak} dias</Text>
+            )}
+          </Pressable>
+        </View>
+      </View>
+
+      <View className="flex-row gap-3">
+        <Pressable
+          onPress={() => router.push("/(tabs)/rotina")}
+          className="flex-1 flex-row items-center gap-2.5 rounded-2xl bg-card p-3.5 shadow-sm"
+        >
+          <View className="h-9 w-9 items-center justify-center rounded-full bg-mint/15">
+            <Ionicons name="checkmark-done" size={16} color="#2ec4b6" />
+          </View>
+          <View className="flex-1">
+            <Text className="text-xs font-semibold text-navy">Rotina</Text>
+            <Text className="text-xs text-navy/50">
+              {dashboard.rotina.totalToday === 0
+                ? "Nada pra hoje"
+                : `${dashboard.rotina.doneToday} de ${dashboard.rotina.totalToday} feitos`}
+            </Text>
+          </View>
+        </Pressable>
+        <Pressable
+          onPress={() => router.push("/(tabs)/saude")}
+          className="flex-1 flex-row items-center gap-2.5 rounded-2xl bg-card p-3.5 shadow-sm"
+        >
+          <View className="h-9 w-9 items-center justify-center rounded-full bg-navy/5">
+            <Ionicons name="pulse" size={16} color="#0b1e3d" />
+          </View>
+          <View className="flex-1">
+            <Text className="text-xs font-semibold text-navy">Saúde</Text>
+            <Text className="text-xs text-navy/50">
+              {dashboard.saude
+                ? `${SAUDE_TYPE_LABELS[dashboard.saude.type] ?? dashboard.saude.type} · ${
+                    dashboard.saude.daysAgo === 0 ? "hoje" : `há ${dashboard.saude.daysAgo}d`
+                  }`
+                : "Nenhum registro ainda"}
+            </Text>
+          </View>
+        </Pressable>
+      </View>
 
       <View className="gap-2">
         <Text className="text-base font-bold text-navy">Ações Rápidas</Text>
