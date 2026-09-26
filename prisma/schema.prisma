@@ -217,6 +217,10 @@ model Product {
   // espelho a partir do catálogo real.
   costCents           Int?
   imageUrl            String
+  // Última vez que a rotina de imagens (lib/catalog/imageBackfill.ts)
+  // tentou achar foto pra esse produto — sem isso ela retentava sempre os
+  // mesmos produtos sem foto e os novos nunca chegavam na vez.
+  imageCheckedAt      DateTime?
   stock               Int                    @default(0)
   codigoProduto       Int?                   @unique
   // Slug já mapeado (ver constants/catalogCategories.ts), não mais um
