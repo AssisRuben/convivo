@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from "react";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import {
   ActivityIndicator,
+  type TextStyle,
   NativeScrollEvent,
   NativeSyntheticEvent,
   Pressable,
@@ -14,6 +15,7 @@ import { apiFetch, type ApiFaithProgress } from "@/lib/api";
 import { getFaithBook } from "@/constants/faithDrops";
 import { showAlert } from "@/lib/alert";
 import { CelebrationModal } from "@/components/CelebrationModal";
+import { ReadingFontSizeControl, useReadingFontScale } from "@/components/ReadingFontSize";
 
 function isCloseToBottom({ layoutMeasurement, contentOffset, contentSize }: NativeScrollEvent) {
   const paddingToBottom = 32;
@@ -22,10 +24,10 @@ function isCloseToBottom({ layoutMeasurement, contentOffset, contentSize }: Nati
 
 /** Markdown inline bem simples — **negrito**, *itálico* e ***os dois
  * juntos*** (ver constants/faithDrops.ts). */
-function RichText({ text, className }: { text: string; className?: string }) {
+function RichText({ text, className, style }: { text: string; className?: string; style?: TextStyle }) {
   const parts = text.split(/(\*\*\*[^*]+\*\*\*|\*\*[^*]+\*\*|\*[^*]+\*)/g).filter(Boolean);
   return (
-    <Text className={className}>
+    <Text className={className} style={style}>
       {parts.map((part, i) => {
         if (part.startsWith("***") && part.endsWith("***")) {
           return (
@@ -67,6 +69,12 @@ export default function GotaLeituraScreen() {
   const book = getFaithBook(livro);
   const chapter = book?.chapters.find((c) => c.number === Number(numero));
   const accentColor = book?.color ?? "#3b82f6";
+
+  const fontScale = useReadingFontScale();
+  const size = (fontSize: number, lineHeight: number): TextStyle => ({
+    fontSize: fontSize * fontScale.scale,
+    lineHeight: lineHeight * fontScale.scale,
+  });
 
   const [progress, setProgress] = useState<ApiFaithProgress | null>(null);
   const [loading, setLoading] = useState(true);
@@ -182,14 +190,22 @@ export default function GotaLeituraScreen() {
         <Text className="text-xs font-semibold uppercase tracking-wide" style={{ color: accentColor }}>
           {book.title} · Capítulo {chapter.number}
         </Text>
-        <Text className="mt-1 text-2xl font-extrabold text-navy">{chapter.title}</Text>
-        <Text className="mt-1 text-sm text-navy/60">{chapter.subtitle}</Text>
+        <Text className="mt-1 text-2xl font-extrabold text-navy" style={size(24, 30)}>
+          {chapter.title}
+        </Text>
+        <Text className="mt-1 text-sm text-navy/60" style={size(14, 20)}>
+          {chapter.subtitle}
+        </Text>
 
-        <View className="mt-6 gap-4">
+        <View className="mt-3">
+          <ReadingFontSizeControl {...fontScale} />
+        </View>
+
+        <View className="mt-4 gap-4">
           {chapter.blocks.map((block, i) => {
             if (block.type === "heading") {
               return (
-                <Text key={i} className="mt-2 text-lg font-bold text-navy">
+                <Text key={i} className="mt-2 text-lg font-bold text-navy" style={size(18, 26)}>
                   {block.text}
                 </Text>
               );
@@ -200,6 +216,7 @@ export default function GotaLeituraScreen() {
                   <RichText
                     text={block.text}
                     className="text-center text-base italic leading-6 text-navy"
+                    style={size(16, 24)}
                   />
                 </View>
               );
@@ -210,6 +227,7 @@ export default function GotaLeituraScreen() {
                   key={i}
                   text={block.text}
                   className="mt-2 text-xs italic leading-5 text-navy/40"
+                  style={size(12, 20)}
                 />
               );
             }
@@ -221,13 +239,15 @@ export default function GotaLeituraScreen() {
                       <Text className="text-sm" style={{ color: accentColor }}>
                         {block.ordered ? `${j + 1}.` : "•"}
                       </Text>
-                      <RichText text={item} className="flex-1 text-base leading-6 text-navy/80" />
+                      <RichText text={item} className="flex-1 text-base leading-6 text-navy/80" style={size(16, 24)} />
                     </View>
                   ))}
                 </View>
               );
             }
-            return <RichText key={i} text={block.text} className="text-base leading-6 text-navy/80" />;
+            return (
+              <RichText key={i} text={block.text} className="text-base leading-6 text-navy/80" style={size(16, 24)} />
+            );
           })}
         </View>
       </ScrollView>
