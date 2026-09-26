@@ -4,8 +4,10 @@ import { backfillProductImages } from "@/lib/catalog/imageBackfill";
 // header Bearer CRON_SECRET do dispatch-reminders. Lote curto de propósito:
 // cada produto pode levar vários segundos (4 fontes em sequência + pausa
 // entre consultas pra não tomar 429), e a chamada HTTP não pode demorar
-// minutos. ?limit= ajusta o tamanho (máx. 15).
-const DEFAULT_LIMIT = 5;
+// minutos. ?limit= ajusta o tamanho (máx. 15). Padrão 2 por chamada: a
+// Kodebar libera 50 consultas/dia (+5 de tolerância, zera à meia-noite de
+// Brasília) — chamando de hora em hora dá 48/dia, dentro da cota.
+const DEFAULT_LIMIT = 2;
 const MAX_LIMIT = 15;
 const DELAY_BETWEEN_LOOKUPS_MS = 4000;
 
