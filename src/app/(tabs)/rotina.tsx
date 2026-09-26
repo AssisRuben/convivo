@@ -276,14 +276,13 @@ export default function RotinaScreen() {
   // fica em cima ("Bora fazer o certo?"), o que já foi feito hoje desce
   // pra baixo ("Aí tu deu aula!") assim que marcado — o movimento entre
   // as duas é o próprio feedback de progresso do dia.
-  // Editar os dias de um item com meta muda a conta "X de Y dias" da meta
-  // desde o início dela (não há histórico de agenda) — melhor avisar do que
-  // deixar o progresso mudar sem explicação.
+  // Item vinculado: mostra o efeito da edição fora da Rotina (a meta guarda
+  // o histórico da agenda, então mudar os dias só vale daqui pra frente).
   const editingItem = form?.id ? items.find((i) => i.id === form.id) : undefined;
   const editingLinkNote = editingItem
     ? [
         editingItem.activeGoals.length > 0 &&
-          "Esse cuidado é acompanhado por uma meta. Mudar os dias recalcula o progresso dela desde o começo.",
+          "Esse cuidado é acompanhado por uma meta. Se mudar os dias, a meta passa a contar a agenda nova a partir de hoje — o que já passou continua como era.",
         editingItem.medicationTrackingId &&
           "Essa é uma dose de remédio. Pra mudar quantidade ou posologia, use Menu > Medicamentos.",
       ]

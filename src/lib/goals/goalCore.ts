@@ -47,7 +47,12 @@ export type GoalProgressView = {
 export type GoalTipView = { index: number; sentAt: string; text: string };
 
 type GoalWithItem = Goal & {
-  checklistItem: { active: boolean; daysOfWeek: number[]; category: CareCategory } | null;
+  checklistItem: {
+    active: boolean;
+    daysOfWeek: number[];
+    category: CareCategory;
+    scheduleVersions: ScheduleVersion[];
+  } | null;
 };
 
 function clamp(value: number, min: number, max: number): number {
@@ -58,11 +63,44 @@ function toDateOnlyString(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
-function countExpectedDays(start: Date, end: Date, daysOfWeek: number[]): number {
+export type ScheduleVersion = { daysOfWeek: number[]; effectiveFrom: Date };
+
+const GOAL_ITEM_SELECT = {
+  active: true,
+  daysOfWeek: true,
+  category: true,
+  scheduleVersions: { select: { daysOfWeek: true, effectiveFrom: true } },
+} as const;
+
+/**
+ * Dias em que o cuidado estava programado entre start e end (inclusive),
+ * usando a agenda que valia em cada dia (ver CareScheduleVersion). Sem
+ * histórico, a agenda atual vale pro período todo. Dia anterior à versão
+ * mais antiga usa a mais antiga — é a agenda original do item.
+ */
+export function countExpectedDays(
+  start: Date,
+  end: Date,
+  currentDaysOfWeek: number[],
+  versions: ScheduleVersion[] = []
+): number {
+  const sorted = [...versions].sort((a, b) => a.effectiveFrom.getTime() - b.effectiveFrom.getTime());
+
+  function daysOfWeekOn(day: Date): number[] {
+    if (sorted.length === 0) return currentDaysOfWeek;
+    let applicable = sorted[0];
+    for (const version of sorted) {
+      if (version.effectiveFrom.getTime() <= day.getTime()) applicable = version;
+      else break;
+    }
+    return applicable.daysOfWeek;
+  }
+
   let count = 0;
   const cursor = new Date(start);
   while (cursor.getTime() <= end.getTime()) {
-    if (daysOfWeek.length === 0 || daysOfWeek.includes(cursor.getUTCDay())) count++;
+    const days = daysOfWeekOn(cursor);
+    if (days.length === 0 || days.includes(cursor.getUTCDay())) count++;
     cursor.setUTCDate(cursor.getUTCDate() + 1);
   }
   return count;
@@ -196,7 +234,8 @@ async function computeGoalProgress(goal: GoalWithItem): Promise<GoalProgressView
       const expectedDays = countExpectedDays(
         goal.startDate,
         rangeEnd,
-        goal.checklistItem?.daysOfWeek ?? []
+        goal.checklistItem?.daysOfWeek ?? [],
+        goal.checklistItem?.scheduleVersions ?? []
       );
       const completions = await prisma.careChecklistCompletion.count({
         where: { itemId: goal.checklistItemId, date: { gte: goal.startDate, lte: rangeEnd } },
@@ -238,7 +277,7 @@ async function computeGoalProgress(goal: GoalWithItem): Promise<GoalProgressView
 async function requireOwnedGoal(userId: string, id: string): Promise<GoalWithItem> {
   const goal = await prisma.goal.findUnique({
     where: { id },
-    include: { checklistItem: { select: { active: true, daysOfWeek: true, category: true } } },
+    include: { checklistItem: { select: GOAL_ITEM_SELECT } },
   });
   if (!goal || goal.userId !== userId) {
     throw new Error("Sem permissão pra acessar essa meta");
@@ -250,7 +289,7 @@ export async function listGoalsForUser(userId: string): Promise<GoalProgressView
   const goals = await prisma.goal.findMany({
     where: { userId },
     orderBy: { createdAt: "desc" },
-    include: { checklistItem: { select: { active: true, daysOfWeek: true, category: true } } },
+    include: { checklistItem: { select: GOAL_ITEM_SELECT } },
   });
   return Promise.all(goals.map(computeGoalProgress));
 }

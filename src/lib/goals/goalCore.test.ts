@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { TIP_INTERVAL_DAYS, dueTipIndexes } from "@/lib/goals/goalCore";
+import { TIP_INTERVAL_DAYS, countExpectedDays, dueTipIndexes } from "@/lib/goals/goalCore";
 
 function daysFrom(base: Date, days: number): Date {
   const result = new Date(base);
@@ -58,5 +58,31 @@ describe("dueTipIndexes", () => {
   it("prazo inválido (fim antes ou igual ao início) nunca deve dica nenhuma", () => {
     expect(dueTipIndexes({ startDate: START, endDate: START }, START)).toEqual([]);
     expect(dueTipIndexes({ startDate: START, endDate: daysFrom(START, -5) }, START)).toEqual([]);
+  });
+});
+
+describe("countExpectedDays", () => {
+  // 2026-09-01 é terça (2). Semana 1: 01..07 set.
+  const d = (n: number) => new Date(Date.UTC(2026, 8, n));
+
+  it("sem histórico: agenda atual vale o período todo", () => {
+    // todo dia, 01..10 = 10 dias
+    expect(countExpectedDays(d(1), d(10), [])).toBe(10);
+    // só seg/qua/sex entre 01 (ter) e 10 (qui): qua 2, sex 4, seg 7, qua 9 = 4
+    expect(countExpectedDays(d(1), d(10), [1, 3, 5])).toBe(4);
+  });
+
+  it("mudou de seg/qua/sex pra todo dia no dia 08: passado mantém a agenda antiga", () => {
+    const versions = [
+      { daysOfWeek: [1, 3, 5], effectiveFrom: d(1) },
+      { daysOfWeek: [], effectiveFrom: d(8) },
+    ];
+    // 01..07 com seg/qua/sex: qua 2, sex 4, seg 7 = 3; 08..10 todo dia = 3
+    expect(countExpectedDays(d(1), d(10), [], versions)).toBe(6);
+  });
+
+  it("dia antes da versão mais antiga usa a mais antiga", () => {
+    const versions = [{ daysOfWeek: [], effectiveFrom: d(5) }];
+    expect(countExpectedDays(d(1), d(10), [1, 3, 5], versions)).toBe(10);
   });
 });

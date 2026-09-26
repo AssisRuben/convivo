@@ -431,6 +431,24 @@ model CareChecklistItem {
   completions        CareChecklistCompletion[]
   reminderDispatches CareReminderDispatch[]
   goals              Goal[]
+  scheduleVersions   CareScheduleVersion[]
+}
+
+// Histórico da agenda (daysOfWeek) de um cuidado — só pra meta de Rotina
+// contar "X de Y dias" com os dias que valiam em cada período, em vez de
+// aplicar a agenda atual retroativamente. Sem nenhuma linha = a agenda
+// atual vale desde sempre (itens nunca editados). Ao editar os dias, grava
+// a agenda antiga (se ainda não houver histórico) e a nova a partir de hoje.
+model CareScheduleVersion {
+  id            String   @id @default(cuid())
+  itemId        String
+  daysOfWeek    Int[]    @default([])
+  effectiveFrom DateTime @db.Date
+  createdAt     DateTime @default(now())
+
+  item CareChecklistItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([itemId, effectiveFrom])
 }
 
 // Ficha de acompanhamento de um medicamento comprado — quantidade total,

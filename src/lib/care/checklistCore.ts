@@ -134,6 +134,12 @@ export async function createChecklistItemForUser(
   });
 }
 
+function sameDays(a: number[], b: number[]): boolean {
+  const x = [...a].sort();
+  const y = [...b].sort();
+  return x.length === y.length && x.every((d, i) => d === y[i]);
+}
+
 async function requireOwnedItem(userId: string, id: string) {
   const item = await prisma.careChecklistItem.findUnique({ where: { id } });
   if (!item || item.userId !== userId) {
@@ -150,15 +156,41 @@ export async function updateChecklistItemForUser(
   const title = validateRoutineInput(input);
   const existing = await requireOwnedItem(userId, id);
   const newTime = input.timeOfDay || null;
+  const daysChanged = !sameDays(existing.daysOfWeek, input.daysOfWeek);
 
-  await prisma.careChecklistItem.update({
-    where: { id },
-    data: {
-      title,
-      category: input.category,
-      timeOfDay: newTime,
-      daysOfWeek: input.daysOfWeek,
-    },
+  await prisma.$transaction(async (tx) => {
+    await tx.careChecklistItem.update({
+      where: { id },
+      data: {
+        title,
+        category: input.category,
+        timeOfDay: newTime,
+        daysOfWeek: input.daysOfWeek,
+      },
+    });
+
+    // Histórico da agenda pra meta de Rotina não recalcular o passado com
+    // os dias novos (ver CareScheduleVersion). Primeira edição grava também
+    // a agenda original, valendo desde a criação do item.
+    if (daysChanged) {
+      const today = todayDate();
+      const hasHistory = (await tx.careScheduleVersion.count({ where: { itemId: id } })) > 0;
+      if (!hasHistory) {
+        const createdDay = new Date(
+          Date.UTC(existing.createdAt.getUTCFullYear(), existing.createdAt.getUTCMonth(), existing.createdAt.getUTCDate())
+        );
+        if (createdDay.getTime() < today.getTime()) {
+          await tx.careScheduleVersion.create({
+            data: { itemId: id, daysOfWeek: existing.daysOfWeek, effectiveFrom: createdDay },
+          });
+        }
+      }
+      await tx.careScheduleVersion.upsert({
+        where: { itemId_effectiveFrom: { itemId: id, effectiveFrom: today } },
+        create: { itemId: id, daysOfWeek: input.daysOfWeek, effectiveFrom: today },
+        update: { daysOfWeek: input.daysOfWeek },
+      });
+    }
   });
 
   // O disparo é idempotente por (item, dia) — sem isso, um lembrete que já
