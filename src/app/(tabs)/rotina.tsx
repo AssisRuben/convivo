@@ -24,6 +24,7 @@ import { showAlert } from "@/lib/alert";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { TimeField } from "@/components/TimeField";
 import { CelebrationModal } from "@/components/CelebrationModal";
+import { RotinaCompleteToast } from "@/components/RotinaCompleteToast";
 import { ROTINA_CACHE_KEY, fetchRotina } from "@/lib/tabPrefetch";
 import { getCached, invalidateCached, loadCached, setCached } from "@/lib/tabDataCache";
 
@@ -77,6 +78,7 @@ export default function RotinaScreen() {
   const [detail, setDetail] = useState<ApiRoutineItemDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [celebration, setCelebration] = useState<number | null>(null);
+  const [completeToast, setCompleteToast] = useState<string | null>(null);
   const loadedOnce = useRef(false);
   const hadCacheOnMount = useRef(readCachedRotina() !== undefined);
   // "completedToday" é por data — sem isso, um app que fica dias sem ser
@@ -153,7 +155,13 @@ export default function RotinaScreen() {
       if (latestToggleIntent.current.get(item.id) === nextCompleted) {
         setItems(data.items ?? []);
         setStreakDays(data.streakDays ?? 0);
-        if (isFirstOfDay) setCelebration(data.streakDays ?? 0);
+        if (nextCompleted) {
+          // A primeira do dia ganha a comemoração grande (streak, com
+          // confete); as seguintes só o toast leve — senão marcar várias
+          // atividades seguidas vira uma sequência cansativa de telas.
+          if (isFirstOfDay) setCelebration(data.streakDays ?? 0);
+          else setCompleteToast(item.title);
+        }
       }
     } catch {
       if (latestToggleIntent.current.get(item.id) === nextCompleted) {
@@ -246,10 +254,63 @@ export default function RotinaScreen() {
     return <LoadingScreen />;
   }
 
-  const grouped = CARE_CATEGORIES.map((category) => ({
-    category,
-    items: items.filter((item) => item.category === category),
-  })).filter((group) => group.items.length > 0);
+  // Duas listas em vez de uma só agrupada por categoria: o que falta fazer
+  // fica em cima ("Bora fazer o certo?"), o que já foi feito hoje desce
+  // pra baixo ("Aí tu deu aula!") assim que marcado — o movimento entre
+  // as duas é o próprio feedback de progresso do dia.
+  const pendingItems = items.filter((item) => !item.completedToday);
+  const doneItems = items.filter((item) => item.completedToday);
+
+  function renderItemRow(item: ApiChecklistItem) {
+    const meta = CARE_CATEGORY_META[item.category];
+    return (
+      <View key={item.id} className="flex-row items-center gap-3 rounded-2xl bg-card p-3 shadow-sm">
+        <Pressable
+          onPress={() => toggleComplete(item)}
+          className={`h-7 w-7 items-center justify-center rounded-full border-2 ${
+            item.completedToday ? "border-mint bg-mint" : "border-navy/20"
+          }`}
+        >
+          {item.completedToday && <Ionicons name="checkmark" size={16} color="#fff" />}
+        </Pressable>
+
+        <Pressable className="flex-1" onPress={() => openDetail(item)}>
+          <Text
+            className={`text-sm font-medium ${item.completedToday ? "text-navy/40" : "text-navy"}`}
+          >
+            {meta.emoji} {item.title}
+          </Text>
+          <Text className="text-xs text-navy/50">
+            {item.timeOfDay ?? "Sem horário fixo"}
+            {" · "}
+            {item.daysOfWeek.length === 0
+              ? "Todo dia"
+              : item.daysOfWeek.map((d) => WEEKDAY_LABELS[d]).join(", ")}
+          </Text>
+        </Pressable>
+
+        <Pressable
+          onPress={() =>
+            setForm({
+              id: item.id,
+              title: item.title,
+              category: item.category,
+              timeOfDay: item.timeOfDay ?? "",
+              daysOfWeek: item.daysOfWeek,
+            })
+          }
+          accessibilityLabel="Editar rotina"
+          hitSlop={10}
+          className="p-2.5"
+        >
+          <Ionicons name="pencil-outline" size={16} color="#0b1e3d80" />
+        </Pressable>
+        <Pressable onPress={() => handleRemove(item)} accessibilityLabel="Remover rotina" hitSlop={10} className="p-2.5">
+          <Ionicons name="trash-outline" size={16} color="#e63946" />
+        </Pressable>
+      </View>
+    );
+  }
 
   return (
     <KeyboardAvoidingView
@@ -363,75 +424,25 @@ export default function RotinaScreen() {
         </Text>
       )}
 
-      {grouped.map(({ category, items: catItems }) => {
-        const meta = CARE_CATEGORY_META[category];
-        return (
-          <View key={category} className="mb-4">
-            <Text className="mb-2 text-sm font-semibold text-navy/70">
-              {meta.emoji} {meta.label}
-            </Text>
-            <View className="gap-2">
-              {catItems.map((item) => (
-                <View
-                  key={item.id}
-                  className="flex-row items-center gap-3 rounded-2xl bg-card p-3 shadow-sm"
-                >
-                  <Pressable
-                    onPress={() => toggleComplete(item)}
-                    className={`h-7 w-7 items-center justify-center rounded-full border-2 ${
-                      item.completedToday ? "border-mint bg-mint" : "border-navy/20"
-                    }`}
-                  >
-                    {item.completedToday && <Ionicons name="checkmark" size={16} color="#fff" />}
-                  </Pressable>
-
-                  <Pressable className="flex-1" onPress={() => openDetail(item)}>
-                    <Text
-                      className={`text-sm font-medium ${
-                        item.completedToday ? "text-navy/40" : "text-navy"
-                      }`}
-                    >
-                      {item.title}
-                    </Text>
-                    <Text className="text-xs text-navy/50">
-                      {item.timeOfDay ?? "Sem horário fixo"}
-                      {" · "}
-                      {item.daysOfWeek.length === 0
-                        ? "Todo dia"
-                        : item.daysOfWeek.map((d) => WEEKDAY_LABELS[d]).join(", ")}
-                    </Text>
-                  </Pressable>
-
-                  <Pressable
-                    onPress={() =>
-                      setForm({
-                        id: item.id,
-                        title: item.title,
-                        category: item.category,
-                        timeOfDay: item.timeOfDay ?? "",
-                        daysOfWeek: item.daysOfWeek,
-                      })
-                    }
-                    accessibilityLabel="Editar rotina"
-                    hitSlop={10}
-                    className="p-2.5"
-                  >
-                    <Ionicons name="pencil-outline" size={16} color="#0b1e3d80" />
-                  </Pressable>
-                  <Pressable
-                    onPress={() => handleRemove(item)}
-                    accessibilityLabel="Remover rotina"
-                    hitSlop={10}
-                    className="p-2.5"
-                  >
-                    <Ionicons name="trash-outline" size={16} color="#e63946" />
-                  </Pressable>
-                </View>
-              ))}
+      {items.length > 0 && (
+        <View className="mb-4">
+          <Text className="mb-2 text-sm font-bold text-navy">Bora fazer o certo? 💪</Text>
+          {pendingItems.length === 0 ? (
+            <View className="items-center rounded-2xl bg-card p-5">
+              <Text className="text-sm font-medium text-navy/60">Tudo em dia por aqui! 🎉</Text>
             </View>
-          </View>
-        );
-      })}
+          ) : (
+            <View className="gap-2">{pendingItems.map(renderItemRow)}</View>
+          )}
+        </View>
+      )}
+
+      {doneItems.length > 0 && (
+        <View className="mb-4">
+          <Text className="mb-2 text-sm font-bold text-navy">Aí tu deu aula! 🎉</Text>
+          <View className="gap-2">{doneItems.map(renderItemRow)}</View>
+        </View>
+      )}
       </ScrollView>
 
       <Modal
@@ -511,6 +522,12 @@ export default function RotinaScreen() {
         streakEmoji="🔥"
         streakLabel="cuidando de você"
         onContinue={() => setCelebration(null)}
+      />
+
+      <RotinaCompleteToast
+        visible={completeToast !== null}
+        title={completeToast ?? ""}
+        onDone={() => setCompleteToast(null)}
       />
     </KeyboardAvoidingView>
   );

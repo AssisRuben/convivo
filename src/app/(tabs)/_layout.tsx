@@ -94,17 +94,11 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="perfil"
         options={{
-          title: "Perfil",
+          title: "Menu",
           headerShown: false,
           tabBarActiveTintColor: TAB_COLORS.perfil,
           tabBarIcon: ({ color, focused }) => (
-            <TabIcon
-              name="person-circle-outline"
-              filledName="person-circle"
-              focused={focused}
-              color={color}
-              activeColor={TAB_COLORS.perfil}
-            />
+            <TabIcon name="menu-outline" filledName="menu" focused={focused} color={color} activeColor={TAB_COLORS.perfil} />
           ),
         }}
         listeners={{
