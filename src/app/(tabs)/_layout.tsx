@@ -32,6 +32,13 @@ export default function TabsLayout() {
 
   return (
     <Tabs
+      // Voltar (botão físico do Android) na raiz de qualquer aba vai pra
+      // Home, não fica alternando pra última aba visitada (comportamento
+      // padrão "history") nem sai do app. Dentro de uma aba com pilha
+      // própria (Menu > Meus dados, Produtos > categoria > produto...), o
+      // voltar continua desempilhando normalmente antes de chegar aqui —
+      // isso só entra em ação quando a pilha da aba já está vazia.
+      backBehavior="initialRoute"
       screenOptions={{
         ...brandHeaderOptions,
         tabBarInactiveTintColor: "#0b1e3d99",
