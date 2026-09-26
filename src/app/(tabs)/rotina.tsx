@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -67,6 +67,7 @@ function formatMinutesUntil(daysAhead: number, minutesUntil: number): string {
 }
 
 export default function RotinaScreen() {
+  const router = useRouter();
   const [items, setItems] = useState<ApiChecklistItem[]>(
     () => readCachedRotina()?.items ?? []
   );
@@ -224,7 +225,24 @@ export default function RotinaScreen() {
   }
 
   function handleRemove(item: ApiChecklistItem) {
-    showAlert("Remover cuidado", `Remover "${item.title}" da sua rotina?`, [
+    // Apagar um item vinculado tem efeito fora da Rotina — avisa antes, em
+    // vez de a meta expirar ou a previsão do remédio mudar sem explicação.
+    const warnings: string[] = [];
+    if (item.medicationTrackingId) {
+      warnings.push(
+        "Essa é uma dose de remédio. Sem ela, a previsão de quando o remédio acaba passa a contar uma dose a menos por dia. Pra parar o remédio inteiro, use Menu > Medicamentos."
+      );
+    }
+    if (item.activeGoals.length > 0) {
+      const names = item.activeGoals.map((g) => `"${g.title}"`).join(", ");
+      warnings.push(`A meta ${names} acompanha esse cuidado e vai parar de contar progresso.`);
+    }
+    const message =
+      warnings.length > 0
+        ? `${warnings.join("\n\n")}\n\nRemover "${item.title}" mesmo assim?`
+        : `Remover "${item.title}" da sua rotina?`;
+
+    showAlert("Remover cuidado", message, [
       { text: "Cancelar", style: "cancel" },
       {
         text: "Remover",
@@ -258,6 +276,21 @@ export default function RotinaScreen() {
   // fica em cima ("Bora fazer o certo?"), o que já foi feito hoje desce
   // pra baixo ("Aí tu deu aula!") assim que marcado — o movimento entre
   // as duas é o próprio feedback de progresso do dia.
+  // Editar os dias de um item com meta muda a conta "X de Y dias" da meta
+  // desde o início dela (não há histórico de agenda) — melhor avisar do que
+  // deixar o progresso mudar sem explicação.
+  const editingItem = form?.id ? items.find((i) => i.id === form.id) : undefined;
+  const editingLinkNote = editingItem
+    ? [
+        editingItem.activeGoals.length > 0 &&
+          "Esse cuidado é acompanhado por uma meta. Mudar os dias recalcula o progresso dela desde o começo.",
+        editingItem.medicationTrackingId &&
+          "Essa é uma dose de remédio. Pra mudar quantidade ou posologia, use Menu > Medicamentos.",
+      ]
+        .filter(Boolean)
+        .join(" ")
+    : "";
+
   const pendingItems = items.filter((item) => !item.completedToday);
   const doneItems = items.filter((item) => item.completedToday);
 
@@ -287,6 +320,20 @@ export default function RotinaScreen() {
               ? "Todo dia"
               : item.daysOfWeek.map((d) => WEEKDAY_LABELS[d]).join(", ")}
           </Text>
+          {(item.medicationTrackingId || item.activeGoals.length > 0) && (
+            <View className="mt-1 flex-row flex-wrap gap-1">
+              {item.medicationTrackingId && (
+                <View className="rounded-full bg-mint/15 px-2 py-0.5">
+                  <Text className="text-[10px] font-semibold text-mint">💊 Remédio</Text>
+                </View>
+              )}
+              {item.activeGoals.length > 0 && (
+                <View className="rounded-full bg-coral/10 px-2 py-0.5">
+                  <Text className="text-[10px] font-semibold text-coral">🎯 Meta</Text>
+                </View>
+              )}
+            </View>
+          )}
         </Pressable>
 
         <Pressable
@@ -398,6 +445,12 @@ export default function RotinaScreen() {
           </View>
           <Text className="text-xs text-navy/50">Nenhum dia selecionado = todo dia.</Text>
 
+          {editingLinkNote && (
+            <View className="rounded-xl bg-amber-50 p-3">
+              <Text className="text-xs text-amber-800">{editingLinkNote}</Text>
+            </View>
+          )}
+
           <View className="flex-row gap-2">
             <Pressable
               disabled={saving}
@@ -499,6 +552,27 @@ export default function RotinaScreen() {
                     </Text>
                   </View>
                 </View>
+
+                {detailItem.activeGoals.length > 0 ? (
+                  <View className="flex-row items-center gap-2 rounded-2xl bg-coral/10 p-3">
+                    <Text className="text-lg">🎯</Text>
+                    <Text className="flex-1 text-xs text-navy/70">
+                      Acompanhado pela meta {detailItem.activeGoals.map((g) => `"${g.title}"`).join(", ")}
+                    </Text>
+                  </View>
+                ) : (
+                  <Pressable
+                    onPress={() => {
+                      const itemId = detailItem.id;
+                      setDetailItem(null);
+                      router.push({ pathname: "/perfil/metas/nova", params: { itemId } });
+                    }}
+                    className="flex-row items-center justify-center gap-2 rounded-full bg-coral/10 py-3"
+                  >
+                    <Ionicons name="flag" size={16} color="#e63946" />
+                    <Text className="text-sm font-semibold text-coral">Criar meta com este cuidado</Text>
+                  </Pressable>
+                )}
 
                 <Pressable
                   onPress={() => setDetailItem(null)}

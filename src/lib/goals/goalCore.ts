@@ -23,6 +23,9 @@ export type GoalInput = {
   // Só usado quando metric === "ROTINA" — cria o CareChecklistItem por
   // baixo da meta.
   routine?: { category: CareCategory; timeOfDay?: string | null; daysOfWeek: number[] };
+  // Alternativa a `routine`: vincula a meta a um cuidado que já existe na
+  // Rotina, em vez de criar um novo (evita item duplicado pro mesmo hábito).
+  existingChecklistItemId?: string | null;
 };
 
 export type GoalProgressView = {
@@ -89,6 +92,23 @@ export async function createGoalForUser(userId: string, input: GoalInput): Promi
         baselineValue: latestWeight?.pesoKg ?? null,
         startDate: input.startDate,
         endDate: input.endDate,
+      },
+    });
+  }
+
+  if (input.metric === "ROTINA" && input.existingChecklistItemId) {
+    const item = await prisma.careChecklistItem.findUnique({ where: { id: input.existingChecklistItemId } });
+    if (!item || item.userId !== userId || !item.active) {
+      throw new Error("Esse cuidado não está mais na sua rotina");
+    }
+    return prisma.goal.create({
+      data: {
+        userId,
+        metric: "ROTINA",
+        title,
+        startDate: input.startDate,
+        endDate: input.endDate,
+        checklistItemId: item.id,
       },
     });
   }

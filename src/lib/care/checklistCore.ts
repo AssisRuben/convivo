@@ -26,6 +26,11 @@ export type ChecklistItemView = {
   timeOfDay: string | null;
   daysOfWeek: number[];
   completedToday: boolean;
+  // Vínculos que o usuário precisa enxergar na Rotina antes de editar ou
+  // apagar o item — ele pode ser a dose de um remédio (ficha em
+  // Medicamentos) ou o hábito medido por uma meta em andamento.
+  medicationTrackingId: string | null;
+  activeGoals: { id: string; title: string }[];
 };
 
 export function validateRoutineInput(input: RoutineItemInput): string {
@@ -91,11 +96,13 @@ export async function listChecklistItemsForUser(userId: string): Promise<Checkli
   // Supabase, e essa rota já soma outro round-trip só pra autenticar
   // (ver getApiUserId), então eliminar um daqui é sensível no tempo de
   // resposta percebido ao abrir a aba.
+  const today = todayDate();
   const items = await prisma.careChecklistItem.findMany({
     where: { userId, active: true },
     orderBy: { createdAt: "asc" },
     include: {
-      completions: { where: { date: todayDate() }, select: { id: true } },
+      completions: { where: { date: today }, select: { id: true } },
+      goals: { where: { endDate: { gte: today } }, select: { id: true, title: true } },
     },
   });
 
@@ -106,6 +113,8 @@ export async function listChecklistItemsForUser(userId: string): Promise<Checkli
     timeOfDay: item.timeOfDay,
     daysOfWeek: item.daysOfWeek,
     completedToday: item.completions.length > 0,
+    medicationTrackingId: item.medicationTrackingId,
+    activeGoals: item.goals,
   }));
 }
 

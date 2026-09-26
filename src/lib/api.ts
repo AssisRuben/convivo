@@ -253,6 +253,8 @@ export type ApiChecklistItem = {
   timeOfDay: string | null;
   daysOfWeek: number[];
   completedToday: boolean;
+  medicationTrackingId: string | null;
+  activeGoals: { id: string; title: string }[];
 };
 
 export type RoutineItemInput = {
@@ -307,4 +309,5 @@ export type GoalInput = {
   startDate: string;
   endDate: string;
   routine?: { category: ApiCareCategory; timeOfDay?: string | null; daysOfWeek: number[] };
+  existingChecklistItemId?: string | null;
 };
