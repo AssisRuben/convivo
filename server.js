@@ -34,6 +34,29 @@ app.use(
 
 app.use(morgan("tiny"));
 
+// Fuso horário do celular (header X-Timezone, mandado pelo app em toda
+// chamada) disponível pra requisição inteira — "hoje" e "agora" no backend
+// seguem o relógio do aparelho (ver src/lib/timeZone.ts, que lê este mesmo
+// store via globalThis: server.js e as rotas são bundles separados).
+const { AsyncLocalStorage } = require("node:async_hooks");
+globalThis.__convivoRequestContext ??= new AsyncLocalStorage();
+const TIME_ZONE_PATTERN = /^[A-Za-z_]+(\/[A-Za-z0-9_+-]+)*$/;
+
+function validTimeZone(value) {
+  if (typeof value !== "string" || value.length > 64 || !TIME_ZONE_PATTERN.test(value)) return null;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: value });
+    return value;
+  } catch {
+    return null;
+  }
+}
+
+app.use((req, _res, next) => {
+  const timeZone = validTimeZone(req.get("x-timezone")) ?? "America/Sao_Paulo";
+  globalThis.__convivoRequestContext.run({ timeZone }, next);
+});
+
 app.all(
   "/{*all}",
   createRequestHandler({

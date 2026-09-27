@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { brasiliaClock } from "@/lib/reminders/dispatchCore";
+import { localClock } from "@/lib/reminders/dispatchCore";
 import { estimateRunOutDate, daysBetween } from "@/lib/medications/medicationCore";
 import { todayDate } from "@/lib/timeline/format";
 import { getLoyaltyProgress } from "@/lib/loyalty/loyaltyCore";
@@ -75,7 +75,7 @@ function parseTimeOfDay(value: string): number {
  * ficou pra trás).
  */
 async function getNextDose(userId: string, now: Date): Promise<HomeNextDose | null> {
-  const { minutes: nowMinutes, weekday } = brasiliaClock(now);
+  const { minutes: nowMinutes, weekday } = localClock(now);
   const today = todayDate();
 
   const items = await prisma.careChecklistItem.findMany({
@@ -151,7 +151,7 @@ function summarizeTrail(items: { chaptersRead: number; totalChapters: number; st
 
 /** "X de Y cuidados feitos hoje" — todas as categorias, não só medicamento. */
 async function getRotinaSummary(userId: string, now: Date): Promise<HomeRotinaSummary> {
-  const { weekday } = brasiliaClock(now);
+  const { weekday } = localClock(now);
   const today = todayDate();
 
   const items = await prisma.careChecklistItem.findMany({

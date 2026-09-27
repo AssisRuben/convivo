@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { todayDate } from "@/lib/timeline/format";
+import { zonedParts } from "@/lib/timeZone";
 import { sendPushToUser } from "@/lib/push/expoPush";
 import { estimateRunOutDate, daysBetween } from "@/lib/medications/medicationCore";
 import { dueTipIndexes } from "@/lib/goals/goalCore";
@@ -14,23 +15,18 @@ import { getFaithBook } from "@/constants/faithDrops";
 // evita perder o lembrete se o cron rodar, por exemplo, a cada 5 minutos.
 const REMINDER_TOLERANCE_MINUTES = 5;
 
-// Horários de lembrete (timeOfDay) são em horário de Brasília, mas o
-// servidor roda em container (UTC) — getHours()/getDay() direto comparavam
-// o horário cadastrado com a hora UTC, então um lembrete das 13:15
-// disparava às 10:15 de Brasília e nunca no horário certo. O Brasil não tem
-// horário de verão desde 2019, então UTC-3 fixo é seguro.
-const BRASILIA_OFFSET_MS = 3 * 60 * 60 * 1000;
-
-export function brasiliaClock(date: Date): { minutes: number; weekday: number } {
-  const shifted = new Date(date.getTime() - BRASILIA_OFFSET_MS);
-  return {
-    minutes: shifted.getUTCHours() * 60 + shifted.getUTCMinutes(),
-    weekday: shifted.getUTCDay(),
-  };
+// Horários (timeOfDay) são no relógio local da pessoa, mas o servidor roda
+// em UTC — getHours()/getDay() direto comparavam com a hora UTC (um
+// lembrete das 13:15 disparava às 10:15). localClock usa o fuso do celular
+// da requisição (lib/timeZone.ts); no cron, que não vem de um celular, cai
+// no fuso de Brasília.
+export function localClock(date: Date): { minutes: number; weekday: number } {
+  const { hour, minute, weekday } = zonedParts(date);
+  return { minutes: hour * 60 + minute, weekday };
 }
 
 function minutesSinceMidnight(date: Date): number {
-  return brasiliaClock(date).minutes;
+  return localClock(date).minutes;
 }
 
 function parseTimeOfDay(value: string): number {
@@ -46,7 +42,7 @@ function parseTimeOfDay(value: string): number {
  */
 export async function dispatchDueRoutineReminders(now: Date = new Date()): Promise<number> {
   const today = todayDate();
-  const { minutes: nowMinutes, weekday } = brasiliaClock(now);
+  const { minutes: nowMinutes, weekday } = localClock(now);
 
   const items = await prisma.careChecklistItem.findMany({
     where: { active: true, timeOfDay: { not: null } },

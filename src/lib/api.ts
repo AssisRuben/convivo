@@ -22,12 +22,24 @@ const API_URL = Platform.OS === "web" ? "" : process.env.EXPO_PUBLIC_API_URL!;
  * properties of undefined"). Tratado aqui uma vez só: 401 limpa a sessão
  * guardada e manda pro login, em vez de cada tela precisar checar.
  */
+function deviceTimeZone(): string | null {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || null;
+  } catch {
+    return null;
+  }
+}
+
 export async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
   const token = await getItemAsync(TOKEN_KEY);
 
   const headers = new Headers(options.headers);
   headers.set("Content-Type", "application/json");
   if (token) headers.set("Authorization", `Bearer ${token}`);
+  // Fuso do celular — o servidor usa pra saber que dia é "hoje" pra essa
+  // pessoa (a Rotina vira à meia-noite do aparelho). Ver server.js.
+  const timeZone = deviceTimeZone();
+  if (timeZone) headers.set("X-Timezone", timeZone);
 
   const res = await fetch(`${API_URL}${path}`, { ...options, headers });
 

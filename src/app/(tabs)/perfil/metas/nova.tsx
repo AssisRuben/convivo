@@ -42,11 +42,11 @@ function toDateOnlyString(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
+// Dia de hoje pelo relógio do celular (não o dia UTC, que no Brasil já
+// virou às 21h), no formato meia-noite UTC que a API espera.
 function todayUtc(): Date {
   const now = new Date();
-  return new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
-  );
+  return new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
 }
 
 export default function NovaMetaScreen() {

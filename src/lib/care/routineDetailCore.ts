@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { todayDate } from "@/lib/timeline/format";
-import { brasiliaClock } from "@/lib/reminders/dispatchCore";
+import { localClock } from "@/lib/reminders/dispatchCore";
 
 export type RoutineNextOccurrence = {
   daysAhead: number; // 0 = ainda hoje
@@ -116,7 +116,7 @@ export async function getRoutineItemDetailForUser(
   const completedDates = new Set(completions.map((c) => dateKey(c.date)));
   const completedToday = completedDates.has(dateKey(today));
 
-  const { minutes: nowMinutes, weekday: nowWeekday } = brasiliaClock(now);
+  const { minutes: nowMinutes, weekday: nowWeekday } = localClock(now);
 
   return {
     streakDays: computeStreakDays(item.daysOfWeek, completedDates, today),
