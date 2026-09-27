@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { Redirect, Tabs } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/lib/auth";
 import { brandHeaderOptions } from "@/components/AppHeader";
 import { useProfileDrawer } from "@/lib/profileDrawer";
@@ -19,6 +20,7 @@ const TAB_COLORS = {
 export default function TabsLayout() {
   const { token } = useAuth();
   const { open: openProfileDrawer } = useProfileDrawer();
+  const insets = useSafeAreaInsets();
 
   // Dispara a busca das 4 abas em paralelo assim que o usuário loga, em
   // vez de cada uma só buscar quando ganha foco pela primeira vez — troca
@@ -43,7 +45,15 @@ export default function TabsLayout() {
         ...brandHeaderOptions,
         tabBarInactiveTintColor: "#0b1e3d99",
         tabBarLabelStyle: { fontSize: 12, fontWeight: "600" },
-        tabBarStyle: { height: 62, paddingBottom: 8, paddingTop: 6 },
+        // Altura fixa sozinha ignorava a barra de navegação do Android
+        // (voltar/início/recentes) no modo edge-to-edge — os botões nativos
+        // cobriam as abas. insets.bottom soma esse espaço (0 com navegação
+        // por gestos ou em aparelho sem barra).
+        tabBarStyle: {
+          height: 62 + insets.bottom,
+          paddingBottom: 8 + insets.bottom,
+          paddingTop: 6,
+        },
       }}
     >
       <Tabs.Screen
