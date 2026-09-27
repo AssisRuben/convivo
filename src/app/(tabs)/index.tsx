@@ -8,6 +8,7 @@ import { useProfileDrawer } from "@/lib/profileDrawer";
 import { showAlert } from "@/lib/alert";
 import { HOME_CACHE_KEY, fetchHomeDashboard } from "@/lib/tabPrefetch";
 import { getCached, loadCached, setCached } from "@/lib/tabDataCache";
+import { UserAvatar } from "@/components/UserAvatar";
 
 function readCachedDashboard() {
   return getCached<ApiHomeDashboard>(HOME_CACHE_KEY);
@@ -56,7 +57,7 @@ function QuickAction({
       onPress={onPress}
       onPressIn={() => animateTo(0.9)}
       onPressOut={() => animateTo(1)}
-      className="flex-1 items-center gap-2 rounded-2xl bg-card p-4 shadow-sm"
+      className="flex-1 items-center gap-2 rounded-2xl bg-card px-1 py-4 shadow-sm"
     >
       <Animated.View style={{ transform: [{ scale }] }}>
         <View className="h-12 w-12 items-center justify-center rounded-full" style={{ backgroundColor: `${color}22` }}>
@@ -68,7 +69,16 @@ function QuickAction({
           </View>
         )}
       </Animated.View>
-      <Text className="text-sm font-bold text-navy">{label}</Text>
+      {/* 4 cards lado a lado: em tela estreita "Recompra"/"Notícia" não
+          cabiam e cortavam — encolhe a letra até 70% em vez de cortar. */}
+      <Text
+        className="text-sm font-bold text-navy"
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.7}
+      >
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -157,9 +167,7 @@ export default function HomeScreen() {
     <ScrollView className="flex-1 bg-cream" contentContainerClassName="gap-4 p-4 pb-24">
       <View className="flex-row items-center justify-between">
         <View className="flex-row items-center gap-3">
-          <View className="h-12 w-12 items-center justify-center rounded-full bg-navy/10">
-            <Ionicons name="person" size={22} color="#0b1e3d" />
-          </View>
+          <UserAvatar size={64} />
           <View>
             <Text className="text-sm text-navy/60">Olá,</Text>
             <Text className="text-lg font-bold text-navy">{firstName(user?.name)}.</Text>
