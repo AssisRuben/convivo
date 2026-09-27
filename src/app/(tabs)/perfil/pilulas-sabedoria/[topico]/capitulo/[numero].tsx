@@ -252,10 +252,9 @@ export default function PilulaLeituraScreen() {
         message={`${topic.title} · Capítulo ${chapter.number} concluído`}
         streakDays={result?.streakDays}
         streakEmoji="🔥"
-        onContinue={() => {
-          setResult(null);
-          backToTopic();
-        }}
+        // Fecha só o modal e continua no capítulo — a pessoa pode querer
+        // reler o final; sair é pelo voltar.
+        onContinue={() => setResult(null)}
       />
     </View>
   );

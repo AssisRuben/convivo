@@ -260,10 +260,9 @@ export default function GotaLeituraScreen() {
         message={`${book.title} · Capítulo ${chapter.number} concluído`}
         streakDays={result?.streakDays}
         streakEmoji="🙏"
-        onContinue={() => {
-          setResult(null);
-          backToBook();
-        }}
+        // Fecha só o modal e continua no capítulo — a pessoa pode querer
+        // reler o final; sair é pelo voltar.
+        onContinue={() => setResult(null)}
       />
     </View>
   );
