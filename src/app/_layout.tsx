@@ -116,6 +116,16 @@ function RootNavigator() {
             headerLeft: BackHeaderButton,
           }}
         />
+        {/* Botão "Lançamentos" da aba Saúde (registrar + histórico) */}
+        <Stack.Screen
+          name="saude-lancamentos"
+          options={{
+            ...brandHeaderOptions,
+            headerShown: true,
+            headerBackVisible: true,
+            headerLeft: BackHeaderButton,
+          }}
+        />
       </Stack>
       <ProfileDrawer />
       <OnboardingTour />

@@ -1,65 +1,32 @@
-import { Fragment, useCallback, useEffect, useRef, useState } from "react";
-import { useFocusEffect } from "expo-router";
-import {
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { Fragment, useCallback, useRef, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import { Pressable, ScrollView, Text, View, type LayoutChangeEvent } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { FlashList } from "@shopify/flash-list";
-import Svg, { Circle, Polyline } from "react-native-svg";
-import { apiFetch, type ApiHealthMeasurement, type ApiHealthMeasurementType } from "@/lib/api";
-import { showAlert } from "@/lib/alert";
+import Svg, { Circle, Line, Polyline } from "react-native-svg";
+import { type ApiHealthMeasurement } from "@/lib/api";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { SAUDE_CACHE_KEY, fetchSaude } from "@/lib/tabPrefetch";
-import { getCached, loadCached, setCached } from "@/lib/tabDataCache";
+import { getCached, loadCached } from "@/lib/tabDataCache";
 
-const CHART_WIDTH = 140;
-const CHART_HEIGHT = 80;
-const CHART_PADDING = 8;
+// Folga interna do desenho (pontos na borda não ficam cortados pela metade).
+const PLOT_PADDING = 8;
+// Gráfico nunca fica menor que isso: com muitas séries numa tela pequena,
+// a aba rola em vez de espremer as linhas até ficarem ilegíveis. 110 faz
+// os 4 gráficos + o botão caberem num celular comum (~360x780) sem rolar.
+const CHART_MIN_HEIGHT = 110;
+// Coluna dos valores do eixo Y (à esquerda do desenho).
+const Y_AXIS_WIDTH = 34;
+// Nem maior que isso: com um gráfico só, ocupar a tela inteira esticaria
+// a linha sem mostrar nada a mais.
+const CHART_MAX_HEIGHT = 300;
+const MAX_POINTS = 8;
 
 function readCachedSaude() {
   return getCached<{ measurements: ApiHealthMeasurement[] }>(SAUDE_CACHE_KEY);
 }
 
-const TYPE_LABELS: Record<ApiHealthMeasurementType, string> = {
-  PRESSAO: "Pressão",
-  PESO: "Peso",
-  GORDURA: "% Gordura",
-  GLICEMIA: "Glicemia",
-};
-
-const LOCAL_OPTIONS = ["Farmácia", "Casa", "Outros"];
-
-function formatMeasurement(m: ApiHealthMeasurement): string {
-  if (m.type === "PRESSAO") return `${m.pressaoSistolica ?? "?"}/${m.pressaoDiastolica ?? "?"} mmHg`;
-  if (m.type === "PESO") return `${m.pesoKg ?? "?"} kg`;
-  if (m.type === "GORDURA") return `${m.percentualGordura ?? "?"}%`;
-  return `${m.glicemiaMgDl ?? "?"} mg/dL`;
-}
-
 function shortDate(iso: string): string {
   return new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
-}
-
-type DayGroup = { dateKey: string; dateLabel: string; measurements: ApiHealthMeasurement[] };
-
-function groupByDay(items: ApiHealthMeasurement[]): DayGroup[] {
-  const map = new Map<string, ApiHealthMeasurement[]>();
-  for (const m of items) {
-    const key = new Date(m.measuredAt).toLocaleDateString("pt-BR");
-    if (!map.has(key)) map.set(key, []);
-    map.get(key)!.push(m);
-  }
-  return Array.from(map.entries()).map(([dateKey, measurements]) => ({
-    dateKey,
-    dateLabel: dateKey,
-    measurements,
-  }));
 }
 
 type ChartSeries = { label: string; color: string; points: { date: string; value: number }[] };
@@ -73,32 +40,42 @@ function formatAxisValue(value: number): string {
  * todas compartilham a mesma escala Y (min/max combinado de todas),
  * senão cada linha normalizada separadamente esconderia a diferença real
  * entre sistólica e diastólica, que é justamente o que importa ver.
- * Eixo X mostra pelo menos 3 datas quando há pontos suficientes (antes
- * só mostrava a primeira e a última, escondendo o meio da evolução).
+ *
+ * Ocupa a largura toda e a altura que o layout der (flex: 1 entre os
+ * gráficos da tela) — por isso desenha em pixels medidos via onLayout, não
+ * num viewBox fixo (um viewBox fixo esticado distorceria linhas e pontos).
  */
 function MultiLineChart({ title, series }: { title: string; series: ChartSeries[] }) {
+  const [plot, setPlot] = useState({ width: 0, height: 0 });
   const nonEmpty = series.filter((s) => s.points.length > 0);
   if (nonEmpty.length === 0) return null;
 
-  const lastBySeries = nonEmpty.map((s) => s.points.slice(-8));
+  function onPlotLayout(e: LayoutChangeEvent) {
+    const { width, height } = e.nativeEvent.layout;
+    setPlot((prev) => (prev.width === width && prev.height === height ? prev : { width, height }));
+  }
+
+  const lastBySeries = nonEmpty.map((s) => s.points.slice(-MAX_POINTS));
   const allValues = lastBySeries.flat().map((p) => p.value);
   const max = Math.max(...allValues);
   const min = Math.min(...allValues);
   const range = max - min || 1;
-  const innerWidth = CHART_WIDTH - CHART_PADDING * 2;
-  const innerHeight = CHART_HEIGHT - CHART_PADDING * 2;
+  const innerWidth = Math.max(plot.width - PLOT_PADDING * 2, 0);
+  const innerHeight = Math.max(plot.height - PLOT_PADDING * 2, 0);
 
   // Assume que as séries compartilham as mesmas datas (sistólica e
   // diastólica sempre vêm juntas na mesma medição) — usa a mais longa
   // como referência pra posição X e pros rótulos do eixo.
   const reference = lastBySeries.reduce((a, b) => (b.length > a.length ? b : a));
   const stepX = reference.length > 1 ? innerWidth / (reference.length - 1) : 0;
+  const yOf = (value: number) => PLOT_PADDING + (1 - (value - min) / range) * innerHeight;
 
   const seriesCoords = nonEmpty.map((s, si) => ({
     ...s,
     coords: lastBySeries[si].map((p, i) => ({
-      x: CHART_PADDING + i * stepX,
-      y: CHART_PADDING + (1 - (p.value - min) / range) * innerHeight,
+      // ponto único fica no meio, não colado na borda esquerda
+      x: reference.length > 1 ? PLOT_PADDING + i * stepX : plot.width / 2,
+      y: yOf(p.value),
     })),
   }));
 
@@ -108,141 +85,111 @@ function MultiLineChart({ title, series }: { title: string; series: ChartSeries[
   );
 
   return (
-    <View className="w-[48%] rounded-2xl bg-card p-3 shadow-sm">
-      <View className="mb-2 flex-row items-center justify-between">
-        <Text className="text-xs font-medium text-navy">{title}</Text>
-        {nonEmpty.length > 1 && (
-          <View className="flex-row gap-2">
-            {nonEmpty.map((s) => (
-              <View key={s.label} className="flex-row items-center gap-1">
-                <View className="h-2 w-2 rounded-full" style={{ backgroundColor: s.color }} />
-                <Text className="text-[9px] text-navy/50">{s.label}</Text>
-              </View>
-            ))}
-          </View>
-        )}
+    <View
+      className="rounded-2xl bg-card px-3 pb-2 pt-2.5 shadow-sm"
+      style={{ flex: 1, minHeight: CHART_MIN_HEIGHT, maxHeight: CHART_MAX_HEIGHT }}
+    >
+      <View className="mb-1 flex-row items-center justify-between">
+        <Text className="text-sm font-semibold text-navy">{title}</Text>
+        <Text className="text-xs text-navy/60">
+          Último:{" "}
+          {/* cada número na cor da sua linha (ex.: pressão 125/80) */}
+          {nonEmpty.map((s, i) => (
+            <Text key={s.label} className="font-semibold" style={{ color: nonEmpty.length > 1 ? s.color : "#0b1e3d" }}>
+              {i > 0 ? "/" : ""}
+              {formatAxisValue(s.points[s.points.length - 1].value)}
+            </Text>
+          ))}
+        </Text>
       </View>
-      <View className="flex-row">
-        <View style={{ height: CHART_HEIGHT }} className="mr-1 justify-between">
-          <Text className="text-[9px] leading-[9px] text-navy/40">{formatAxisValue(max)}</Text>
-          <Text className="text-[9px] leading-[9px] text-navy/40">
-            {formatAxisValue((max + min) / 2)}
-          </Text>
-          <Text className="text-[9px] leading-[9px] text-navy/40">{formatAxisValue(min)}</Text>
-        </View>
-        <View className="flex-1">
-          <Svg width="100%" height={CHART_HEIGHT} viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}>
-            {seriesCoords.map((s) => (
-              <Fragment key={s.label}>
-                <Polyline
-                  points={s.coords.map((c) => `${c.x},${c.y}`).join(" ")}
-                  fill="none"
-                  stroke={s.color}
-                  strokeWidth={2}
-                  strokeLinejoin="round"
-                  strokeLinecap="round"
-                />
-                {s.coords.map((c, i) => (
-                  <Circle key={i} cx={c.x} cy={c.y} r={2.5} fill={s.color} />
-                ))}
-              </Fragment>
-            ))}
-          </Svg>
-          <View className="mt-1 flex-row justify-between">
-            {labelIndices.map((idx) => (
-              <Text key={idx} className="text-[10px] text-navy/40">
-                {reference[idx]?.date}
-              </Text>
-            ))}
-          </View>
-        </View>
-      </View>
-    </View>
-  );
-}
-
-/** Card de um dia no histórico — fechado por padrão, só lista as
- * medições daquele dia quando tocado. Evita renderizar toda medição de
- * todo dia de uma vez (o que a FlashList sozinha não resolveria, já que
- * o item é o dia, não a medição individual). */
-function DayGroupCard({
-  group,
-  expanded,
-  onToggle,
-  onDeleteMeasurement,
-}: {
-  group: DayGroup;
-  expanded: boolean;
-  onToggle: () => void;
-  onDeleteMeasurement: (id: string) => void;
-}) {
-  const count = group.measurements.length;
-  return (
-    <View className="mb-2 rounded-2xl bg-card p-3 shadow-sm">
-      <Pressable
-        onPress={onToggle}
-        className="flex-row items-center justify-between"
-        accessibilityRole="button"
-        accessibilityLabel={`${expanded ? "Fechar" : "Abrir"} medições de ${group.dateLabel}`}
-      >
-        <Text className="text-sm font-semibold text-navy">{group.dateLabel}</Text>
-        <View className="flex-row items-center gap-2">
-          <Text className="text-xs text-navy/40">
-            {count} {count === 1 ? "medição" : "medições"}
-          </Text>
-          <Ionicons name={expanded ? "chevron-up" : "chevron-down"} size={16} color="#0b1e3d80" />
-        </View>
-      </Pressable>
-
-      {expanded && (
-        <View className="mt-2 gap-1 border-t border-navy/5 pt-2">
-          {group.measurements.map((m) => (
-            <View key={m.id} className="flex-row items-center gap-2 py-1">
-              <Text className="flex-1 text-sm text-navy/70">
-                {TYPE_LABELS[m.type]}: {formatMeasurement(m)}{" "}
-                <Text className="text-xs text-navy/40">· {m.local}</Text>
-              </Text>
-              <Pressable
-                onPress={() => onDeleteMeasurement(m.id)}
-                accessibilityLabel="Remover medição"
-                hitSlop={12}
-                className="p-2.5"
-              >
-                <Ionicons name="trash-outline" size={15} color="#e63946" />
-              </Pressable>
+      {nonEmpty.length > 1 && (
+        <View className="mb-1 flex-row gap-3">
+          {nonEmpty.map((s) => (
+            <View key={s.label} className="flex-row items-center gap-1">
+              <View className="h-2 w-2 rounded-full" style={{ backgroundColor: s.color }} />
+              <Text className="text-[10px] text-navy/50">{s.label}</Text>
             </View>
           ))}
         </View>
       )}
+      {/* Valores do eixo Y posicionados na MESMA altura das linhas de grade
+          (topo, meio e base do desenho) — a coluna e o desenho ficam lado a
+          lado na mesma linha, então têm a mesma altura. */}
+      <View className="flex-1 flex-row">
+        <View style={{ width: Y_AXIS_WIDTH }}>
+          {plot.height > 0 &&
+            [max, (max + min) / 2, min].map((value, i) => (
+              <Text
+                key={i}
+                className="text-[10px] text-navy/40"
+                style={{ position: "absolute", right: 4, top: yOf(value) - 7, lineHeight: 14 }}
+              >
+                {formatAxisValue(value)}
+              </Text>
+            ))}
+        </View>
+        <View className="flex-1" onLayout={onPlotLayout}>
+          {plot.width > 0 && plot.height > 0 && (
+            <Svg width={plot.width} height={plot.height}>
+              {/* linhas de grade: topo, meio e base (os 3 valores do eixo) */}
+              {[PLOT_PADDING, PLOT_PADDING + innerHeight / 2, PLOT_PADDING + innerHeight].map((y, i) => (
+                <Line
+                  key={i}
+                  x1={0}
+                  x2={plot.width}
+                  y1={y}
+                  y2={y}
+                  stroke="#0b1e3d"
+                  strokeOpacity={0.06}
+                  strokeWidth={1}
+                />
+              ))}
+              {seriesCoords.map((s) => (
+                <Fragment key={s.label}>
+                  {s.coords.length > 1 && (
+                    <Polyline
+                      points={s.coords.map((c) => `${c.x},${c.y}`).join(" ")}
+                      fill="none"
+                      stroke={s.color}
+                      strokeWidth={2.5}
+                      strokeLinejoin="round"
+                      strokeLinecap="round"
+                    />
+                  )}
+                  {s.coords.map((c, i) => (
+                    <Circle key={i} cx={c.x} cy={c.y} r={3.5} fill={s.color} />
+                  ))}
+                </Fragment>
+              ))}
+            </Svg>
+          )}
+        </View>
+      </View>
+      <View className="mt-0.5 flex-row justify-between" style={{ marginLeft: Y_AXIS_WIDTH }}>
+        {labelIndices.map((idx) => (
+          <Text key={idx} className="text-[10px] text-navy/40">
+            {reference[idx]?.date}
+          </Text>
+        ))}
+      </View>
     </View>
   );
 }
 
+/**
+ * Aba Saúde: só a evolução — um gráfico embaixo do outro, dividindo a
+ * altura da tela entre eles (rola se não couber com um tamanho legível).
+ * Registrar medição e ver o histórico ficou em "Lançamentos"
+ * (app/saude-lancamentos.tsx), que grava no mesmo cache lido aqui.
+ */
 export default function SaudeScreen() {
+  const router = useRouter();
   const [measurements, setMeasurements] = useState<ApiHealthMeasurement[]>(
     () => readCachedSaude()?.measurements ?? []
   );
   const [loading, setLoading] = useState(() => readCachedSaude() === undefined);
-  const [saving, setSaving] = useState(false);
   const loadedOnce = useRef(false);
   const hadCacheOnMount = useRef(readCachedSaude() !== undefined);
-
-  const [pesoKg, setPesoKg] = useState("");
-  const [sistolica, setSistolica] = useState("");
-  const [diastolica, setDiastolica] = useState("");
-  const [gordura, setGordura] = useState("");
-  const [glicemia, setGlicemia] = useState("");
-  const [local, setLocal] = useState(LOCAL_OPTIONS[0]);
-  const [expandedDays, setExpandedDays] = useState<Set<string>>(() => new Set());
-
-  function toggleDay(dateKey: string) {
-    setExpandedDays((prev) => {
-      const next = new Set(prev);
-      if (next.has(dateKey)) next.delete(dateKey);
-      else next.add(dateKey);
-      return next;
-    });
-  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -256,80 +203,18 @@ export default function SaudeScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      if (loadedOnce.current) return;
+      if (loadedOnce.current) {
+        // Voltando de Lançamentos: ela grava no mesmo cache — adota o que
+        // estiver lá pra os gráficos já mostrarem a medição nova.
+        const cached = readCachedSaude();
+        if (cached) setMeasurements(cached.measurements ?? []);
+        return;
+      }
       loadedOnce.current = true;
       if (hadCacheOnMount.current) return; // já veio do cache/prefetch
       load();
     }, [load])
   );
-
-  // Espelha o state atual no cache — cobre a carga inicial e qualquer
-  // mutação (novo registro, remoção) sem precisar sincronizar em cada
-  // handler.
-  useEffect(() => {
-    if (!loading) setCached(SAUDE_CACHE_KEY, { measurements });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [measurements]);
-
-  async function handleAdd() {
-    const measuredAt = new Date().toISOString();
-    const entries: Record<string, unknown>[] = [];
-
-    if (pesoKg) entries.push({ type: "PESO", pesoKg: Number(pesoKg), local, measuredAt });
-    if (sistolica && diastolica) {
-      entries.push({
-        type: "PRESSAO",
-        pressaoSistolica: Number(sistolica),
-        pressaoDiastolica: Number(diastolica),
-        local,
-        measuredAt,
-      });
-    }
-    if (gordura) {
-      entries.push({ type: "GORDURA", percentualGordura: Number(gordura), local, measuredAt });
-    }
-    if (glicemia) {
-      entries.push({ type: "GLICEMIA", glicemiaMgDl: Number(glicemia), local, measuredAt });
-    }
-
-    if (entries.length === 0) {
-      showAlert("Nada pra registrar", "Preencha ao menos uma medida.");
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const res = await apiFetch("/api/mobile/saude", {
-        method: "POST",
-        body: JSON.stringify({ entries }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error ?? "Não foi possível salvar");
-      setMeasurements(data.measurements ?? []);
-      setPesoKg("");
-      setSistolica("");
-      setDiastolica("");
-      setGordura("");
-      setGlicemia("");
-    } catch (error) {
-      showAlert("Erro ao salvar", error instanceof Error ? error.message : undefined);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function handleDelete(id: string) {
-    const res = await apiFetch(`/api/mobile/saude/${id}`, { method: "DELETE" });
-    const data = await res.json();
-    if (res.ok) setMeasurements(data.measurements ?? []);
-  }
-
-  function confirmDelete(id: string) {
-    showAlert("Remover registro", "Tem certeza?", [
-      { text: "Cancelar", style: "cancel" },
-      { text: "Remover", style: "destructive", onPress: () => handleDelete(id) },
-    ]);
-  }
 
   if (loading) {
     return <LoadingScreen />;
@@ -338,154 +223,85 @@ export default function SaudeScreen() {
   const sorted = [...measurements].sort(
     (a, b) => new Date(a.measuredAt).getTime() - new Date(b.measuredAt).getTime()
   );
-  const pesoPoints = sorted
-    .filter((m) => m.type === "PESO" && m.pesoKg != null)
-    .map((m) => ({ date: shortDate(m.measuredAt), value: m.pesoKg! }));
-  const sistolicaPoints = sorted
-    .filter((m) => m.type === "PRESSAO" && m.pressaoSistolica != null)
-    .map((m) => ({ date: shortDate(m.measuredAt), value: m.pressaoSistolica! }));
-  const diastolicaPoints = sorted
-    .filter((m) => m.type === "PRESSAO" && m.pressaoDiastolica != null)
-    .map((m) => ({ date: shortDate(m.measuredAt), value: m.pressaoDiastolica! }));
-  const gorduraPoints = sorted
-    .filter((m) => m.type === "GORDURA" && m.percentualGordura != null)
-    .map((m) => ({ date: shortDate(m.measuredAt), value: m.percentualGordura! }));
-  const glicemiaPoints = sorted
-    .filter((m) => m.type === "GLICEMIA" && m.glicemiaMgDl != null)
-    .map((m) => ({ date: shortDate(m.measuredAt), value: m.glicemiaMgDl! }));
+  const pontos = (filtro: (m: ApiHealthMeasurement) => number | null | undefined) =>
+    sorted.flatMap((m) => {
+      const value = filtro(m);
+      return value == null ? [] : [{ date: shortDate(m.measuredAt), value }];
+    });
 
-  const days = groupByDay(measurements);
-
-  const header = (
-    <View>
-      {(pesoPoints.length > 0 ||
-        sistolicaPoints.length > 0 ||
-        diastolicaPoints.length > 0 ||
-        gorduraPoints.length > 0 ||
-        glicemiaPoints.length > 0) && (
-        <>
-          <Text className="mb-2 text-sm font-semibold text-navy">Evolução</Text>
-          <View className="mb-5 flex-row flex-wrap justify-between gap-y-3">
-            <MultiLineChart
-              title="Peso (kg)"
-              series={[{ label: "Peso", color: "#e63946", points: pesoPoints }]}
-            />
-            <MultiLineChart
-              title="Pressão (mmHg)"
-              series={[
-                { label: "Sistólica", color: "#e63946", points: sistolicaPoints },
-                { label: "Diastólica", color: "#2ec4b6", points: diastolicaPoints },
-              ]}
-            />
-            <MultiLineChart
-              title="Gordura corporal (%)"
-              series={[{ label: "Gordura", color: "#2ec4b6", points: gorduraPoints }]}
-            />
-            <MultiLineChart
-              title="Glicemia (mg/dL)"
-              series={[{ label: "Glicemia", color: "#2ec4b6", points: glicemiaPoints }]}
-            />
-          </View>
-        </>
-      )}
-
-      <Text className="mb-2 text-sm font-semibold text-navy">Novo registro</Text>
-      <View className="gap-3 rounded-2xl bg-card p-4 shadow-sm">
-        <View className="flex-row gap-2">
-          <TextInput
-            value={sistolica}
-            onChangeText={setSistolica}
-            placeholder="Sistólica"
-            keyboardType="numeric"
-            className="flex-1 rounded-xl border border-navy/10 p-3"
-          />
-          <TextInput
-            value={diastolica}
-            onChangeText={setDiastolica}
-            placeholder="Diastólica"
-            keyboardType="numeric"
-            className="flex-1 rounded-xl border border-navy/10 p-3"
-          />
-        </View>
-        <TextInput
-          value={pesoKg}
-          onChangeText={setPesoKg}
-          placeholder="Peso (kg)"
-          keyboardType="numeric"
-          className="rounded-xl border border-navy/10 p-3"
-        />
-        <TextInput
-          value={gordura}
-          onChangeText={setGordura}
-          placeholder="% de gordura corporal"
-          keyboardType="numeric"
-          className="rounded-xl border border-navy/10 p-3"
-        />
-        <TextInput
-          value={glicemia}
-          onChangeText={setGlicemia}
-          placeholder="Glicemia (mg/dL)"
-          keyboardType="numeric"
-          className="rounded-xl border border-navy/10 p-3"
-        />
-
-        <Text className="text-xs font-medium text-navy/60">Onde mediu</Text>
-        <View className="flex-row gap-2">
-          {LOCAL_OPTIONS.map((option) => {
-            const active = local === option;
-            return (
-              <Pressable
-                key={option}
-                onPress={() => setLocal(option)}
-                className={`flex-1 items-center rounded-xl p-2.5 ${active ? "bg-navy" : "bg-navy/5"}`}
-              >
-                <Text className={`text-xs font-medium ${active ? "text-white" : "text-navy/70"}`}>
-                  {option}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        <Pressable
-          disabled={saving}
-          onPress={handleAdd}
-          className="items-center rounded-xl bg-navy p-3 disabled:opacity-50"
-        >
-          {saving ? (
-            <ActivityIndicator color="#fff" size="small" />
-          ) : (
-            <Text className="font-semibold text-white">Registrar</Text>
-          )}
-        </Pressable>
-      </View>
-
-      <Text className="mb-2 mt-5 text-sm font-semibold text-navy">Histórico</Text>
-    </View>
-  );
+  const charts: { title: string; series: ChartSeries[] }[] = [
+    {
+      title: "Peso (kg)",
+      series: [{ label: "Peso", color: "#e63946", points: pontos((m) => (m.type === "PESO" ? m.pesoKg : null)) }],
+    },
+    {
+      title: "Pressão (mmHg)",
+      series: [
+        {
+          label: "Sistólica",
+          color: "#e63946",
+          points: pontos((m) => (m.type === "PRESSAO" ? m.pressaoSistolica : null)),
+        },
+        {
+          label: "Diastólica",
+          color: "#2ec4b6",
+          points: pontos((m) => (m.type === "PRESSAO" ? m.pressaoDiastolica : null)),
+        },
+      ],
+    },
+    {
+      title: "Gordura corporal (%)",
+      series: [
+        {
+          label: "Gordura",
+          color: "#2ec4b6",
+          points: pontos((m) => (m.type === "GORDURA" ? m.percentualGordura : null)),
+        },
+      ],
+    },
+    {
+      title: "Glicemia (mg/dL)",
+      series: [
+        {
+          label: "Glicemia",
+          color: "#2ec4b6",
+          points: pontos((m) => (m.type === "GLICEMIA" ? m.glicemiaMgDl : null)),
+        },
+      ],
+    },
+  ].filter((c) => c.series.some((s) => s.points.length > 0));
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      className="flex-1"
+    <ScrollView
+      className="flex-1 bg-cream"
+      contentContainerStyle={{ flexGrow: 1, padding: 16, gap: 12 }}
     >
-      <FlashList
-        className="flex-1 bg-cream"
-        data={days}
-        keyExtractor={(group) => group.dateKey}
-        renderItem={({ item }) => (
-          <DayGroupCard
-            group={item}
-            expanded={expandedDays.has(item.dateKey)}
-            onToggle={() => toggleDay(item.dateKey)}
-            onDeleteMeasurement={confirmDelete}
-          />
-        )}
-        ListHeaderComponent={header}
-        ListEmptyComponent={<Text className="text-sm text-navy/60">Nenhum registro ainda.</Text>}
-        contentContainerStyle={{ padding: 16, paddingBottom: 96 }}
-        keyboardShouldPersistTaps="handled"
-      />
-    </KeyboardAvoidingView>
+      <Text className="text-sm font-semibold text-navy">Evolução</Text>
+
+      {charts.length > 0 ? (
+        <View style={{ flex: 1, gap: 12 }}>
+          {charts.map((c) => (
+            <MultiLineChart key={c.title} title={c.title} series={c.series} />
+          ))}
+        </View>
+      ) : (
+        <View className="flex-1 items-center justify-center gap-2 rounded-2xl bg-card p-6 shadow-sm">
+          <Ionicons name="pulse-outline" size={28} color="#0b1e3d60" />
+          <Text className="text-center text-sm text-navy/60">
+            Nenhuma medição ainda. Toque em Lançamentos para registrar pressão, peso, gordura ou
+            glicemia.
+          </Text>
+        </View>
+      )}
+
+      <Pressable
+        onPress={() => router.push("/saude-lancamentos")}
+        accessibilityRole="button"
+        className="flex-row items-center justify-center gap-2 rounded-full bg-navy py-3.5"
+      >
+        <Ionicons name="create-outline" size={18} color="#fff" />
+        <Text className="font-semibold text-white">Lançamentos</Text>
+      </Pressable>
+    </ScrollView>
   );
 }
