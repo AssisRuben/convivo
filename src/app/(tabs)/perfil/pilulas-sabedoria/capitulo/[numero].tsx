@@ -11,7 +11,8 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { apiFetch, type ApiWisdomProgress } from "@/lib/api";
-import { WISDOM_CHAPTERS } from "@/constants/wisdomPills";
+import { useReadingChapter } from "@/lib/readingClient";
+import { WISDOM_BOOK_SLUG } from "@/lib/reading/types";
 import { showAlert } from "@/lib/alert";
 import { CelebrationModal } from "@/components/CelebrationModal";
 
@@ -21,7 +22,7 @@ function isCloseToBottom({ layoutMeasurement, contentOffset, contentSize }: Nati
 }
 
 /** Markdown inline bem simples — **negrito**, *itálico* e ***os dois
- * juntos*** (ver constants/wisdomPills.ts). */
+ * juntos*** (ver ReadingBlock em lib/reading/types.ts). */
 function RichText({ text, className }: { text: string; className?: string }) {
   const parts = text.split(/(\*\*\*[^*]+\*\*\*|\*\*[^*]+\*\*|\*[^*]+\*)/g).filter(Boolean);
   return (
@@ -64,7 +65,8 @@ export default function PilulaLeituraScreen() {
     if (router.canGoBack()) router.back();
     else router.replace("/perfil/pilulas-sabedoria");
   }
-  const chapter = WISDOM_CHAPTERS.find((c) => c.number === Number(numero));
+  // Texto do capítulo vem do Supabase pela API (antes era embutido no app)
+  const { data: chapter, loading: chapterLoading } = useReadingChapter(WISDOM_BOOK_SLUG, Number(numero));
 
   const [progress, setProgress] = useState<ApiWisdomProgress | null>(null);
   const [loading, setLoading] = useState(true);
@@ -128,7 +130,7 @@ export default function PilulaLeituraScreen() {
     }
   }
 
-  if (loading || !progress) {
+  if (loading || !progress || chapterLoading) {
     return (
       <View className="flex-1 items-center justify-center bg-cream">
         <ActivityIndicator color="#0b1e3d" />

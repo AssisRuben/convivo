@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { apiFetch, type ApiFaithProgress } from "@/lib/api";
-import { getFaithBook } from "@/constants/faithDrops";
+import { useReadingBook, useReadingChapter } from "@/lib/readingClient";
 import { showAlert } from "@/lib/alert";
 import { CelebrationModal } from "@/components/CelebrationModal";
 
@@ -21,7 +21,7 @@ function isCloseToBottom({ layoutMeasurement, contentOffset, contentSize }: Nati
 }
 
 /** Markdown inline bem simples — **negrito**, *itálico* e ***os dois
- * juntos*** (ver constants/faithDrops.ts). */
+ * juntos*** (ver ReadingBlock em lib/reading/types.ts). */
 function RichText({ text, className }: { text: string; className?: string }) {
   const parts = text.split(/(\*\*\*[^*]+\*\*\*|\*\*[^*]+\*\*|\*[^*]+\*)/g).filter(Boolean);
   return (
@@ -64,8 +64,9 @@ export default function GotaLeituraScreen() {
     if (router.canGoBack()) router.back();
     else router.replace({ pathname: "/perfil/gotas-de-fe/[livro]", params: { livro } });
   }
-  const book = getFaithBook(livro);
-  const chapter = book?.chapters.find((c) => c.number === Number(numero));
+  // Livro (título/ícone/cor) e texto do capítulo vêm do Supabase pela API
+  const { data: book, loading: bookLoading } = useReadingBook(livro);
+  const { data: chapter, loading: chapterLoading } = useReadingChapter(livro, Number(numero));
   const accentColor = book?.color ?? "#3b82f6";
 
   const [progress, setProgress] = useState<ApiFaithProgress | null>(null);
@@ -126,6 +127,14 @@ export default function GotaLeituraScreen() {
     if (scrollViewHeightRef.current > 0 && height <= scrollViewHeightRef.current) {
       handleReachedEnd();
     }
+  }
+
+  if (bookLoading || chapterLoading) {
+    return (
+      <View className="flex-1 items-center justify-center bg-cream">
+        <ActivityIndicator color="#0b1e3d" />
+      </View>
+    );
   }
 
   if (!book || !chapter) {

@@ -3,7 +3,8 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { ActivityIndicator, Pressable, SectionList, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { apiFetch, type ApiWisdomProgress } from "@/lib/api";
-import { WISDOM_CHAPTERS, WISDOM_TOPICS, type WisdomChapter, type WisdomTopic } from "@/constants/wisdomPills";
+import { useReadingBook } from "@/lib/readingClient";
+import { WISDOM_BOOK_SLUG, type ReadingChapterSummary, type ReadingTopicView } from "@/lib/reading/types";
 
 type ChapterStatus = "read" | "available" | "waiting" | "locked";
 
@@ -25,15 +26,12 @@ const STATUS_META: Record<
   locked: { icon: "lock-closed-outline", color: "#0b1e3d40", label: "Bloqueado" },
 };
 
-const SECTIONS: (WisdomTopic & { data: WisdomChapter[] })[] = WISDOM_TOPICS.map((topic) => ({
-  ...topic,
-  data: WISDOM_CHAPTERS.filter((c) => c.number >= topic.firstChapter && c.number <= topic.lastChapter),
-}));
-
 export default function PilulasSabedoriaScreen() {
   const router = useRouter();
   const [progress, setProgress] = useState<ApiWisdomProgress | null>(null);
   const [loading, setLoading] = useState(true);
+  // Conteúdo (assuntos + títulos dos capítulos) vem do Supabase pela API
+  const { data: book, error: bookError } = useReadingBook(WISDOM_BOOK_SLUG);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -51,7 +49,15 @@ export default function PilulasSabedoriaScreen() {
     }, [load])
   );
 
-  if (loading || !progress) {
+  if (bookError) {
+    return (
+      <View className="flex-1 items-center justify-center bg-cream p-6">
+        <Text className="text-center text-navy/60">{bookError}</Text>
+      </View>
+    );
+  }
+
+  if (loading || !progress || !book) {
     return (
       <View className="flex-1 items-center justify-center bg-cream">
         <ActivityIndicator color="#0b1e3d" />
@@ -59,10 +65,15 @@ export default function PilulasSabedoriaScreen() {
     );
   }
 
+  const sections: (ReadingTopicView & { data: ReadingChapterSummary[] })[] = book.topics.map((topic) => ({
+    ...topic,
+    data: book.chapters.filter((c) => c.number >= topic.firstChapter && c.number <= topic.lastChapter),
+  }));
+
   return (
     <SectionList
       className="flex-1 bg-cream"
-      sections={SECTIONS}
+      sections={sections}
       keyExtractor={(item) => String(item.number)}
       contentContainerClassName="p-4 pb-24"
       stickySectionHeadersEnabled={false}

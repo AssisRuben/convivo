@@ -1,3 +1,8 @@
+// !!! DESDE 05/10/2026 O CONTEÚDO MORA NO SUPABASE (tabelas ReadingBook,
+// !!! ReadingTopic, ReadingChapter). Este arquivo é só a fonte da CARGA
+// !!! INICIAL (scripts/seed-reading-content.ts) e não vai mais no app.
+// !!! Pra corrigir/adicionar capítulo, edite direto no banco — rodar o
+// !!! seed de novo SOBRESCREVE o que foi editado lá com o texto daqui.
 /**
  * Conteúdo de "Gotas de Fé" — devocional diário, mesma dinâmica das
  * Pílulas de sabedoria (ver constants/wisdomPills.ts), só com o tema e

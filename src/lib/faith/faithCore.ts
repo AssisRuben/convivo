@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { todayDate } from "@/lib/timeline/format";
-import { FAITH_BOOKS, getFaithBook } from "@/constants/faithDrops";
+import { getReadingBook, listReadingBooks } from "@/lib/reading/readingContent";
 
 export type FaithProgressView = {
   bookSlug: string;
@@ -82,8 +82,14 @@ function toView(
   };
 }
 
+/** Livro de Gotas de Fé (kind FAITH) — slug de Pílulas não vale aqui. */
+async function getFaithBook(bookSlug: string) {
+  const book = await getReadingBook(bookSlug);
+  return book?.kind === "FAITH" ? book : null;
+}
+
 export async function getFaithProgressForUser(userId: string, bookSlug: string): Promise<FaithProgressView> {
-  const book = getFaithBook(bookSlug);
+  const book = await getFaithBook(bookSlug);
   if (!book) throw new Error("Livro não encontrado");
 
   const row = await prisma.faithProgress.findUnique({ where: { userId_bookSlug: { userId, bookSlug } } });
@@ -92,10 +98,13 @@ export async function getFaithProgressForUser(userId: string, bookSlug: string):
 
 /** Resumo de todos os livros pro hub de "Gotas de Fé" — um card por livro. */
 export async function getFaithBooksSummaryForUser(userId: string): Promise<FaithBookSummary[]> {
-  const rows = await prisma.faithProgress.findMany({ where: { userId } });
+  const [rows, books] = await Promise.all([
+    prisma.faithProgress.findMany({ where: { userId } }),
+    listReadingBooks("FAITH"),
+  ]);
   const byBookSlug = new Map(rows.map((row) => [row.bookSlug, row]));
 
-  return FAITH_BOOKS.map((book) => {
+  return books.map((book) => {
     const row = byBookSlug.get(book.slug);
     return {
       slug: book.slug,
@@ -119,7 +128,7 @@ export async function completeChapterForUser(
   bookSlug: string,
   chapterNumber: number
 ): Promise<FaithProgressView> {
-  const book = getFaithBook(bookSlug);
+  const book = await getFaithBook(bookSlug);
   if (!book) throw new Error("Livro não encontrado");
 
   const existing = await prisma.faithProgress.findUnique({ where: { userId_bookSlug: { userId, bookSlug } } });

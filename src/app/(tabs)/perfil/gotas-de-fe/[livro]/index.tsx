@@ -3,7 +3,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { ActivityIndicator, FlatList, Pressable, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { apiFetch, type ApiFaithProgress } from "@/lib/api";
-import { getFaithBook } from "@/constants/faithDrops";
+import { useReadingBook } from "@/lib/readingClient";
 
 type ChapterStatus = "read" | "available" | "waiting" | "locked";
 
@@ -28,7 +28,8 @@ const STATUS_META: Record<
 export default function GotasDeFeLivroScreen() {
   const router = useRouter();
   const { livro } = useLocalSearchParams<{ livro: string }>();
-  const book = getFaithBook(livro);
+  // Livro e títulos dos capítulos vêm do Supabase pela API
+  const { data: book, loading: bookLoading } = useReadingBook(livro);
 
   const [progress, setProgress] = useState<ApiFaithProgress | null>(null);
   const [loading, setLoading] = useState(true);
@@ -49,7 +50,7 @@ export default function GotasDeFeLivroScreen() {
     }, [load])
   );
 
-  if (!book) {
+  if (!book && !bookLoading) {
     return (
       <View className="flex-1 items-center justify-center gap-3 bg-cream p-6">
         <Text className="text-center text-navy/60">Livro não encontrado.</Text>
@@ -63,7 +64,7 @@ export default function GotasDeFeLivroScreen() {
     );
   }
 
-  if (loading || !progress) {
+  if (loading || !progress || !book) {
     return (
       <View className="flex-1 items-center justify-center bg-cream">
         <ActivityIndicator color="#0b1e3d" />

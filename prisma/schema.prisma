@@ -153,9 +153,67 @@ model WisdomProgress {
 // Progresso em "Gotas de Fé" (devocional diário) — mesma dinâmica de
 // WisdomProgress acima, tabela própria porque é uma trilha de leitura
 // independente (streak e capítulo lido separados dos de sabedoria).
+// Conteúdo de leitura (05/10/2026): Pílulas de sabedoria e os livros de
+// Gotas de Fé moravam em src/constants/*.ts, empacotados no app. Agora são
+// dados — editar/adicionar capítulo é mexer nestas tabelas, sem build nem
+// OTA. Lido por lib/reading/readingContent.ts (com cache em memória).
+enum ReadingKind {
+  WISDOM // Pílulas de sabedoria (um livro só, slug "pilulas-sabedoria")
+  FAITH // Gotas de Fé (um livro por slug: proverbios, marcos, ...)
+}
+
+model ReadingBook {
+  slug      String      @id
+  kind      ReadingKind
+  title     String
+  subtitle  String
+  icon      String // nome do Ionicons
+  color     String // hex
+  sortOrder Int         @default(0)
+  active    Boolean     @default(true)
+  updatedAt DateTime    @updatedAt
+
+  topics   ReadingTopic[]
+  chapters ReadingChapter[]
+}
+
+// Assunto: agrupa uma faixa de capítulos na lista (Pílulas). A progressão
+// continua uma trilha única — o assunto só organiza a tela.
+model ReadingTopic {
+  id           String @id @default(cuid())
+  bookSlug     String
+  title        String
+  subtitle     String
+  icon         String
+  color        String
+  firstChapter Int
+  lastChapter  Int
+  sortOrder    Int    @default(0)
+
+  book ReadingBook @relation(fields: [bookSlug], references: [slug], onDelete: Cascade)
+
+  @@index([bookSlug])
+}
+
+model ReadingChapter {
+  id        String   @id @default(cuid())
+  bookSlug  String
+  number    Int
+  title     String
+  subtitle  String
+  // Lista de blocos (heading/paragraph/quote/list/footnote) — formato em
+  // lib/reading/types.ts (ReadingBlock).
+  blocks    Json
+  updatedAt DateTime @updatedAt
+
+  book ReadingBook @relation(fields: [bookSlug], references: [slug], onDelete: Cascade)
+
+  @@unique([bookSlug, number])
+}
+
 // Progresso por LIVRO (Provérbios, Evangelho de Marcos, ...) — cada um com
 // sua própria sequência de capítulos e streak independente, ver
-// constants/faithDrops.ts (FAITH_BOOKS) e lib/faith/faithCore.ts.
+// ReadingBook (kind FAITH) e lib/faith/faithCore.ts.
 model FaithProgress {
   id               String    @id @default(cuid())
   userId           String

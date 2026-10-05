@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { todayDate } from "@/lib/timeline/format";
-import { WISDOM_CHAPTERS } from "@/constants/wisdomPills";
+import { getReadingChapterCount } from "@/lib/reading/readingContent";
+import { WISDOM_BOOK_SLUG } from "@/lib/reading/types";
 
 export type WisdomProgressView = {
   chaptersRead: number;
@@ -32,16 +33,21 @@ export function isNextChapterAvailable(
   chaptersRead: number,
   lastReadDate: Date | null,
   today: Date,
-  totalChapters = WISDOM_CHAPTERS.length
+  totalChapters: number
 ): boolean {
   if (chaptersRead >= totalChapters) return false;
   if (chaptersRead === 0 || lastReadDate === null) return true;
   return daysBetween(lastReadDate, today) >= 1;
 }
 
-function nextChapterAvailableNow(chaptersRead: number, lastReadDate: Date | null, today: Date): boolean {
-  if (!DAILY_GATE_ENABLED) return chaptersRead < WISDOM_CHAPTERS.length;
-  return isNextChapterAvailable(chaptersRead, lastReadDate, today);
+function nextChapterAvailableNow(
+  chaptersRead: number,
+  lastReadDate: Date | null,
+  today: Date,
+  totalChapters: number
+): boolean {
+  if (!DAILY_GATE_ENABLED) return chaptersRead < totalChapters;
+  return isNextChapterAvailable(chaptersRead, lastReadDate, today, totalChapters);
 }
 
 /**
@@ -54,18 +60,24 @@ export function computeNextStreak(lastReadDate: Date | null, today: Date, curren
   return daysBetween(lastReadDate, today) === 1 ? currentStreak + 1 : 1;
 }
 
-function toView(row: { chaptersRead: number; streakDays: number; lastReadDate: Date | null }): WisdomProgressView {
+function toView(
+  totalChapters: number,
+  row: { chaptersRead: number; streakDays: number; lastReadDate: Date | null }
+): WisdomProgressView {
   return {
     chaptersRead: row.chaptersRead,
     streakDays: row.streakDays,
-    totalChapters: WISDOM_CHAPTERS.length,
-    nextChapterAvailable: nextChapterAvailableNow(row.chaptersRead, row.lastReadDate, todayDate()),
+    totalChapters,
+    nextChapterAvailable: nextChapterAvailableNow(row.chaptersRead, row.lastReadDate, todayDate(), totalChapters),
   };
 }
 
 export async function getWisdomProgressForUser(userId: string): Promise<WisdomProgressView> {
-  const row = await prisma.wisdomProgress.findUnique({ where: { userId } });
-  return toView(row ?? { chaptersRead: 0, streakDays: 0, lastReadDate: null });
+  const [row, totalChapters] = await Promise.all([
+    prisma.wisdomProgress.findUnique({ where: { userId } }),
+    getReadingChapterCount(WISDOM_BOOK_SLUG),
+  ]);
+  return toView(totalChapters, row ?? { chaptersRead: 0, streakDays: 0, lastReadDate: null });
 }
 
 /**
@@ -76,15 +88,18 @@ export async function completeChapterForUser(
   userId: string,
   chapterNumber: number
 ): Promise<WisdomProgressView> {
-  const existing = await prisma.wisdomProgress.findUnique({ where: { userId } });
+  const [existing, totalChapters] = await Promise.all([
+    prisma.wisdomProgress.findUnique({ where: { userId } }),
+    getReadingChapterCount(WISDOM_BOOK_SLUG),
+  ]);
   const current = existing ?? { chaptersRead: 0, streakDays: 0, lastReadDate: null };
 
-  if (chapterNumber !== current.chaptersRead + 1 || chapterNumber > WISDOM_CHAPTERS.length) {
+  if (chapterNumber !== current.chaptersRead + 1 || chapterNumber > totalChapters) {
     throw new Error("Esse capítulo não está disponível agora");
   }
 
   const today = todayDate();
-  if (!nextChapterAvailableNow(current.chaptersRead, current.lastReadDate, today)) {
+  if (!nextChapterAvailableNow(current.chaptersRead, current.lastReadDate, today, totalChapters)) {
     throw new Error("Volte amanhã para o próximo capítulo");
   }
 
@@ -96,5 +111,5 @@ export async function completeChapterForUser(
     update: { chaptersRead: chapterNumber, streakDays, lastReadDate: today },
   });
 
-  return toView(updated);
+  return toView(totalChapters, updated);
 }

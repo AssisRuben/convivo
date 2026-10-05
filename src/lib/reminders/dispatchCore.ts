@@ -10,9 +10,9 @@ import {
 import { dueTipIndexes } from "@/lib/goals/goalCore";
 import { pickTipForIndex } from "@/lib/goals/goalTips";
 import { isNextChapterAvailable as isNextWisdomChapterAvailable } from "@/lib/wisdom/wisdomCore";
-import { WISDOM_CHAPTERS } from "@/constants/wisdomPills";
 import { isNextChapterAvailable as isNextFaithChapterAvailable } from "@/lib/faith/faithCore";
-import { getFaithBook } from "@/constants/faithDrops";
+import { getReadingChapterCount } from "@/lib/reading/readingContent";
+import { WISDOM_BOOK_SLUG } from "@/lib/reading/types";
 
 // O disparo não roda exatamente no minuto do horário cadastrado (depende
 // de com que frequência o cron externo chama essa rota) — essa tolerância
@@ -188,16 +188,17 @@ export async function dispatchDueWisdomReminders(now: Date = new Date()): Promis
   }
 
   const today = todayDate();
+  const totalChapters = await getReadingChapterCount(WISDOM_BOOK_SLUG);
   const rows = await prisma.wisdomProgress.findMany({
     where: {
-      chaptersRead: { lt: WISDOM_CHAPTERS.length },
+      chaptersRead: { lt: totalChapters },
       OR: [{ lastNotifiedDate: null }, { lastNotifiedDate: { not: today } }],
     },
   });
 
   let sent = 0;
   for (const row of rows) {
-    if (!isNextWisdomChapterAvailable(row.chaptersRead, row.lastReadDate, today)) continue;
+    if (!isNextWisdomChapterAvailable(row.chaptersRead, row.lastReadDate, today, totalChapters)) continue;
 
     await sendPushToUser(row.userId, {
       title: "Sua pílula de sabedoria chegou 💊",
@@ -232,9 +233,9 @@ export async function dispatchDueFaithReminders(now: Date = new Date()): Promise
   let sent = 0;
   for (const row of rows) {
     if (notifiedUserIds.has(row.userId)) continue;
-    const book = getFaithBook(row.bookSlug);
-    if (!book || row.chaptersRead >= book.chapters.length) continue;
-    if (!isNextFaithChapterAvailable(row.chaptersRead, row.lastReadDate, today, book.chapters.length)) continue;
+    const totalChapters = await getReadingChapterCount(row.bookSlug);
+    if (totalChapters === 0 || row.chaptersRead >= totalChapters) continue;
+    if (!isNextFaithChapterAvailable(row.chaptersRead, row.lastReadDate, today, totalChapters)) continue;
 
     await sendPushToUser(row.userId, {
       title: "Sua gota de fé chegou 🙏",
