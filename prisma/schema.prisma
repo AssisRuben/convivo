@@ -438,6 +438,10 @@ model MedicationTracking {
   purchaseDate  DateTime
   totalUnits    Int
   unitsPerDose  Int
+  // Duração do tratamento em dias, contada a partir de purchaseDate (dia 1
+  // = dia da compra). Null = uso contínuo (sem data pra acabar). Passou do
+  // último dia: some da Home, para de lembrar e não entra em recompra.
+  treatmentDays Int?
   active        Boolean  @default(true)
   createdAt     DateTime @default(now())
 

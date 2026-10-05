@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import {
   deactivateMedicationTracking,
   listMedicationTrackingsForUser,
+  updateMedicationTracking,
 } from "@/lib/medications/medicationCore";
 import { getCatalogProductByCodigo } from "@/lib/catalog/catalogDb";
 
@@ -50,6 +51,30 @@ export async function GET(request: Request, { id }: Record<string, string>) {
     totalUnits: tracking.totalUnits,
     subtotalCents: catalogProduct.precoCents * tracking.totalUnits,
   });
+}
+
+/** Editar a ficha: quantidade, dose, horários (ajusta a Rotina junto) e
+ * uso contínuo x tratamento de N dias. */
+export async function PATCH(request: Request, { id }: Record<string, string>) {
+  const userId = await getApiUserId(request);
+  if (!userId) {
+    return Response.json({ error: "Não autenticado" }, { status: 401 });
+  }
+
+  try {
+    const body = await request.json();
+    await updateMedicationTracking(userId, id, {
+      totalUnits: Number(body.totalUnits),
+      unitsPerDose: Number(body.unitsPerDose),
+      horarios: Array.isArray(body.horarios) ? body.horarios.map(String) : [],
+      treatmentDays: body.treatmentDays == null ? null : Number(body.treatmentDays),
+    });
+    const items = await listMedicationTrackingsForUser(userId);
+    return Response.json({ items });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Não foi possível salvar";
+    return Response.json({ error: message }, { status: 400 });
+  }
 }
 
 export async function DELETE(request: Request, { id }: Record<string, string>) {

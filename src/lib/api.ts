@@ -160,7 +160,23 @@ export type ApiHomeRepurchaseItem = {
   daysUntilRunOut: number;
 };
 
+/** Espelha HomeDosePeriod/HomeDose (lib/home/homeCore.ts). */
+export type ApiHomeDosePeriod =
+  | { kind: "tratamento"; day: number; totalDays: number }
+  | { kind: "continuo"; month: number; taken: number; expected: number };
+
+export type ApiHomeDose = {
+  checklistItemId: string;
+  title: string;
+  timeOfDay: string | null;
+  taken: boolean;
+  overdue: boolean;
+  period: ApiHomeDosePeriod | null;
+};
+
 export type ApiHomeDashboard = {
+  /** Ausente quando o servidor ainda é a versão antiga (só nextDose). */
+  todayDoses?: ApiHomeDose[];
   nextDose: ApiHomeNextDose | null;
   repurchaseReady: ApiHomeRepurchaseItem[];
   loyalty: { stampsFilled: number; stampsTotal: number; totalRewardCents: number };

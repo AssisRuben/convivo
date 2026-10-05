@@ -1,6 +1,12 @@
 import { prisma } from "@/lib/prisma";
 import { brasiliaClock } from "@/lib/reminders/dispatchCore";
-import { estimateRunOutDate, daysBetween } from "@/lib/medications/medicationCore";
+import {
+  estimateRunOutDate,
+  daysBetween,
+  monthlyDoseSummary,
+  supplyCoversTreatment,
+  treatmentProgress,
+} from "@/lib/medications/medicationCore";
 import { todayDate } from "@/lib/timeline/format";
 import { getLoyaltyProgress } from "@/lib/loyalty/loyaltyCore";
 import { getActivePromotions } from "@/lib/catalog/catalogDb";
@@ -10,6 +16,23 @@ export type HomeNextDose = {
   title: string;
   timeOfDay: string;
   overdue: boolean;
+};
+
+/** Período da dose: tratamento com prazo ("Dia 5 de 7") ou uso contínuo
+ * (soma do mês: "Outubro: 9 de 10 doses"). null = item de rotina sem
+ * ficha de medicamento (não dá pra saber período). */
+export type HomeDosePeriod =
+  | { kind: "tratamento"; day: number; totalDays: number }
+  | { kind: "continuo"; month: number; taken: number; expected: number };
+
+export type HomeDose = {
+  checklistItemId: string;
+  title: string;
+  /** "HH:mm"; null = item de rotina sem horário fixo. */
+  timeOfDay: string | null;
+  taken: boolean;
+  overdue: boolean;
+  period: HomeDosePeriod | null;
 };
 
 export type HomeRepurchaseItem = {
@@ -26,6 +49,9 @@ export type HomeLoyaltySummary = {
 };
 
 export type HomeDashboardView = {
+  /** Todas as doses de hoje (tomadas e pendentes), em ordem de horário. */
+  todayDoses: HomeDose[];
+  /** Mantido pra versões antigas do app, que só mostravam uma dose. */
   nextDose: HomeNextDose | null;
   repurchaseReady: HomeRepurchaseItem[];
   loyalty: HomeLoyaltySummary;
@@ -44,43 +70,100 @@ function parseTimeOfDay(value: string): number {
 }
 
 /**
- * Próxima dose de medicamento hoje: entre os itens de checklist categoria
- * MEDICACAO agendados pra hoje e ainda não marcados, pega o de horário
- * mais próximo — se todos já passaram do horário, mostra o mais antigo
- * como atrasado em vez de esconder (a pessoa ainda precisa saber que
- * ficou pra trás).
+ * Todas as doses de medicamento de hoje — itens de rotina categoria
+ * MEDICACAO agendados pra hoje, tomados ou não (a Home marca/desmarca
+ * direto, a mesma conclusão que a aba Rotina usa). Cada dose traz o
+ * período: dia do tratamento ("5 de 7") ou, no uso contínuo, a soma do
+ * mês. Tratamento que já passou do último dia não aparece.
+ * Ordem: por horário; sem horário fixo vai pro fim.
  */
-async function getNextDose(userId: string, now: Date): Promise<HomeNextDose | null> {
+async function getTodayDoses(userId: string, now: Date): Promise<HomeDose[]> {
   const { minutes: nowMinutes, weekday } = brasiliaClock(now);
   const today = todayDate();
+  const monthStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
 
   const items = await prisma.careChecklistItem.findMany({
-    where: { userId, active: true, category: "MEDICACAO", timeOfDay: { not: null } },
-    include: { completions: { where: { date: today }, select: { id: true } } },
+    where: { userId, active: true, category: "MEDICACAO" },
+    include: {
+      // o mês inteiro (inclui hoje): status de hoje + soma do uso contínuo
+      completions: { where: { date: { gte: monthStart } }, select: { date: true } },
+      medicationTracking: {
+        select: { id: true, purchaseDate: true, treatmentDays: true, active: true },
+      },
+    },
   });
 
-  const pending = items.filter((item) => {
-    if (item.completions.length > 0) return false;
-    if (item.daysOfWeek.length > 0 && !item.daysOfWeek.includes(weekday)) return false;
-    return true;
-  });
-  if (pending.length === 0) return null;
+  // Doses por dia e conclusões do mês de cada ficha — somando TODOS os
+  // horários dela, não só o da linha.
+  const porFicha = new Map<string, { dosesPerDay: number; dates: Date[] }>();
+  for (const item of items) {
+    if (!item.medicationTrackingId) continue;
+    const acc = porFicha.get(item.medicationTrackingId) ?? { dosesPerDay: 0, dates: [] };
+    acc.dosesPerDay += 1;
+    acc.dates.push(...item.completions.map((c) => c.date));
+    porFicha.set(item.medicationTrackingId, acc);
+  }
 
-  const withMinutes = pending.map((item) => ({
-    item,
-    minutes: parseTimeOfDay(item.timeOfDay!),
-  }));
+  const doses: (HomeDose & { minutes: number | null })[] = [];
+  for (const item of items) {
+    if (item.daysOfWeek.length > 0 && !item.daysOfWeek.includes(weekday)) continue;
 
-  const upcoming = withMinutes
-    .filter((x) => x.minutes >= nowMinutes)
-    .sort((a, b) => a.minutes - b.minutes)[0];
-  const chosen = upcoming ?? withMinutes.sort((a, b) => a.minutes - b.minutes)[0];
+    let period: HomeDosePeriod | null = null;
+    const tracking = item.medicationTracking;
+    if (tracking) {
+      if (!tracking.active) continue;
+      const progress = treatmentProgress(tracking.purchaseDate, tracking.treatmentDays, today);
+      if (progress) {
+        if (progress.ended || progress.day < 1) continue;
+        period = { kind: "tratamento", day: progress.day, totalDays: progress.totalDays };
+      } else {
+        const ficha = porFicha.get(tracking.id)!;
+        const resumo = monthlyDoseSummary(tracking.purchaseDate, ficha.dosesPerDay, ficha.dates, today);
+        period = {
+          kind: "continuo",
+          month: today.getUTCMonth() + 1,
+          taken: resumo.taken,
+          expected: resumo.expected,
+        };
+      }
+    }
 
+    const taken = item.completions.some((c) => c.date.getTime() === today.getTime());
+    const minutes = item.timeOfDay ? parseTimeOfDay(item.timeOfDay) : null;
+    doses.push({
+      checklistItemId: item.id,
+      title: item.title,
+      timeOfDay: item.timeOfDay,
+      taken,
+      overdue: !taken && minutes != null && minutes < nowMinutes,
+      period,
+      minutes,
+    });
+  }
+
+  return doses
+    .sort(
+      (a, b) =>
+        (a.minutes ?? Number.MAX_SAFE_INTEGER) - (b.minutes ?? Number.MAX_SAFE_INTEGER) ||
+        a.title.localeCompare(b.title, "pt-BR")
+    )
+    .map(({ minutes: _minutes, ...dose }) => dose);
+}
+
+/**
+ * Formato antigo (uma dose só), pras versões do app que ainda não
+ * mostram a lista: a pendente de horário mais próximo; se todas já
+ * passaram, a mais antiga, como atrasada.
+ */
+function pickNextDose(doses: HomeDose[]): HomeNextDose | null {
+  const pending = doses.filter((d) => !d.taken && d.timeOfDay);
+  const chosen = pending.find((d) => !d.overdue) ?? pending[0];
+  if (!chosen) return null;
   return {
-    checklistItemId: chosen.item.id,
-    title: chosen.item.title,
-    timeOfDay: chosen.item.timeOfDay!,
-    overdue: chosen.minutes < nowMinutes,
+    checklistItemId: chosen.checklistItemId,
+    title: chosen.title,
+    timeOfDay: chosen.timeOfDay!,
+    overdue: chosen.overdue,
   };
 }
 
@@ -102,6 +185,11 @@ async function getRepurchaseReady(userId: string): Promise<HomeRepurchaseItem[]>
     );
     const daysUntilRunOut = daysBetween(today, runOutDate);
     if (daysUntilRunOut > REPURCHASE_READY_THRESHOLD_DAYS) continue;
+    // tratamento com prazo que acaba antes do remédio (ou já acabou) não
+    // precisa de recompra
+    if (supplyCoversTreatment(tracking.purchaseDate, tracking.treatmentDays, today, daysUntilRunOut)) {
+      continue;
+    }
 
     ready.push({
       medicationTrackingId: tracking.id,
@@ -115,15 +203,16 @@ async function getRepurchaseReady(userId: string): Promise<HomeRepurchaseItem[]>
 }
 
 export async function getHomeDashboardForUser(userId: string, now: Date = new Date()): Promise<HomeDashboardView> {
-  const [nextDose, repurchaseReady, loyalty, promotions] = await Promise.all([
-    getNextDose(userId, now),
+  const [todayDoses, repurchaseReady, loyalty, promotions] = await Promise.all([
+    getTodayDoses(userId, now),
     getRepurchaseReady(userId),
     getLoyaltyProgress(userId),
     getActivePromotions(1),
   ]);
 
   return {
-    nextDose,
+    todayDoses,
+    nextDose: pickNextDose(todayDoses),
     repurchaseReady,
     loyalty: {
       stampsFilled: loyalty.stampsFilled,

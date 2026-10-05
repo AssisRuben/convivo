@@ -2,15 +2,68 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { apiFetch, type ApiHomeDashboard } from "@/lib/api";
+import { apiFetch, type ApiHomeDashboard, type ApiHomeDose } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useProfileDrawer } from "@/lib/profileDrawer";
 import { showAlert } from "@/lib/alert";
-import { HOME_CACHE_KEY, fetchHomeDashboard } from "@/lib/tabPrefetch";
+import { HOME_CACHE_KEY, ROTINA_CACHE_KEY, fetchHomeDashboard } from "@/lib/tabPrefetch";
 import { getCached, loadCached, setCached } from "@/lib/tabDataCache";
 
 function readCachedDashboard() {
   return getCached<ApiHomeDashboard>(HOME_CACHE_KEY);
+}
+
+const MESES = [
+  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+];
+
+/** "Dia 5 de 7" (tratamento com prazo) ou "Outubro: 9 de 10 doses" (uso
+ * contínuo — soma do mês até hoje). */
+function periodLabel(dose: ApiHomeDose): string | null {
+  const p = dose.period;
+  if (!p) return null;
+  if (p.kind === "tratamento") return `Dia ${p.day} de ${p.totalDays}`;
+  return `${MESES[p.month - 1]}: ${p.taken} de ${p.expected} dose${p.expected === 1 ? "" : "s"}`;
+}
+
+/** Servidor antigo só manda `nextDose` — vira uma lista de 1 item. */
+function dosesOf(dashboard: ApiHomeDashboard): ApiHomeDose[] {
+  if (dashboard.todayDoses) return dashboard.todayDoses;
+  if (!dashboard.nextDose) return [];
+  return [{ ...dashboard.nextDose, taken: false, period: null }];
+}
+
+function DoseRow({ dose, onPress }: { dose: ApiHomeDose; onPress: () => void }) {
+  const periodo = periodLabel(dose);
+  const status = dose.taken ? "Tomado" : dose.overdue ? "Atrasado" : "A tomar";
+  const statusColor = dose.taken ? "text-mint" : dose.overdue ? "text-coral" : "text-navy/60";
+
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked: dose.taken }}
+      accessibilityLabel={`${dose.title}${dose.timeOfDay ? `, ${dose.timeOfDay}` : ""}, ${status}`}
+      className="flex-row items-center gap-3 rounded-2xl bg-card p-3.5 shadow-sm"
+    >
+      <Ionicons
+        name={dose.taken ? "checkmark-circle" : "ellipse-outline"}
+        size={28}
+        color={dose.taken ? "#2ec4b6" : dose.overdue ? "#e63946" : "#0b1e3d40"}
+      />
+      <View className="flex-1 gap-0.5">
+        <Text className={`font-semibold ${dose.taken ? "text-navy/50 line-through" : "text-navy"}`}>
+          {dose.title}
+        </Text>
+        <View className="flex-row flex-wrap items-center gap-x-2">
+          <Text className="text-xs text-navy/60">{dose.timeOfDay ?? "Sem horário"}</Text>
+          <Text className={`text-xs font-medium ${statusColor}`}>· {status}</Text>
+        </View>
+        {periodo && <Text className="text-xs font-medium text-navy/70">{periodo}</Text>}
+      </View>
+    </Pressable>
+  );
 }
 
 function formatPrice(cents: number): string {
@@ -53,8 +106,8 @@ function QuickAction({
 }
 
 /**
- * Home vira um dashboard (próxima dose, recompra rápida, fidelidade,
- * ações rápidas) em vez do feed que morava aqui antes — o feed
+ * Home vira um dashboard (medicamentos de hoje, recompra rápida,
+ * fidelidade, ações rápidas) em vez do feed que morava aqui antes — o feed
  * (conquistas/comunidade) mudou pra Perfil > Novidades. Cada seção some
  * sozinha quando não tem dado (sem medicamento cadastrado, nada perto de
  * acabar) em vez de mostrar card vazio.
@@ -65,9 +118,14 @@ export default function HomeScreen() {
   const { open: openProfileDrawer } = useProfileDrawer();
   const [dashboard, setDashboard] = useState<ApiHomeDashboard | null>(() => readCachedDashboard() ?? null);
   const [loading, setLoading] = useState(() => readCachedDashboard() === undefined);
-  const [marking, setMarking] = useState(false);
   const loadedOnce = useRef(false);
   const hadCacheOnMount = useRef(readCachedDashboard() !== undefined);
+  // Mesmo esquema do toggleComplete da Rotina: marca na hora e guarda a
+  // última intenção por dose, pra resposta atrasada não desfazer um toque
+  // mais novo. `inFlight` evita que o recarregamento de uma dose apague o
+  // estado otimista de outra que ainda está indo pro servidor.
+  const latestToggleIntent = useRef<Map<string, boolean>>(new Map());
+  const inFlight = useRef(0);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -81,7 +139,16 @@ export default function HomeScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      if (loadedOnce.current) return;
+      if (loadedOnce.current) {
+        // A Rotina invalida o cache da Home quando marca/edita algo —
+        // aqui refaz a busca pra lista de doses refletir o status novo.
+        if (readCachedDashboard() === undefined) {
+          fetchHomeDashboard()
+            .then(setDashboard)
+            .catch(() => {});
+        }
+        return;
+      }
       loadedOnce.current = true;
       if (hadCacheOnMount.current) return; // já veio do cache/prefetch
       load();
@@ -95,21 +162,63 @@ export default function HomeScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dashboard]);
 
-  async function markDoseTaken() {
-    if (!dashboard?.nextDose || marking) return;
-    setMarking(true);
+  function setDoseTaken(checklistItemId: string, taken: boolean) {
+    setDashboard((prev) =>
+      prev
+        ? {
+            ...prev,
+            todayDoses: dosesOf(prev).map((d) =>
+              d.checklistItemId === checklistItemId
+                ? { ...d, taken, overdue: taken ? false : d.overdue }
+                : d
+            ),
+          }
+        : prev
+    );
+  }
+
+  // Toque na dose marca/desmarca — é a mesma conclusão da aba Rotina
+  // (rotina/[id]/complete), então o status fica igual nas duas telas.
+  async function toggleDose(dose: ApiHomeDose) {
+    const id = dose.checklistItemId;
+    const next = !dose.taken;
+    latestToggleIntent.current.set(id, next);
+    setDoseTaken(id, next);
+    inFlight.current += 1;
+
+    let saved = false;
     try {
-      const res = await apiFetch(`/api/mobile/rotina/${dashboard.nextDose.checklistItemId}/complete`, {
-        method: "POST",
+      const res = await apiFetch(`/api/mobile/rotina/${id}/complete`, {
+        method: next ? "POST" : "DELETE",
       });
       if (!res.ok) throw new Error();
-      // Fetch direto, não `load()` — esse já leu do cache e devolveria o
-      // estado antigo (loadCached nunca refaz a busca se já tem valor).
-      setDashboard(await fetchHomeDashboard());
+      // A resposta é a lista da Rotina já atualizada — a aba Rotina adota
+      // esse cache quando ganhar foco.
+      setCached(ROTINA_CACHE_KEY, await res.json());
+      saved = true;
     } catch {
-      showAlert("Erro", "Não foi possível marcar a dose como tomada.");
-    } finally {
-      setMarking(false);
+      // tratado abaixo
+    }
+    inFlight.current -= 1;
+
+    if (!saved) {
+      if (latestToggleIntent.current.get(id) === next) {
+        setDoseTaken(id, !next);
+        showAlert("Não foi possível salvar", "Sua conexão pode estar instável — tente de novo.");
+      }
+      return;
+    }
+
+    // Recarrega pra atualizar a soma do mês (uso contínuo) e o "atrasado"
+    // de quem foi desmarcado — só se não tem outro toque pendente, senão
+    // sobrescreveria o estado otimista dele.
+    if (inFlight.current === 0) {
+      try {
+        const fresh = await fetchHomeDashboard();
+        if (inFlight.current === 0) setDashboard(fresh);
+      } catch {
+        // a marcação já foi salva; a soma atualiza na próxima carga
+      }
     }
   }
 
@@ -131,6 +240,9 @@ export default function HomeScreen() {
       </View>
     );
   }
+
+  const doses = dosesOf(dashboard);
+  const tomadas = doses.filter((d) => d.taken).length;
 
   return (
     <ScrollView className="flex-1 bg-cream" contentContainerClassName="gap-4 p-4 pb-24">
@@ -162,35 +274,23 @@ export default function HomeScreen() {
         <Text className="text-navy/50">Buscar remédios e produtos...</Text>
       </Pressable>
 
-      {dashboard.nextDose && (
-        <View className="gap-3 rounded-2xl bg-mint/10 p-4">
-          <View className="flex-row items-center justify-between">
+      {doses.length > 0 && (
+        <View className="gap-2 rounded-2xl bg-mint/10 p-3">
+          <View className="flex-row items-center justify-between px-1">
             <View className="flex-row items-center gap-1.5">
               <Ionicons name="calendar-outline" size={14} color="#2ec4b6" />
-              <Text className="text-xs font-semibold text-mint">
-                {dashboard.nextDose.overdue ? "Dose atrasada" : "Próxima dose"}
-              </Text>
+              <Text className="text-xs font-semibold text-mint">Medicamentos de hoje</Text>
             </View>
-            <View className="flex-row items-center gap-1">
-              <Ionicons name="time-outline" size={14} color="#0b1e3d80" />
-              <Text className="text-xs text-navy/60">{dashboard.nextDose.timeOfDay}</Text>
-            </View>
+            <Text className="text-xs text-navy/60">
+              {tomadas} de {doses.length} tomado{doses.length === 1 ? "" : "s"}
+            </Text>
           </View>
-          <Text className="text-lg font-bold text-navy">{dashboard.nextDose.title}</Text>
-          <Pressable
-            disabled={marking}
-            onPress={markDoseTaken}
-            className="flex-row items-center justify-center gap-2 rounded-full bg-mint p-3 disabled:opacity-50"
-          >
-            {marking ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <>
-                <Ionicons name="checkmark" size={16} color="#fff" />
-                <Text className="font-semibold text-white">Marcar como Tomado</Text>
-              </>
-            )}
-          </Pressable>
+          {doses.map((dose) => (
+            <DoseRow key={dose.checklistItemId} dose={dose} onPress={() => toggleDose(dose)} />
+          ))}
+          <Text className="px-1 text-[11px] text-navy/50">
+            Toque no remédio para marcar como tomado (ou desmarcar).
+          </Text>
         </View>
       )}
 

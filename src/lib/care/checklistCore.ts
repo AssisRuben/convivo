@@ -4,6 +4,7 @@ import {
   checkRoutineStreakMilestones,
 } from "@/lib/timeline/achievements";
 import { todayDate } from "@/lib/timeline/format";
+import { treatmentProgress } from "@/lib/medications/medicationCore";
 import type { CareCategory } from "@/lib/generated/prisma/client";
 
 /**
@@ -46,15 +47,24 @@ export async function listChecklistItemsForUser(userId: string): Promise<Checkli
   // Supabase, e essa rota já soma outro round-trip só pra autenticar
   // (ver getApiUserId), então eliminar um daqui é sensível no tempo de
   // resposta percebido ao abrir a aba.
+  const today = todayDate();
   const items = await prisma.careChecklistItem.findMany({
     where: { userId, active: true },
     orderBy: { createdAt: "asc" },
     include: {
-      completions: { where: { date: todayDate() }, select: { id: true } },
+      completions: { where: { date: today }, select: { id: true } },
+      medicationTracking: { select: { purchaseDate: true, treatmentDays: true } },
     },
   });
 
-  return items.map((item) => ({
+  return items
+    // Horário de remédio com tratamento já encerrado (ex.: antibiótico de
+    // 7 dias) sai da Rotina sozinho — mesma regra da Home e dos lembretes.
+    .filter((item) => {
+      const tracking = item.medicationTracking;
+      return !(tracking && treatmentProgress(tracking.purchaseDate, tracking.treatmentDays, today)?.ended);
+    })
+    .map((item) => ({
     id: item.id,
     title: item.title,
     category: item.category,

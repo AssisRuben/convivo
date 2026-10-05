@@ -10,7 +10,11 @@ export type MedicationTrackingInput = {
   totalUnits: number;
   unitsPerDose: number;
   horarios: string[]; // ["08:00", "20:00", ...]
+  /** Dias de tratamento; null/ausente = uso contínuo. */
+  treatmentDays?: number | null;
 };
+
+const MAX_TREATMENT_DAYS = 365;
 
 export type MedicationTrackingView = {
   id: string;
@@ -20,6 +24,8 @@ export type MedicationTrackingView = {
   totalUnits: number;
   unitsPerDose: number;
   horarios: string[];
+  /** null = uso contínuo. */
+  treatmentDays: number | null;
   /** Doses já tomadas desde a compra — soma as conclusões de todos os
    * horários ligados a essa ficha. */
   dosesTaken: number;
@@ -44,6 +50,72 @@ export function validateInput(input: MedicationTrackingInput): void {
   if (Number.isNaN(new Date(input.purchaseDate).getTime())) {
     throw new Error("Data da compra inválida");
   }
+  if (input.treatmentDays != null) {
+    if (
+      !Number.isInteger(input.treatmentDays) ||
+      input.treatmentDays <= 0 ||
+      input.treatmentDays > MAX_TREATMENT_DAYS
+    ) {
+      throw new Error(`Duração do tratamento inválida (1 a ${MAX_TREATMENT_DAYS} dias)`);
+    }
+  }
+}
+
+/**
+ * Em que dia do tratamento a pessoa está: dia 1 = dia da compra
+ * (purchaseDate). `null` pra uso contínuo (treatmentDays null). `ended`
+ * quando hoje já passou do último dia — quem consome esconde a dose /
+ * para de lembrar.
+ */
+export function treatmentProgress(
+  purchaseDate: Date,
+  treatmentDays: number | null,
+  today: Date
+): { day: number; totalDays: number; ended: boolean } | null {
+  if (treatmentDays == null) return null;
+  const day = daysBetween(startOfDayUtc(purchaseDate), today) + 1;
+  return { day, totalDays: treatmentDays, ended: day > treatmentDays };
+}
+
+/**
+ * Soma do mês pro uso contínuo: doses tomadas x doses previstas, do dia 1
+ * do mês (ou do dia da compra, se foi depois) até hoje, inclusive.
+ * `completionDates` são as datas de conclusão de TODOS os horários da
+ * ficha; datas fora da janela são ignoradas.
+ */
+export function monthlyDoseSummary(
+  purchaseDate: Date,
+  dosesPerDay: number,
+  completionDates: Date[],
+  today: Date
+): { taken: number; expected: number; monthStart: Date } {
+  const monthStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
+  const purchaseDay = startOfDayUtc(purchaseDate);
+  const from = purchaseDay > monthStart ? purchaseDay : monthStart;
+  const days = Math.max(daysBetween(from, today) + 1, 0);
+  const taken = completionDates.filter((d) => d >= from && d <= today).length;
+  return { taken, expected: days * Math.max(dosesPerDay, 1), monthStart };
+}
+
+/**
+ * Tratamento com prazo que o estoque atual já cobre até o fim (ou que já
+ * acabou) — não faz sentido sugerir/avisar recompra. Uso contínuo
+ * (treatmentDays null) sempre devolve false.
+ */
+export function supplyCoversTreatment(
+  purchaseDate: Date,
+  treatmentDays: number | null,
+  today: Date,
+  daysUntilRunOut: number
+): boolean {
+  const progress = treatmentProgress(purchaseDate, treatmentDays, today);
+  if (!progress) return false;
+  const remainingDays = progress.totalDays - progress.day;
+  return remainingDays <= Math.max(daysUntilRunOut, 0);
+}
+
+function startOfDayUtc(date: Date): Date {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
 }
 
 /**
@@ -85,6 +157,7 @@ export async function createMedicationTracking(
         purchaseDate: new Date(input.purchaseDate),
         totalUnits: input.totalUnits,
         unitsPerDose: input.unitsPerDose,
+        treatmentDays: input.treatmentDays ?? null,
       },
     });
 
@@ -115,7 +188,11 @@ export async function listMedicationTrackingsForUser(
   const today = todayDate();
 
   return trackings.map((tracking) => {
+    // Só os horários ATIVOS (o que foi tirado na edição ou removido na
+    // Rotina não conta mais); dosesTaken abaixo soma todos, inclusive os
+    // inativos — é histórico do que já foi tomado.
     const horarios = tracking.checklistItems
+      .filter((item) => item.active)
       .map((item) => item.timeOfDay)
       .filter((t): t is string => Boolean(t))
       .sort();
@@ -139,10 +216,102 @@ export async function listMedicationTrackingsForUser(
       totalUnits: tracking.totalUnits,
       unitsPerDose: tracking.unitsPerDose,
       horarios,
+      treatmentDays: tracking.treatmentDays,
       dosesTaken,
       estimatedRunOutDate: runOutDate.toISOString().slice(0, 10),
       daysUntilRunOut: daysBetween(today, runOutDate),
     };
+  });
+}
+
+/** O que dá pra mudar numa ficha já cadastrada (nome e data da compra
+ * vêm do histórico de compras e ficam como estão). */
+export type MedicationTrackingUpdate = {
+  totalUnits: number;
+  unitsPerDose: number;
+  horarios: string[];
+  treatmentDays: number | null;
+};
+
+/**
+ * Compara os horários atuais (itens ativos da Rotina) com os desejados:
+ * horário que continua -> mantém o item (preserva "tomado hoje" e o
+ * histórico); que saiu -> desativa; que entrou -> cria item novo.
+ */
+export function diffHorarios(
+  atuais: { id: string; timeOfDay: string | null }[],
+  desejados: string[]
+): { manter: string[]; desativar: string[]; criar: string[] } {
+  const desejadosSet = new Set(desejados);
+  const manter: string[] = [];
+  const desativar: string[] = [];
+  const horariosMantidos = new Set<string>();
+  for (const item of atuais) {
+    // horário duplicado (dois itens no mesmo horário) — fica só um
+    if (item.timeOfDay && desejadosSet.has(item.timeOfDay) && !horariosMantidos.has(item.timeOfDay)) {
+      manter.push(item.id);
+      horariosMantidos.add(item.timeOfDay);
+    } else {
+      desativar.push(item.id);
+    }
+  }
+  const criar = [...desejadosSet].filter((h) => !horariosMantidos.has(h)).sort();
+  return { manter, desativar, criar };
+}
+
+export async function updateMedicationTracking(
+  userId: string,
+  id: string,
+  update: MedicationTrackingUpdate
+): Promise<void> {
+  const tracking = await prisma.medicationTracking.findUnique({
+    where: { id },
+    include: { checklistItems: { where: { active: true } } },
+  });
+  if (!tracking || tracking.userId !== userId || !tracking.active) {
+    throw new Error("Sem permissão pra alterar esse medicamento");
+  }
+
+  const horarios = [...new Set(update.horarios)];
+  validateInput({
+    productName: tracking.productName,
+    codigoProduto: tracking.codigoProduto,
+    purchaseDate: tracking.purchaseDate.toISOString().slice(0, 10),
+    totalUnits: update.totalUnits,
+    unitsPerDose: update.unitsPerDose,
+    horarios,
+    treatmentDays: update.treatmentDays,
+  });
+
+  const { desativar, criar } = diffHorarios(tracking.checklistItems, horarios);
+
+  await prisma.$transaction(async (tx) => {
+    await tx.medicationTracking.update({
+      where: { id },
+      data: {
+        totalUnits: update.totalUnits,
+        unitsPerDose: update.unitsPerDose,
+        treatmentDays: update.treatmentDays,
+      },
+    });
+    if (desativar.length > 0) {
+      await tx.careChecklistItem.updateMany({
+        where: { id: { in: desativar } },
+        data: { active: false },
+      });
+    }
+    for (const horario of criar) {
+      await tx.careChecklistItem.create({
+        data: {
+          userId,
+          title: tracking.productName,
+          category: "MEDICACAO",
+          timeOfDay: horario,
+          daysOfWeek: [],
+          medicationTrackingId: id,
+        },
+      });
+    }
   });
 }
 

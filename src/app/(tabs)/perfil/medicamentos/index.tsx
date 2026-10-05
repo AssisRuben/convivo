@@ -4,6 +4,8 @@ import { ActivityIndicator, FlatList, Pressable, Text, View } from "react-native
 import { Ionicons } from "@expo/vector-icons";
 import { apiFetch } from "@/lib/api";
 import { showAlert } from "@/lib/alert";
+import { invalidateCached } from "@/lib/tabDataCache";
+import { HOME_CACHE_KEY, ROTINA_CACHE_KEY } from "@/lib/tabPrefetch";
 
 type ApiMedicationTracking = {
   id: string;
@@ -13,6 +15,8 @@ type ApiMedicationTracking = {
   totalUnits: number;
   unitsPerDose: number;
   horarios: string[];
+  /** null = uso contínuo (ausente em servidor antigo). */
+  treatmentDays?: number | null;
   dosesTaken: number;
   estimatedRunOutDate: string;
   daysUntilRunOut: number;
@@ -63,7 +67,12 @@ export default function MedicamentosScreen() {
               method: "DELETE",
             });
             const data = await res.json();
-            if (res.ok) setItems(data.items ?? []);
+            if (res.ok) {
+              setItems(data.items ?? []);
+              // os horários dele saem da Home e da Rotina
+              invalidateCached(HOME_CACHE_KEY);
+              invalidateCached(ROTINA_CACHE_KEY);
+            }
           } finally {
             setBusyId(null);
           }
@@ -102,7 +111,23 @@ export default function MedicamentosScreen() {
                 <Text className="mt-0.5 text-xs text-navy/50">
                   {item.horarios.join(" · ")} — {item.unitsPerDose}un/dose
                 </Text>
+                <Text className="mt-0.5 text-xs text-navy/50">
+                  {item.treatmentDays
+                    ? `Tratamento de ${item.treatmentDays} dia${item.treatmentDays > 1 ? "s" : ""}`
+                    : "Uso contínuo"}
+                </Text>
               </View>
+              <Pressable
+                onPress={() =>
+                  router.push({ pathname: "/perfil/medicamentos/[id]/editar", params: { id: item.id } })
+                }
+                disabled={busyId === item.id}
+                accessibilityLabel="Editar medicamento"
+                hitSlop={12}
+                className="p-2.5"
+              >
+                <Ionicons name="create-outline" size={16} color="#0b1e3d" />
+              </Pressable>
               <Pressable
                 onPress={() => handleRemove(item)}
                 disabled={busyId === item.id}

@@ -21,7 +21,7 @@ import { CARE_CATEGORIES, CARE_CATEGORY_META, WEEKDAY_LABELS } from "@/constants
 import { showAlert } from "@/lib/alert";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { TimeField } from "@/components/TimeField";
-import { ROTINA_CACHE_KEY, fetchRotina } from "@/lib/tabPrefetch";
+import { HOME_CACHE_KEY, ROTINA_CACHE_KEY, fetchRotina } from "@/lib/tabPrefetch";
 import { getCached, invalidateCached, loadCached, setCached } from "@/lib/tabDataCache";
 
 function readCachedRotina() {
@@ -82,7 +82,16 @@ export default function RotinaScreen() {
         return;
       }
 
-      if (loadedOnce.current) return;
+      if (loadedOnce.current) {
+        // A Home marca dose tomada direto (mesma conclusão daqui) e grava
+        // a lista nova no cache — ao voltar pra cá, adota o que estiver lá
+        // em vez de mostrar o status antigo.
+        // Sem cache = alguém invalidou (ex.: edição de remédio) — busca de novo.
+        const cached = readCachedRotina();
+        if (cached) setItems(cached.items ?? []);
+        else load();
+        return;
+      }
       loadedOnce.current = true;
       if (hadCacheOnMount.current) return; // já veio do cache/prefetch
       load();
@@ -109,6 +118,9 @@ export default function RotinaScreen() {
   async function toggleComplete(item: ApiChecklistItem) {
     const nextCompleted = !item.completedToday;
     latestToggleIntent.current.set(item.id, nextCompleted);
+    // A Home lista as doses do dia com o mesmo status — ela refaz a busca
+    // na próxima vez que ganhar foco.
+    invalidateCached(HOME_CACHE_KEY);
 
     setItems((prev) =>
       prev.map((i) => (i.id === item.id ? { ...i, completedToday: nextCompleted } : i))
@@ -164,6 +176,7 @@ export default function RotinaScreen() {
       if (!res.ok) throw new Error(data?.error ?? "Não foi possível salvar");
       setItems(data.items ?? []);
       setForm(null);
+      invalidateCached(HOME_CACHE_KEY);
     } catch (error) {
       showAlert("Erro ao salvar", error instanceof Error ? error.message : undefined);
     } finally {
@@ -185,6 +198,7 @@ export default function RotinaScreen() {
           try {
             const res = await apiFetch(`/api/mobile/rotina/${item.id}`, { method: "DELETE" });
             if (!res.ok) throw new Error();
+            invalidateCached(HOME_CACHE_KEY);
           } catch {
             setItems((prev) =>
               prev.some((i) => i.id === item.id)

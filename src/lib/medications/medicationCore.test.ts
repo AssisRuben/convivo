@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   estimateRunOutDate,
   daysBetween,
+  diffHorarios,
+  monthlyDoseSummary,
+  supplyCoversTreatment,
+  treatmentProgress,
   validateInput,
   type MedicationTrackingInput,
 } from "@/lib/medications/medicationCore";
@@ -125,5 +129,133 @@ describe("daysBetween", () => {
   it("30 dias entre compra e estimativa de acabar, batendo com estimateRunOutDate", () => {
     const runOut = estimateRunOutDate(PURCHASE, 60, 1, 2);
     expect(daysBetween(PURCHASE, runOut)).toBe(30);
+  });
+});
+
+const d = (iso: string) => new Date(`${iso}T00:00:00Z`);
+
+describe("validateInput — duração do tratamento", () => {
+  it("aceita uso contínuo (null/ausente) e tratamento de 1 a 365 dias", () => {
+    expect(() => validateInput({ ...VALID_INPUT, treatmentDays: null })).not.toThrow();
+    expect(() => validateInput({ ...VALID_INPUT, treatmentDays: 7 })).not.toThrow();
+    expect(() => validateInput({ ...VALID_INPUT, treatmentDays: 365 })).not.toThrow();
+  });
+
+  it("rejeita zero, negativo, fração e mais de 365", () => {
+    for (const treatmentDays of [0, -3, 2.5, 366]) {
+      expect(() => validateInput({ ...VALID_INPUT, treatmentDays })).toThrow(
+        "Duração do tratamento inválida"
+      );
+    }
+  });
+});
+
+describe("treatmentProgress", () => {
+  it("uso contínuo não tem dia de tratamento", () => {
+    expect(treatmentProgress(d("2026-10-01"), null, d("2026-10-05"))).toBeNull();
+  });
+
+  it("dia da compra é o dia 1; 4 dias depois é o dia 5 de 7", () => {
+    expect(treatmentProgress(d("2026-10-01"), 7, d("2026-10-01"))).toEqual({
+      day: 1,
+      totalDays: 7,
+      ended: false,
+    });
+    expect(treatmentProgress(d("2026-10-01"), 7, d("2026-10-05"))).toEqual({
+      day: 5,
+      totalDays: 7,
+      ended: false,
+    });
+  });
+
+  it("último dia ainda vale; o dia seguinte já terminou", () => {
+    expect(treatmentProgress(d("2026-10-01"), 7, d("2026-10-07"))?.ended).toBe(false);
+    expect(treatmentProgress(d("2026-10-01"), 7, d("2026-10-08"))?.ended).toBe(true);
+  });
+
+  it("ignora o horário gravado na data da compra", () => {
+    const compraComHora = new Date("2026-10-01T15:30:00Z");
+    expect(treatmentProgress(compraComHora, 7, d("2026-10-05"))?.day).toBe(5);
+  });
+});
+
+describe("monthlyDoseSummary", () => {
+  it("conta do dia 1 do mês até hoje: 5 dias x 2 doses = 10 previstas", () => {
+    const tomadas = [d("2026-10-01"), d("2026-10-01"), d("2026-10-02"), d("2026-10-05")];
+    expect(monthlyDoseSummary(d("2026-08-10"), 2, tomadas, d("2026-10-05"))).toMatchObject({
+      taken: 4,
+      expected: 10,
+    });
+  });
+
+  it("compra no meio do mês: começa a contar no dia da compra", () => {
+    expect(monthlyDoseSummary(d("2026-10-04"), 1, [d("2026-10-04")], d("2026-10-05"))).toMatchObject({
+      taken: 1,
+      expected: 2,
+    });
+  });
+
+  it("ignora doses do mês anterior e de antes da compra", () => {
+    const tomadas = [d("2026-09-30"), d("2026-10-03"), d("2026-10-05")];
+    expect(monthlyDoseSummary(d("2026-10-04"), 1, tomadas, d("2026-10-05"))).toMatchObject({
+      taken: 1,
+      expected: 2,
+    });
+  });
+
+  it("compra no futuro (data errada) não gera previsão negativa", () => {
+    expect(monthlyDoseSummary(d("2026-10-20"), 1, [], d("2026-10-05")).expected).toBe(0);
+  });
+});
+
+describe("supplyCoversTreatment", () => {
+  it("uso contínuo sempre precisa de recompra", () => {
+    expect(supplyCoversTreatment(d("2026-10-01"), null, d("2026-10-05"), 1)).toBe(false);
+  });
+
+  it("tratamento que termina antes do remédio acabar não pede recompra", () => {
+    // dia 5 de 7 -> faltam 2 dias; remédio acaba em 3
+    expect(supplyCoversTreatment(d("2026-10-01"), 7, d("2026-10-05"), 3)).toBe(true);
+  });
+
+  it("remédio acaba antes do fim do tratamento: precisa recomprar", () => {
+    // dia 5 de 10 -> faltam 5 dias; remédio acaba em 1
+    expect(supplyCoversTreatment(d("2026-10-01"), 10, d("2026-10-05"), 1)).toBe(false);
+  });
+
+  it("tratamento já encerrado não pede recompra", () => {
+    expect(supplyCoversTreatment(d("2026-09-01"), 7, d("2026-10-05"), -20)).toBe(true);
+  });
+});
+
+describe("diffHorarios — edição da ficha x itens da Rotina", () => {
+  const atuais = [
+    { id: "i8", timeOfDay: "08:00" },
+    { id: "i20", timeOfDay: "20:00" },
+  ];
+
+  it("horário mantido preserva o item (histórico de tomado fica)", () => {
+    expect(diffHorarios(atuais, ["08:00", "20:00"])).toEqual({
+      manter: ["i8", "i20"],
+      desativar: [],
+      criar: [],
+    });
+  });
+
+  it("troca 20:00 por 14:00: desativa um e cria outro", () => {
+    expect(diffHorarios(atuais, ["08:00", "14:00"])).toEqual({
+      manter: ["i8"],
+      desativar: ["i20"],
+      criar: ["14:00"],
+    });
+  });
+
+  it("item duplicado no mesmo horário: fica só um", () => {
+    const comDuplicado = [...atuais, { id: "i8b", timeOfDay: "08:00" }];
+    expect(diffHorarios(comDuplicado, ["08:00"])).toEqual({
+      manter: ["i8"],
+      desativar: ["i20", "i8b"],
+      criar: [],
+    });
   });
 });

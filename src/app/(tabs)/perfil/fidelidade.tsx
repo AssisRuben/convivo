@@ -18,7 +18,9 @@ function formatPrice(cents: number): string {
  * Expo Go trava o app (crash confirmado batendo no dispositivo real,
  * `libworklets.so` na pilha); `Animated` do core nunca teve esse problema.
  */
-function StampSlot({ index, filled }: { index: number; filled: boolean }) {
+const STAMP_SIZE = 56;
+
+function StampSlot({ index, filled, isNext }: { index: number; filled: boolean; isNext: boolean }) {
   const [scale] = useState(() => new Animated.Value(filled ? 0 : 1));
   const [opacity] = useState(() => new Animated.Value(filled ? 0 : 1));
   const [rotate] = useState(() => new Animated.Value(filled ? -12 : 0));
@@ -55,40 +57,101 @@ function StampSlot({ index, filled }: { index: number; filled: boolean }) {
   };
 
   if (!filled) {
+    // O próximo a conquistar ganha contorno tracejado na cor da marca —
+    // mostra "falta este" sem precisar ler o texto embaixo.
     return (
-      <View className="items-center gap-1">
-        <View className="h-14 w-14 items-center justify-center rounded-full border border-navy/10 bg-navy/[0.04]">
-          <Text className="text-sm font-semibold text-navy/25">{index + 1}</Text>
-        </View>
+      <View
+        accessibilityLabel={isNext ? `Selo ${index + 1}, o próximo` : `Selo ${index + 1}, vazio`}
+        style={{
+          width: STAMP_SIZE,
+          height: STAMP_SIZE,
+          borderRadius: STAMP_SIZE / 2,
+          alignItems: "center",
+          justifyContent: "center",
+          borderWidth: isNext ? 2 : 1,
+          borderStyle: isNext ? "dashed" : "solid",
+          borderColor: isNext ? "rgba(230,57,70,0.55)" : "rgba(11,30,61,0.10)",
+          backgroundColor: isNext ? "rgba(230,57,70,0.05)" : "rgba(11,30,61,0.04)",
+        }}
+      >
+        <Text
+          style={{
+            fontSize: 15,
+            fontWeight: "700",
+            color: isNext ? "#e63946" : "rgba(11,30,61,0.25)",
+          }}
+        >
+          {index + 1}
+        </Text>
       </View>
     );
   }
 
+  // Moeda dourada: a sombra fica na camada de fora (overflow cortaria a
+  // sombra no iOS) e o degradê, o aro e o brilho na de dentro, recortados
+  // no círculo. Tudo em `style` explícito — tamanho e centralização não
+  // podem depender de className num componente de fora do RN.
   return (
-    <View className="items-center gap-1">
-      <Animated.View
-        style={[
-          animatedStyle,
-          {
-            shadowColor: "#b45309",
-            shadowOffset: { width: 0, height: 3 },
-            shadowOpacity: 0.35,
-            shadowRadius: 5,
-            elevation: 4,
-          },
-        ]}
-        className="h-14 w-14 overflow-hidden rounded-full"
+    <Animated.View
+      accessibilityLabel={`Selo ${index + 1}, conquistado`}
+      style={[
+        animatedStyle,
+        {
+          width: STAMP_SIZE,
+          height: STAMP_SIZE,
+          borderRadius: STAMP_SIZE / 2,
+          shadowColor: "#b45309",
+          shadowOffset: { width: 0, height: 3 },
+          shadowOpacity: 0.35,
+          shadowRadius: 5,
+          elevation: 4,
+        },
+      ]}
+    >
+      <LinearGradient
+        colors={["#fef3c7", "#fbbf24", "#d97706", "#b45309"]}
+        locations={[0, 0.35, 0.75, 1]}
+        start={{ x: 0.15, y: 0 }}
+        end={{ x: 0.85, y: 1 }}
+        style={{
+          flex: 1,
+          borderRadius: STAMP_SIZE / 2,
+          overflow: "hidden",
+          alignItems: "center",
+          justifyContent: "center",
+          borderWidth: 1.5,
+          borderColor: "#fde68a",
+        }}
       >
-        <LinearGradient
-          colors={["#fde68a", "#f59e0b", "#b45309"]}
-          start={{ x: 0.2, y: 0 }}
-          end={{ x: 0.8, y: 1 }}
-          className="h-full w-full items-center justify-center border border-[#fde68a]/60"
-        >
-          <Ionicons name="checkmark" size={22} color="#3a2408" />
-        </LinearGradient>
-      </Animated.View>
-    </View>
+        {/* aro interno, como a borda cunhada de uma moeda */}
+        <View
+          style={{
+            position: "absolute",
+            top: 4,
+            left: 4,
+            right: 4,
+            bottom: 4,
+            borderRadius: STAMP_SIZE / 2 - 4,
+            borderWidth: 1,
+            borderColor: "rgba(255,255,255,0.55)",
+          }}
+        />
+        {/* brilho no canto superior */}
+        <View
+          style={{
+            position: "absolute",
+            top: 7,
+            left: 12,
+            width: 18,
+            height: 9,
+            borderRadius: 9,
+            backgroundColor: "rgba(255,255,255,0.45)",
+            transform: [{ rotate: "-20deg" }],
+          }}
+        />
+        <Ionicons name="checkmark-sharp" size={28} color="#5b3409" />
+      </LinearGradient>
+    </Animated.View>
   );
 }
 
@@ -200,7 +263,7 @@ export default function FidelidadeScreen() {
 
       <View className="mt-6 flex-row flex-wrap justify-center gap-3 rounded-2xl bg-card p-5 shadow-sm">
         {slots.map((filled, i) => (
-          <StampSlot key={i} index={i} filled={filled} />
+          <StampSlot key={i} index={i} filled={filled} isNext={i === progress.stampsFilled} />
         ))}
       </View>
 

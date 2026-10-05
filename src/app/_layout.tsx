@@ -12,6 +12,14 @@ import { ProfileDrawer } from "@/components/ProfileDrawer";
 import { OnboardingTour } from "@/components/OnboardingTour";
 import { CartProvider } from "@/lib/cartState";
 import { initMonitoring, Sentry } from "@/lib/monitoring";
+import { LinearGradient } from "expo-linear-gradient";
+import { cssInterop } from "nativewind";
+
+// LinearGradient é de fora do React Native — sem registrar no NativeWind,
+// `className` nele era ignorado em silêncio (cantos arredondados, tamanho,
+// padding e alinhamento sumiam: era o que deixava o selo do Cartão
+// Fidelidade pela metade e o cartão com canto reto).
+cssInterop(LinearGradient, { className: "style" });
 
 SplashScreen.preventAutoHideAsync();
 

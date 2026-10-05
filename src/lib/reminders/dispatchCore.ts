@@ -1,7 +1,12 @@
 import { prisma } from "@/lib/prisma";
 import { todayDate } from "@/lib/timeline/format";
 import { sendPushToUser } from "@/lib/push/expoPush";
-import { estimateRunOutDate, daysBetween } from "@/lib/medications/medicationCore";
+import {
+  estimateRunOutDate,
+  daysBetween,
+  supplyCoversTreatment,
+  treatmentProgress,
+} from "@/lib/medications/medicationCore";
 import { dueTipIndexes } from "@/lib/goals/goalCore";
 import { pickTipForIndex } from "@/lib/goals/goalTips";
 import { isNextChapterAvailable as isNextWisdomChapterAvailable } from "@/lib/wisdom/wisdomCore";
@@ -53,12 +58,19 @@ export async function dispatchDueRoutineReminders(now: Date = new Date()): Promi
     include: {
       reminderDispatches: { where: { date: today } },
       completions: { where: { date: today } },
+      medicationTracking: { select: { purchaseDate: true, treatmentDays: true } },
     },
   });
 
   let sent = 0;
   for (const item of items) {
     if (item.reminderDispatches.length > 0) continue;
+    // Tratamento com prazo (ex.: antibiótico de 7 dias) que já terminou —
+    // para de lembrar sozinho, sem a pessoa precisar apagar a ficha.
+    const tracking = item.medicationTracking;
+    if (tracking && treatmentProgress(tracking.purchaseDate, tracking.treatmentDays, today)?.ended) {
+      continue;
+    }
     // Já marcado como feito hoje (ver toggleComplete em (tabs)/rotina.tsx)
     // — lembrete existe pra não deixar esquecer, não faz sentido avisar de
     // novo depois que a pessoa já confirmou que fez.
@@ -104,6 +116,8 @@ export async function dispatchMedicationRepurchaseAlerts(now: Date = new Date())
       dosesPerDay
     );
     if (daysBetween(today, runOutDate) !== 1) continue;
+    // tratamento com prazo que termina junto com o remédio: nada a recomprar
+    if (supplyCoversTreatment(tracking.purchaseDate, tracking.treatmentDays, today, 1)) continue;
 
     await sendPushToUser(tracking.userId, {
       title: "Seu remédio está acabando 🔔",
