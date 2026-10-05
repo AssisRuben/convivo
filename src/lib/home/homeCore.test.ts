@@ -9,8 +9,13 @@ vi.mock("@/lib/prisma", () => ({
   prisma: {
     careChecklistItem: { findMany: (...args: unknown[]) => findItems(...args) },
     medicationTracking: { findMany: (...args: unknown[]) => findTrackings(...args) },
+    // resumo de Saúde da Home (sem medição)
+    healthMeasurement: { findFirst: async () => null },
   },
 }));
+// resumos de trilhas de leitura da Home — fora do escopo destes testes
+vi.mock("@/lib/wisdom/wisdomCore", () => ({ getWisdomTopicsSummaryForUser: async () => [] }));
+vi.mock("@/lib/faith/faithCore", () => ({ getFaithBooksSummaryForUser: async () => [] }));
 vi.mock("@/lib/loyalty/loyaltyCore", () => ({
   getLoyaltyProgress: async () => ({ stampsFilled: 0, stampsTotal: 10, totalRewardCents: 0 }),
 }));

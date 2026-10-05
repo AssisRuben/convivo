@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { todayDate } from "@/lib/timeline/format";
+import { zonedParts } from "@/lib/timeZone";
 import { sendPushToUser } from "@/lib/push/expoPush";
 import {
   estimateRunOutDate,
@@ -12,30 +13,24 @@ import { pickTipForIndex } from "@/lib/goals/goalTips";
 import { isNextChapterAvailable as isNextWisdomChapterAvailable } from "@/lib/wisdom/wisdomCore";
 import { isNextChapterAvailable as isNextFaithChapterAvailable } from "@/lib/faith/faithCore";
 import { getReadingChapterCount } from "@/lib/reading/readingContent";
-import { WISDOM_BOOK_SLUG } from "@/lib/reading/types";
 
 // O disparo não roda exatamente no minuto do horário cadastrado (depende
 // de com que frequência o cron externo chama essa rota) — essa tolerância
 // evita perder o lembrete se o cron rodar, por exemplo, a cada 5 minutos.
 const REMINDER_TOLERANCE_MINUTES = 5;
 
-// Horários de lembrete (timeOfDay) são em horário de Brasília, mas o
-// servidor roda em container (UTC) — getHours()/getDay() direto comparavam
-// o horário cadastrado com a hora UTC, então um lembrete das 13:15
-// disparava às 10:15 de Brasília e nunca no horário certo. O Brasil não tem
-// horário de verão desde 2019, então UTC-3 fixo é seguro.
-const BRASILIA_OFFSET_MS = 3 * 60 * 60 * 1000;
-
-export function brasiliaClock(date: Date): { minutes: number; weekday: number } {
-  const shifted = new Date(date.getTime() - BRASILIA_OFFSET_MS);
-  return {
-    minutes: shifted.getUTCHours() * 60 + shifted.getUTCMinutes(),
-    weekday: shifted.getUTCDay(),
-  };
+// Horários (timeOfDay) são no relógio local da pessoa, mas o servidor roda
+// em UTC — getHours()/getDay() direto comparavam com a hora UTC (um
+// lembrete das 13:15 disparava às 10:15). localClock usa o fuso do celular
+// da requisição (lib/timeZone.ts); no cron, que não vem de um celular, cai
+// no fuso de Brasília.
+export function localClock(date: Date): { minutes: number; weekday: number } {
+  const { hour, minute, weekday } = zonedParts(date);
+  return { minutes: hour * 60 + minute, weekday };
 }
 
 function minutesSinceMidnight(date: Date): number {
-  return brasiliaClock(date).minutes;
+  return localClock(date).minutes;
 }
 
 function parseTimeOfDay(value: string): number {
@@ -51,7 +46,7 @@ function parseTimeOfDay(value: string): number {
  */
 export async function dispatchDueRoutineReminders(now: Date = new Date()): Promise<number> {
   const today = todayDate();
-  const { minutes: nowMinutes, weekday } = brasiliaClock(now);
+  const { minutes: nowMinutes, weekday } = localClock(now);
 
   const items = await prisma.careChecklistItem.findMany({
     where: { active: true, timeOfDay: { not: null } },
@@ -177,10 +172,10 @@ export async function dispatchDueGoalTips(now: Date = new Date()): Promise<numbe
 const DAILY_READING_REMINDER_MINUTES = 8 * 60; // 08:00
 
 /**
- * Avisa quem já começou a trilha (tem WisdomProgress, ou seja, já leu
- * pelo menos o capítulo 1) e ainda não terminou, que o capítulo de hoje
- * está liberado. Idempotente via lastNotifiedDate — não manda de novo no
- * mesmo dia se o cron rodar mais de uma vez.
+ * Avisa quem já começou algum tópico (tem WisdomProgress, ou seja, já leu
+ * pelo menos o capítulo 1 dele) e ainda não terminou, que o capítulo de
+ * hoje está liberado. Idempotente via lastNotifiedDate — não manda de novo
+ * no mesmo dia se o cron rodar mais de uma vez.
  */
 export async function dispatchDueWisdomReminders(now: Date = new Date()): Promise<number> {
   if (Math.abs(minutesSinceMidnight(now) - DAILY_READING_REMINDER_MINUTES) > REMINDER_TOLERANCE_MINUTES) {
@@ -188,16 +183,20 @@ export async function dispatchDueWisdomReminders(now: Date = new Date()): Promis
   }
 
   const today = todayDate();
-  const totalChapters = await getReadingChapterCount(WISDOM_BOOK_SLUG);
+  // Um lembrete por USUÁRIO, não por tópico — se qualquer tópico tiver
+  // capítulo disponível hoje, avisa uma vez só (evita duplicar
+  // notificação quando o usuário lê mais de um tópico em paralelo).
   const rows = await prisma.wisdomProgress.findMany({
-    where: {
-      chaptersRead: { lt: totalChapters },
-      OR: [{ lastNotifiedDate: null }, { lastNotifiedDate: { not: today } }],
-    },
+    where: { OR: [{ lastNotifiedDate: null }, { lastNotifiedDate: { not: today } }] },
   });
 
+  const notifiedUserIds = new Set<string>();
   let sent = 0;
   for (const row of rows) {
+    if (notifiedUserIds.has(row.userId)) continue;
+    // capítulos do tópico vêm do banco (ReadingBook kind WISDOM, slug = topicSlug)
+    const totalChapters = await getReadingChapterCount(row.topicSlug);
+    if (totalChapters === 0 || row.chaptersRead >= totalChapters) continue;
     if (!isNextWisdomChapterAvailable(row.chaptersRead, row.lastReadDate, today, totalChapters)) continue;
 
     await sendPushToUser(row.userId, {
@@ -205,8 +204,9 @@ export async function dispatchDueWisdomReminders(now: Date = new Date()): Promis
       body: "O capítulo de hoje já está liberado — leva menos de 5 minutos.",
       data: { screen: "pilulas-sabedoria" },
     });
+    notifiedUserIds.add(row.userId);
     await prisma.wisdomProgress.update({
-      where: { userId: row.userId },
+      where: { userId_topicSlug: { userId: row.userId, topicSlug: row.topicSlug } },
       data: { lastNotifiedDate: today },
     });
     sent += 1;

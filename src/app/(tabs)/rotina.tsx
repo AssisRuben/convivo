@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -15,6 +16,7 @@ import {
   apiFetch,
   type ApiCareCategory,
   type ApiChecklistItem,
+  type ApiRoutineItemDetail,
   type RoutineItemInput,
 } from "@/lib/api";
 import { CARE_CATEGORIES, CARE_CATEGORY_META, WEEKDAY_LABELS } from "@/constants/careCategories";
@@ -22,10 +24,12 @@ import { showAlert } from "@/lib/alert";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { TimeField } from "@/components/TimeField";
 import { HOME_CACHE_KEY, ROTINA_CACHE_KEY, fetchRotina } from "@/lib/tabPrefetch";
+import { CelebrationModal } from "@/components/CelebrationModal";
+import { RotinaCompleteToast } from "@/components/RotinaCompleteToast";
 import { getCached, invalidateCached, loadCached, setCached } from "@/lib/tabDataCache";
 
 function readCachedRotina() {
-  return getCached<{ items: ApiChecklistItem[] }>(ROTINA_CACHE_KEY);
+  return getCached<{ items: ApiChecklistItem[]; streakDays: number }>(ROTINA_CACHE_KEY);
 }
 
 type FormState = {
@@ -44,13 +48,38 @@ const EMPTY_FORM: FormState = {
   daysOfWeek: [],
 };
 
+/** "há 2h30", "amanhã", "em 3 dias" — pra caber no modal de detalhe sem números soltos. */
+function formatMinutesUntil(daysAhead: number, minutesUntil: number): string {
+  if (daysAhead === 0 && minutesUntil < 0) {
+    const overdue = -minutesUntil;
+    const h = Math.floor(overdue / 60);
+    const m = overdue % 60;
+    return `Atrasado hoje há ${h > 0 ? `${h}h` : ""}${m > 0 ? `${m}min` : h > 0 ? "" : "menos de 1min"}`;
+  }
+  if (daysAhead === 0) {
+    const h = Math.floor(minutesUntil / 60);
+    const m = minutesUntil % 60;
+    if (h === 0 && m === 0) return "Agora";
+    return `Em ${h > 0 ? `${h}h` : ""}${m > 0 ? `${m}min` : ""}`;
+  }
+  if (daysAhead === 1) return "Amanhã";
+  return `Em ${daysAhead} dias`;
+}
+
 export default function RotinaScreen() {
+  const router = useRouter();
   const [items, setItems] = useState<ApiChecklistItem[]>(
     () => readCachedRotina()?.items ?? []
   );
+  const [streakDays, setStreakDays] = useState(() => readCachedRotina()?.streakDays ?? 0);
   const [loading, setLoading] = useState(() => readCachedRotina() === undefined);
   const [form, setForm] = useState<FormState | null>(null);
   const [saving, setSaving] = useState(false);
+  const [detailItem, setDetailItem] = useState<ApiChecklistItem | null>(null);
+  const [detail, setDetail] = useState<ApiRoutineItemDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [celebration, setCelebration] = useState<number | null>(null);
+  const [completeToast, setCompleteToast] = useState<string | null>(null);
   const loadedOnce = useRef(false);
   const hadCacheOnMount = useRef(readCachedRotina() !== undefined);
   // "completedToday" é por data — sem isso, um app que fica dias sem ser
@@ -64,6 +93,7 @@ export default function RotinaScreen() {
     try {
       const data = await loadCached(ROTINA_CACHE_KEY, fetchRotina);
       setItems(data.items ?? []);
+      setStreakDays(data.streakDays ?? 0);
     } finally {
       setLoading(false);
     }
@@ -88,8 +118,10 @@ export default function RotinaScreen() {
         // em vez de mostrar o status antigo.
         // Sem cache = alguém invalidou (ex.: edição de remédio) — busca de novo.
         const cached = readCachedRotina();
-        if (cached) setItems(cached.items ?? []);
-        else load();
+        if (cached) {
+          setItems(cached.items ?? []);
+          setStreakDays(cached.streakDays ?? 0);
+        } else load();
         return;
       }
       loadedOnce.current = true;
@@ -102,9 +134,9 @@ export default function RotinaScreen() {
   // mutação (completar, salvar, remover) sem precisar sincronizar em
   // cada handler.
   useEffect(() => {
-    if (!loading) setCached(ROTINA_CACHE_KEY, { items });
+    if (!loading) setCached(ROTINA_CACHE_KEY, { items, streakDays });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items]);
+  }, [items, streakDays]);
 
   // Marca/desmarca na hora, sem esperar o servidor — o banco fica longe
   // (Supabase remota) e travar o clique até a resposta voltar tornava a
@@ -117,6 +149,9 @@ export default function RotinaScreen() {
 
   async function toggleComplete(item: ApiChecklistItem) {
     const nextCompleted = !item.completedToday;
+    // Nenhum outro cuidado feito hoje ainda — essa marcação é a primeira
+    // do dia, vale comemorar (só quando está marcando, não desmarcando).
+    const isFirstOfDay = nextCompleted && items.every((i) => i.id === item.id || !i.completedToday);
     latestToggleIntent.current.set(item.id, nextCompleted);
     // A Home lista as doses do dia com o mesmo status — ela refaz a busca
     // na próxima vez que ganhar foco.
@@ -134,6 +169,14 @@ export default function RotinaScreen() {
       const data = await res.json();
       if (latestToggleIntent.current.get(item.id) === nextCompleted) {
         setItems(data.items ?? []);
+        setStreakDays(data.streakDays ?? 0);
+        if (nextCompleted) {
+          // A primeira do dia ganha a comemoração grande (streak, com
+          // confete); as seguintes só o toast leve — senão marcar várias
+          // atividades seguidas vira uma sequência cansativa de telas.
+          if (isFirstOfDay) setCelebration(data.streakDays ?? 0);
+          else setCompleteToast(item.title);
+        }
       }
     } catch {
       if (latestToggleIntent.current.get(item.id) === nextCompleted) {
@@ -142,6 +185,18 @@ export default function RotinaScreen() {
         );
         showAlert("Não foi possível salvar", "Sua conexão pode estar instável — tente de novo.");
       }
+    }
+  }
+
+  async function openDetail(item: ApiChecklistItem) {
+    setDetailItem(item);
+    setDetail(null);
+    setDetailLoading(true);
+    try {
+      const res = await apiFetch(`/api/mobile/rotina/${item.id}/detalhes`);
+      if (res.ok) setDetail(await res.json());
+    } finally {
+      setDetailLoading(false);
     }
   }
 
@@ -185,7 +240,24 @@ export default function RotinaScreen() {
   }
 
   function handleRemove(item: ApiChecklistItem) {
-    showAlert("Remover cuidado", `Remover "${item.title}" da sua rotina?`, [
+    // Apagar um item vinculado tem efeito fora da Rotina — avisa antes, em
+    // vez de a meta expirar ou a previsão do remédio mudar sem explicação.
+    const warnings: string[] = [];
+    if (item.medicationTrackingId) {
+      warnings.push(
+        "Essa é uma dose de remédio. Sem ela, a previsão de quando o remédio acaba passa a contar uma dose a menos por dia. Pra parar o remédio inteiro, use Menu > Medicamentos."
+      );
+    }
+    if (item.activeGoals.length > 0) {
+      const names = item.activeGoals.map((g) => `"${g.title}"`).join(", ");
+      warnings.push(`A meta ${names} acompanha esse cuidado e vai parar de contar progresso.`);
+    }
+    const message =
+      warnings.length > 0
+        ? `${warnings.join("\n\n")}\n\nRemover "${item.title}" mesmo assim?`
+        : `Remover "${item.title}" da sua rotina?`;
+
+    showAlert("Remover cuidado", message, [
       { text: "Cancelar", style: "cancel" },
       {
         text: "Remover",
@@ -216,10 +288,91 @@ export default function RotinaScreen() {
     return <LoadingScreen />;
   }
 
-  const grouped = CARE_CATEGORIES.map((category) => ({
-    category,
-    items: items.filter((item) => item.category === category),
-  })).filter((group) => group.items.length > 0);
+  // Duas listas em vez de uma só agrupada por categoria: o que falta fazer
+  // fica em cima ("Bora fazer o certo?"), o que já foi feito hoje desce
+  // pra baixo ("Aí tu deu aula!") assim que marcado — o movimento entre
+  // as duas é o próprio feedback de progresso do dia.
+  // Item vinculado: mostra o efeito da edição fora da Rotina (a meta guarda
+  // o histórico da agenda, então mudar os dias só vale daqui pra frente).
+  const editingItem = form?.id ? items.find((i) => i.id === form.id) : undefined;
+  const editingLinkNote = editingItem
+    ? [
+        editingItem.activeGoals.length > 0 &&
+          "Esse cuidado é acompanhado por uma meta. Se mudar os dias, a meta passa a contar a agenda nova a partir de hoje — o que já passou continua como era.",
+        editingItem.medicationTrackingId &&
+          "Essa é uma dose de remédio. Pra mudar quantidade ou posologia, use Menu > Medicamentos.",
+      ]
+        .filter(Boolean)
+        .join(" ")
+    : "";
+
+  const pendingItems = items.filter((item) => !item.completedToday);
+  const doneItems = items.filter((item) => item.completedToday);
+
+  function renderItemRow(item: ApiChecklistItem) {
+    const meta = CARE_CATEGORY_META[item.category];
+    return (
+      <View key={item.id} className="flex-row items-center gap-3 rounded-2xl bg-card p-3 shadow-sm">
+        <Pressable
+          onPress={() => toggleComplete(item)}
+          className={`h-7 w-7 items-center justify-center rounded-full border-2 ${
+            item.completedToday ? "border-mint bg-mint" : "border-navy/20"
+          }`}
+        >
+          {item.completedToday && <Ionicons name="checkmark" size={16} color="#fff" />}
+        </Pressable>
+
+        <Pressable className="flex-1" onPress={() => openDetail(item)}>
+          <Text
+            className={`text-sm font-medium ${item.completedToday ? "text-navy/40" : "text-navy"}`}
+          >
+            {meta.emoji} {item.title}
+          </Text>
+          <Text className="text-xs text-navy/50">
+            {item.timeOfDay ?? "Sem horário fixo"}
+            {" · "}
+            {item.daysOfWeek.length === 0
+              ? "Todo dia"
+              : item.daysOfWeek.map((d) => WEEKDAY_LABELS[d]).join(", ")}
+          </Text>
+          {(item.medicationTrackingId || item.activeGoals.length > 0) && (
+            <View className="mt-1 flex-row flex-wrap gap-1">
+              {item.medicationTrackingId && (
+                <View className="rounded-full bg-mint/15 px-2 py-0.5">
+                  <Text className="text-[10px] font-semibold text-mint">💊 Remédio</Text>
+                </View>
+              )}
+              {item.activeGoals.length > 0 && (
+                <View className="rounded-full bg-coral/10 px-2 py-0.5">
+                  <Text className="text-[10px] font-semibold text-coral">🎯 Meta</Text>
+                </View>
+              )}
+            </View>
+          )}
+        </Pressable>
+
+        <Pressable
+          onPress={() =>
+            setForm({
+              id: item.id,
+              title: item.title,
+              category: item.category,
+              timeOfDay: item.timeOfDay ?? "",
+              daysOfWeek: item.daysOfWeek,
+            })
+          }
+          accessibilityLabel="Editar rotina"
+          hitSlop={10}
+          className="p-2.5"
+        >
+          <Ionicons name="pencil-outline" size={16} color="#0b1e3d80" />
+        </Pressable>
+        <Pressable onPress={() => handleRemove(item)} accessibilityLabel="Remover rotina" hitSlop={10} className="p-2.5">
+          <Ionicons name="trash-outline" size={16} color="#e63946" />
+        </Pressable>
+      </View>
+    );
+  }
 
   return (
     <KeyboardAvoidingView
@@ -237,6 +390,20 @@ export default function RotinaScreen() {
           <Text className="text-sm font-medium text-mint">Novo cuidado</Text>
         </Pressable>
       </View>
+
+      {streakDays > 0 && (
+        <View className="mb-4 flex-row items-center gap-3 rounded-2xl bg-navy p-4">
+          <View className="h-12 w-12 items-center justify-center rounded-full bg-white/10">
+            <Ionicons name="flame" size={22} color="#f59e0b" />
+          </View>
+          <View className="flex-1">
+            <Text className="text-sm font-semibold text-white">
+              {streakDays} dia{streakDays > 1 ? "s seguidos" : " seguido"} cuidando de você
+            </Text>
+            <Text className="mt-0.5 text-xs text-white/60">Marque pelo menos um cuidado hoje pra manter</Text>
+          </View>
+        </View>
+      )}
 
       {form && (
         <View className="mb-4 gap-3 rounded-2xl bg-card p-4 shadow-sm">
@@ -293,6 +460,12 @@ export default function RotinaScreen() {
           </View>
           <Text className="text-xs text-navy/50">Nenhum dia selecionado = todo dia.</Text>
 
+          {editingLinkNote && (
+            <View className="rounded-xl bg-amber-50 p-3">
+              <Text className="text-xs text-amber-800">{editingLinkNote}</Text>
+            </View>
+          )}
+
           <View className="flex-row gap-2">
             <Pressable
               disabled={saving}
@@ -319,76 +492,132 @@ export default function RotinaScreen() {
         </Text>
       )}
 
-      {grouped.map(({ category, items: catItems }) => {
-        const meta = CARE_CATEGORY_META[category];
-        return (
-          <View key={category} className="mb-4">
-            <Text className="mb-2 text-sm font-semibold text-navy/70">
-              {meta.emoji} {meta.label}
-            </Text>
-            <View className="gap-2">
-              {catItems.map((item) => (
-                <View
-                  key={item.id}
-                  className="flex-row items-center gap-3 rounded-2xl bg-card p-3 shadow-sm"
-                >
-                  <Pressable
-                    onPress={() => toggleComplete(item)}
-                    className={`h-7 w-7 items-center justify-center rounded-full border-2 ${
-                      item.completedToday ? "border-mint bg-mint" : "border-navy/20"
-                    }`}
-                  >
-                    {item.completedToday && <Ionicons name="checkmark" size={16} color="#fff" />}
-                  </Pressable>
+      {items.length > 0 && (
+        <View className="mb-4">
+          <Text className="mb-2 text-sm font-bold text-navy">Bora fazer o certo? 💪</Text>
+          {pendingItems.length === 0 ? (
+            <View className="items-center rounded-2xl bg-card p-5">
+              <Text className="text-sm font-medium text-navy/60">Tudo em dia por aqui! 🎉</Text>
+            </View>
+          ) : (
+            <View className="gap-2">{pendingItems.map(renderItemRow)}</View>
+          )}
+        </View>
+      )}
 
+      {doneItems.length > 0 && (
+        <View className="mb-4">
+          <Text className="mb-2 text-sm font-bold text-navy">Aí tu deu aula! 🎉</Text>
+          <View className="gap-2">{doneItems.map(renderItemRow)}</View>
+        </View>
+      )}
+      </ScrollView>
+
+      <Modal
+        visible={detailItem !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDetailItem(null)}
+      >
+        <Pressable
+          className="flex-1 items-center justify-center bg-black/40 p-6"
+          onPress={() => setDetailItem(null)}
+        >
+          <Pressable className="w-full max-w-sm gap-4 rounded-2xl bg-cream p-5" onPress={() => {}}>
+            {detailLoading || !detail || !detailItem ? (
+              <View className="items-center py-6">
+                <ActivityIndicator color="#0b1e3d" />
+              </View>
+            ) : (
+              <>
+                <Text className="text-lg font-bold text-navy">{detailItem.title}</Text>
+
+                <View className="flex-row items-center gap-3 rounded-2xl bg-card p-4">
+                  <View className="h-11 w-11 items-center justify-center rounded-full bg-coral/10">
+                    <Ionicons name="flame" size={20} color="#e63946" />
+                  </View>
                   <View className="flex-1">
-                    <Text
-                      className={`text-sm font-medium ${
-                        item.completedToday ? "text-navy/40" : "text-navy"
-                      }`}
-                    >
-                      {item.title}
+                    <Text className="text-sm font-semibold text-navy">
+                      {detail.streakDays > 0
+                        ? `${detail.streakDays} dia${detail.streakDays > 1 ? "s" : ""} seguidos`
+                        : "Nenhuma sequência ainda"}
                     </Text>
                     <Text className="text-xs text-navy/50">
-                      {item.timeOfDay ?? "Sem horário fixo"}
-                      {" · "}
-                      {item.daysOfWeek.length === 0
-                        ? "Todo dia"
-                        : item.daysOfWeek.map((d) => WEEKDAY_LABELS[d]).join(", ")}
+                      {detail.streakDays > 0
+                        ? "Continue marcando pra não perder o ritmo"
+                        : "Marque hoje pra começar sua sequência"}
                     </Text>
                   </View>
-
-                  <Pressable
-                    onPress={() =>
-                      setForm({
-                        id: item.id,
-                        title: item.title,
-                        category: item.category,
-                        timeOfDay: item.timeOfDay ?? "",
-                        daysOfWeek: item.daysOfWeek,
-                      })
-                    }
-                    accessibilityLabel="Editar rotina"
-                    hitSlop={10}
-                    className="p-2.5"
-                  >
-                    <Ionicons name="pencil-outline" size={16} color="#0b1e3d80" />
-                  </Pressable>
-                  <Pressable
-                    onPress={() => handleRemove(item)}
-                    accessibilityLabel="Remover rotina"
-                    hitSlop={10}
-                    className="p-2.5"
-                  >
-                    <Ionicons name="trash-outline" size={16} color="#e63946" />
-                  </Pressable>
                 </View>
-              ))}
-            </View>
-          </View>
-        );
-      })}
-      </ScrollView>
+
+                <View className="flex-row items-center gap-3 rounded-2xl bg-card p-4">
+                  <View className="h-11 w-11 items-center justify-center rounded-full bg-mint/15">
+                    <Ionicons name="time" size={20} color="#2ec4b6" />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-sm font-semibold text-navy">
+                      {detail.next
+                        ? formatMinutesUntil(detail.next.daysAhead, detail.next.minutesUntil)
+                        : detail.completedToday
+                          ? "Já feito hoje"
+                          : "Sem horário fixo"}
+                    </Text>
+                    <Text className="text-xs text-navy/50">
+                      {detail.timeOfDay ? `Horário: ${detail.timeOfDay}` : "Marque quando lembrar"}
+                    </Text>
+                  </View>
+                </View>
+
+                {detailItem.activeGoals.length > 0 ? (
+                  <View className="flex-row items-center gap-2 rounded-2xl bg-coral/10 p-3">
+                    <Text className="text-lg">🎯</Text>
+                    <Text className="flex-1 text-xs text-navy/70">
+                      Acompanhado pela meta {detailItem.activeGoals.map((g) => `"${g.title}"`).join(", ")}
+                    </Text>
+                  </View>
+                ) : (
+                  <Pressable
+                    onPress={() => {
+                      const itemId = detailItem.id;
+                      setDetailItem(null);
+                      router.push({ pathname: "/perfil/metas/nova", params: { itemId } });
+                    }}
+                    className="flex-row items-center justify-center gap-2 rounded-full bg-coral/10 py-3"
+                  >
+                    <Ionicons name="flag" size={16} color="#e63946" />
+                    <Text className="text-sm font-semibold text-coral">Criar meta com este cuidado</Text>
+                  </Pressable>
+                )}
+
+                <Pressable
+                  onPress={() => setDetailItem(null)}
+                  className="items-center rounded-full bg-navy py-3"
+                >
+                  <Text className="text-sm font-semibold text-white">Fechar</Text>
+                </Pressable>
+              </>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <CelebrationModal
+        visible={celebration !== null}
+        icon="flame"
+        color="#f59e0b"
+        title="Primeiro cuidado do dia!"
+        message="Você já garantiu mais um dia na sua sequência."
+        streakDays={celebration ?? undefined}
+        streakEmoji="🔥"
+        streakLabel="cuidando de você"
+        onContinue={() => setCelebration(null)}
+      />
+
+      <RotinaCompleteToast
+        visible={completeToast !== null}
+        title={completeToast ?? ""}
+        onDone={() => setCompleteToast(null)}
+      />
     </KeyboardAvoidingView>
   );
 }

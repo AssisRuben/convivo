@@ -7,8 +7,8 @@ import type {
 } from "@/lib/reading/types";
 
 /**
- * Conteúdo de leitura (Pílulas de sabedoria + Gotas de Fé), lido das
- * tabelas ReadingBook/ReadingTopic/ReadingChapter.
+ * Conteúdo de leitura (tópicos de Pílulas de sabedoria + livros de Gotas
+ * de Fé), lido das tabelas ReadingBook/ReadingChapter.
  *
  * Cache em memória por livro: o conteúdo quase nunca muda e é lido a cada
  * abertura de tela, a cada "concluir capítulo" e pelo cron de lembretes —
@@ -32,10 +32,7 @@ async function loadBook(slug: string): Promise<BookFull | null> {
 
   const row = await prisma.readingBook.findFirst({
     where: { slug, active: true },
-    include: {
-      topics: { orderBy: { sortOrder: "asc" } },
-      chapters: { orderBy: { number: "asc" } },
-    },
+    include: { chapters: { orderBy: { number: "asc" } } },
   });
 
   const book: BookFull | null = row
@@ -46,14 +43,6 @@ async function loadBook(slug: string): Promise<BookFull | null> {
         subtitle: row.subtitle,
         icon: row.icon,
         color: row.color,
-        topics: row.topics.map((t) => ({
-          title: t.title,
-          subtitle: t.subtitle,
-          icon: t.icon,
-          color: t.color,
-          firstChapter: t.firstChapter,
-          lastChapter: t.lastChapter,
-        })),
         chapters: row.chapters.map((c) => ({ number: c.number, title: c.title, subtitle: c.subtitle })),
         chapterBlocks: new Map(row.chapters.map((c) => [c.number, c.blocks as ReadingBlock[]])),
       }
@@ -84,7 +73,7 @@ export async function getReadingChapterCount(slug: string): Promise<number> {
   return (await loadBook(slug))?.chapters.length ?? 0;
 }
 
-/** Livros ativos de um tipo, na ordem de exibição (ex.: hub de Gotas de Fé). */
+/** Livros ativos de um tipo, na ordem de exibição (hub de Pílulas ou de Gotas). */
 export async function listReadingBooks(kind: ReadingKind): Promise<ReadingBookView[]> {
   if (!listCache || !fresh(listCache.at)) {
     const rows = await prisma.readingBook.findMany({

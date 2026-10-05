@@ -22,12 +22,24 @@ const API_URL = Platform.OS === "web" ? "" : process.env.EXPO_PUBLIC_API_URL!;
  * properties of undefined"). Tratado aqui uma vez só: 401 limpa a sessão
  * guardada e manda pro login, em vez de cada tela precisar checar.
  */
+function deviceTimeZone(): string | null {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || null;
+  } catch {
+    return null;
+  }
+}
+
 export async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
   const token = await getItemAsync(TOKEN_KEY);
 
   const headers = new Headers(options.headers);
   headers.set("Content-Type", "application/json");
   if (token) headers.set("Authorization", `Bearer ${token}`);
+  // Fuso do celular — o servidor usa pra saber que dia é "hoje" pra essa
+  // pessoa (a Rotina vira à meia-noite do aparelho). Ver server.js.
+  const timeZone = deviceTimeZone();
+  if (timeZone) headers.set("X-Timezone", timeZone);
 
   const res = await fetch(`${API_URL}${path}`, { ...options, headers });
 
@@ -174,6 +186,35 @@ export type ApiHomeDose = {
   period: ApiHomeDosePeriod | null;
 };
 
+export type ApiRoutineNextOccurrence = {
+  daysAhead: number;
+  minutesUntil: number;
+};
+
+export type ApiRoutineItemDetail = {
+  streakDays: number;
+  completedToday: boolean;
+  timeOfDay: string | null;
+  next: ApiRoutineNextOccurrence | null;
+};
+
+export type ApiHomeTrailSummary = {
+  chaptersRead: number;
+  totalChapters: number;
+  bestStreak: number;
+};
+
+export type ApiHomeRotinaSummary = {
+  doneToday: number;
+  totalToday: number;
+};
+
+export type ApiHomeSaudeSummary = {
+  type: "PRESSAO" | "PESO" | "GORDURA" | "GLICEMIA";
+  measuredAt: string;
+  daysAgo: number;
+} | null;
+
 export type ApiHomeDashboard = {
   /** Ausente quando o servidor ainda é a versão antiga (só nextDose). */
   todayDoses?: ApiHomeDose[];
@@ -181,13 +222,29 @@ export type ApiHomeDashboard = {
   repurchaseReady: ApiHomeRepurchaseItem[];
   loyalty: { stampsFilled: number; stampsTotal: number; totalRewardCents: number };
   activePromotionsCount: number;
+  wisdom: ApiHomeTrailSummary;
+  faith: ApiHomeTrailSummary;
+  rotina: ApiHomeRotinaSummary;
+  saude: ApiHomeSaudeSummary;
 };
 
 export type ApiWisdomProgress = {
+  topicSlug: string;
   chaptersRead: number;
   streakDays: number;
   totalChapters: number;
   nextChapterAvailable: boolean;
+};
+
+export type ApiWisdomTopicSummary = {
+  slug: string;
+  title: string;
+  subtitle: string;
+  icon: string;
+  color: string;
+  chaptersRead: number;
+  totalChapters: number;
+  streakDays: number;
 };
 
 export type ApiFaithProgress = {
@@ -224,6 +281,8 @@ export type ApiChecklistItem = {
   timeOfDay: string | null;
   daysOfWeek: number[];
   completedToday: boolean;
+  medicationTrackingId: string | null;
+  activeGoals: { id: string; title: string }[];
 };
 
 export type RoutineItemInput = {
@@ -278,4 +337,5 @@ export type GoalInput = {
   startDate: string;
   endDate: string;
   routine?: { category: ApiCareCategory; timeOfDay?: string | null; daysOfWeek: number[] };
+  existingChecklistItemId?: string | null;
 };

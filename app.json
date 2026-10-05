@@ -44,6 +44,13 @@
       ],
       "expo-secure-store",
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "O Convivo precisa acessar suas fotos para você escolher a foto do seu perfil.",
+          "cameraPermission": "O Convivo precisa da câmera para você tirar a foto do seu perfil."
+        }
+      ],
+      [
         "expo-notifications",
         {
           "icon": "./assets/images/notification-icon.png",

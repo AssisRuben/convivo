@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from "react";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import {
   ActivityIndicator,
+  type TextStyle,
   NativeScrollEvent,
   NativeSyntheticEvent,
   Pressable,
@@ -11,10 +12,10 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { apiFetch, type ApiWisdomProgress } from "@/lib/api";
-import { useReadingChapter } from "@/lib/readingClient";
-import { WISDOM_BOOK_SLUG } from "@/lib/reading/types";
+import { useReadingBook, useReadingChapter } from "@/lib/readingClient";
 import { showAlert } from "@/lib/alert";
 import { CelebrationModal } from "@/components/CelebrationModal";
+import { ReadingFontSizeControl, useReadingFontScale } from "@/components/ReadingFontSize";
 
 function isCloseToBottom({ layoutMeasurement, contentOffset, contentSize }: NativeScrollEvent) {
   const paddingToBottom = 32;
@@ -23,10 +24,10 @@ function isCloseToBottom({ layoutMeasurement, contentOffset, contentSize }: Nati
 
 /** Markdown inline bem simples — **negrito**, *itálico* e ***os dois
  * juntos*** (ver ReadingBlock em lib/reading/types.ts). */
-function RichText({ text, className }: { text: string; className?: string }) {
+function RichText({ text, className, style }: { text: string; className?: string; style?: TextStyle }) {
   const parts = text.split(/(\*\*\*[^*]+\*\*\*|\*\*[^*]+\*\*|\*[^*]+\*)/g).filter(Boolean);
   return (
-    <Text className={className}>
+    <Text className={className} style={style}>
       {parts.map((part, i) => {
         if (part.startsWith("***") && part.endsWith("***")) {
           return (
@@ -57,16 +58,24 @@ function RichText({ text, className }: { text: string; className?: string }) {
 
 export default function PilulaLeituraScreen() {
   const router = useRouter();
-  const { numero } = useLocalSearchParams<{ numero: string }>();
+  const { topico, numero } = useLocalSearchParams<{ topico: string; numero: string }>();
 
   // Aberto por notificação/link direto não tem histórico — sem o fallback,
   // voltar sairia de Pílulas em vez de ir pra lista de capítulos.
-  function backToList() {
+  function backToTopic() {
     if (router.canGoBack()) router.back();
-    else router.replace("/perfil/pilulas-sabedoria");
+    else router.replace({ pathname: "/perfil/pilulas-sabedoria/[topico]", params: { topico } });
   }
-  // Texto do capítulo vem do Supabase pela API (antes era embutido no app)
-  const { data: chapter, loading: chapterLoading } = useReadingChapter(WISDOM_BOOK_SLUG, Number(numero));
+  // Livro/tópico (título, ícone, cor) e texto do capítulo vêm do Supabase pela API
+  const { data: topic, loading: bookLoading } = useReadingBook(topico);
+  const { data: chapter, loading: chapterLoading } = useReadingChapter(topico, Number(numero));
+  const accentColor = topic?.color ?? "#f59e0b";
+
+  const fontScale = useReadingFontScale();
+  const size = (fontSize: number, lineHeight: number): TextStyle => ({
+    fontSize: fontSize * fontScale.scale,
+    lineHeight: lineHeight * fontScale.scale,
+  });
 
   const [progress, setProgress] = useState<ApiWisdomProgress | null>(null);
   const [loading, setLoading] = useState(true);
@@ -78,12 +87,12 @@ export default function PilulaLeituraScreen() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiFetch("/api/mobile/wisdom");
+      const res = await apiFetch(`/api/mobile/wisdom/${topico}`);
       if (res.ok) setProgress(await res.json());
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [topico]);
 
   useFocusEffect(
     useCallback(() => {
@@ -104,7 +113,7 @@ export default function PilulaLeituraScreen() {
     try {
       const res = await apiFetch("/api/mobile/wisdom/complete", {
         method: "POST",
-        body: JSON.stringify({ chapterNumber: chapter.number }),
+        body: JSON.stringify({ topicSlug: topico, chapterNumber: chapter.number }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error ?? "Não foi possível salvar");
@@ -130,7 +139,7 @@ export default function PilulaLeituraScreen() {
     }
   }
 
-  if (loading || !progress || chapterLoading) {
+  if (bookLoading || chapterLoading) {
     return (
       <View className="flex-1 items-center justify-center bg-cream">
         <ActivityIndicator color="#0b1e3d" />
@@ -138,13 +147,21 @@ export default function PilulaLeituraScreen() {
     );
   }
 
-  if (!chapter) {
+  if (!topic || !chapter) {
     return (
       <View className="flex-1 items-center justify-center gap-3 bg-cream p-6">
         <Text className="text-center text-navy/60">Capítulo não encontrado.</Text>
-        <Pressable onPress={backToList} className="rounded-full bg-navy px-5 py-2.5">
+        <Pressable onPress={backToTopic} className="rounded-full bg-navy px-5 py-2.5">
           <Text className="text-sm font-semibold text-white">Voltar</Text>
         </Pressable>
+      </View>
+    );
+  }
+
+  if (loading || !progress) {
+    return (
+      <View className="flex-1 items-center justify-center bg-cream">
+        <ActivityIndicator color="#0b1e3d" />
       </View>
     );
   }
@@ -162,7 +179,7 @@ export default function PilulaLeituraScreen() {
             ? "Esse capítulo libera amanhã — um por dia pra dar tempo de refletir."
             : "Esse capítulo ainda não foi liberado."}
         </Text>
-        <Pressable onPress={backToList} className="rounded-full bg-navy px-5 py-2.5">
+        <Pressable onPress={backToTopic} className="rounded-full bg-navy px-5 py-2.5">
           <Text className="text-sm font-semibold text-white">Voltar</Text>
         </Pressable>
       </View>
@@ -181,27 +198,36 @@ export default function PilulaLeituraScreen() {
         onScroll={onScroll}
         scrollEventThrottle={100}
       >
-        <Text className="text-xs font-semibold uppercase tracking-wide text-coral">
-          Capítulo {chapter.number}
+        <Text className="text-xs font-semibold uppercase tracking-wide" style={{ color: accentColor }}>
+          {topic.title} · Capítulo {chapter.number}
         </Text>
-        <Text className="mt-1 text-2xl font-extrabold text-navy">{chapter.title}</Text>
-        <Text className="mt-1 text-sm text-navy/60">{chapter.subtitle}</Text>
+        <Text className="mt-1 text-2xl font-extrabold text-navy" style={size(24, 30)}>
+          {chapter.title}
+        </Text>
+        <Text className="mt-1 text-sm text-navy/60" style={size(14, 20)}>
+          {chapter.subtitle}
+        </Text>
 
-        <View className="mt-6 gap-4">
+        <View className="mt-3">
+          <ReadingFontSizeControl {...fontScale} />
+        </View>
+
+        <View className="mt-4 gap-4">
           {chapter.blocks.map((block, i) => {
             if (block.type === "heading") {
               return (
-                <Text key={i} className="mt-2 text-lg font-bold text-navy">
+                <Text key={i} className="mt-2 text-lg font-bold text-navy" style={size(18, 26)}>
                   {block.text}
                 </Text>
               );
             }
             if (block.type === "quote") {
               return (
-                <View key={i} className="rounded-2xl bg-navy/5 p-4">
+                <View key={i} className="rounded-2xl p-4" style={{ backgroundColor: `${accentColor}0d` }}>
                   <RichText
                     text={block.text}
                     className="text-center text-base italic leading-6 text-navy"
+                    style={size(16, 24)}
                   />
                 </View>
               );
@@ -211,14 +237,18 @@ export default function PilulaLeituraScreen() {
                 <View key={i} className="gap-2">
                   {block.items.map((item, j) => (
                     <View key={j} className="flex-row gap-2">
-                      <Text className="text-sm text-coral">{block.ordered ? `${j + 1}.` : "•"}</Text>
-                      <RichText text={item} className="flex-1 text-base leading-6 text-navy/80" />
+                      <Text className="text-sm" style={{ color: accentColor }}>
+                        {block.ordered ? `${j + 1}.` : "•"}
+                      </Text>
+                      <RichText text={item} className="flex-1 text-base leading-6 text-navy/80" style={size(16, 24)} />
                     </View>
                   ))}
                 </View>
               );
             }
-            return <RichText key={i} text={block.text} className="text-base leading-6 text-navy/80" />;
+            return (
+              <RichText key={i} text={block.text} className="text-base leading-6 text-navy/80" style={size(16, 24)} />
+            );
           })}
         </View>
       </ScrollView>
@@ -226,15 +256,14 @@ export default function PilulaLeituraScreen() {
       <CelebrationModal
         visible={result !== null}
         icon="sparkles"
-        color="#f59e0b"
+        color={accentColor}
         title="Sua sabedoria aumentou!"
-        message={`Capítulo ${chapter.number} concluído: ${chapter.title}`}
+        message={`${topic.title} · Capítulo ${chapter.number} concluído`}
         streakDays={result?.streakDays}
         streakEmoji="🔥"
-        onContinue={() => {
-          setResult(null);
-          backToList();
-        }}
+        // Fecha só o modal e continua no capítulo — a pessoa pode querer
+        // reler o final; sair é pelo voltar.
+        onContinue={() => setResult(null)}
       />
     </View>
   );

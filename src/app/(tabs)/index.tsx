@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
+import { Animated, ActivityIndicator, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { apiFetch, type ApiHomeDashboard, type ApiHomeDose } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -8,6 +8,7 @@ import { useProfileDrawer } from "@/lib/profileDrawer";
 import { showAlert } from "@/lib/alert";
 import { HOME_CACHE_KEY, ROTINA_CACHE_KEY, fetchHomeDashboard } from "@/lib/tabPrefetch";
 import { getCached, loadCached, setCached } from "@/lib/tabDataCache";
+import { UserAvatar } from "@/components/UserAvatar";
 
 function readCachedDashboard() {
   return getCached<ApiHomeDashboard>(HOME_CACHE_KEY);
@@ -74,33 +75,63 @@ function firstName(fullName: string | undefined): string {
   return fullName?.split(" ")[0] ?? "";
 }
 
+const SAUDE_TYPE_LABELS: Record<string, string> = {
+  PRESSAO: "Pressão",
+  PESO: "Peso",
+  GORDURA: "% Gordura",
+  GLICEMIA: "Glicemia",
+};
+
+const useNativeDriver = Platform.OS !== "web";
+
 function QuickAction({
   icon,
   label,
+  color,
   onPress,
   badge,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
+  color: string;
   onPress: () => void;
   badge?: number;
 }) {
+  // Bolha colorida + leve "pulo" ao tocar — deixa a ação mais viva do que
+  // o círculo cinza uniforme que tinha antes.
+  const [scale] = useState(() => new Animated.Value(1));
+
+  function animateTo(value: number) {
+    Animated.spring(scale, { toValue: value, friction: 5, tension: 120, useNativeDriver }).start();
+  }
+
   return (
     <Pressable
       onPress={onPress}
-      className="flex-1 items-center gap-2 rounded-2xl bg-card p-4 shadow-sm"
+      onPressIn={() => animateTo(0.9)}
+      onPressOut={() => animateTo(1)}
+      className="flex-1 items-center gap-2 rounded-2xl bg-card px-1 py-4 shadow-sm"
     >
-      <View>
-        <View className="h-10 w-10 items-center justify-center rounded-full bg-navy/5">
-          <Ionicons name={icon} size={20} color="#0b1e3d" />
+      <Animated.View style={{ transform: [{ scale }] }}>
+        <View className="h-12 w-12 items-center justify-center rounded-full" style={{ backgroundColor: `${color}22` }}>
+          <Ionicons name={icon} size={24} color={color} />
         </View>
         {Boolean(badge) && (
-          <View className="absolute -right-1 -top-1 h-4 w-4 items-center justify-center rounded-full bg-coral">
-            <Text className="text-[9px] font-bold text-white">{badge}</Text>
+          <View className="absolute -right-1 -top-1 h-5 w-5 items-center justify-center rounded-full bg-coral">
+            <Text className="text-[10px] font-bold text-white">{badge}</Text>
           </View>
         )}
-      </View>
-      <Text className="text-xs font-medium text-navy">{label}</Text>
+      </Animated.View>
+      {/* 4 cards lado a lado: em tela estreita "Recompra"/"Notícia" não
+          cabiam e cortavam — encolhe a letra até 70% em vez de cortar. */}
+      <Text
+        className="text-sm font-bold text-navy"
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.7}
+      >
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -248,9 +279,7 @@ export default function HomeScreen() {
     <ScrollView className="flex-1 bg-cream" contentContainerClassName="gap-4 p-4 pb-24">
       <View className="flex-row items-center justify-between">
         <View className="flex-row items-center gap-3">
-          <View className="h-12 w-12 items-center justify-center rounded-full bg-navy/10">
-            <Ionicons name="person" size={22} color="#0b1e3d" />
-          </View>
+          <UserAvatar size={64} />
           <View>
             <Text className="text-sm text-navy/60">Olá,</Text>
             <Text className="text-lg font-bold text-navy">{firstName(user?.name)}.</Text>
@@ -345,26 +374,103 @@ export default function HomeScreen() {
       </Pressable>
 
       <View className="gap-2">
+        <Text className="text-base font-bold text-navy">Minhas trilhas</Text>
+        <View className="flex-row gap-3">
+          <Pressable
+            onPress={() => router.push("/perfil/pilulas-sabedoria")}
+            className="flex-1 gap-1.5 rounded-2xl bg-card p-3.5 shadow-sm"
+          >
+            <View className="flex-row items-center gap-1.5">
+              <Ionicons name="bulb" size={16} color="#f59e0b" />
+              <Text className="text-xs font-semibold text-navy">Pílulas de sabedoria</Text>
+            </View>
+            <Text className="text-xs text-navy/50">
+              {dashboard.wisdom.chaptersRead} de {dashboard.wisdom.totalChapters} capítulos
+            </Text>
+            {dashboard.wisdom.bestStreak > 0 && (
+              <Text className="text-xs font-medium text-coral">🔥 {dashboard.wisdom.bestStreak} dias</Text>
+            )}
+          </Pressable>
+          <Pressable
+            onPress={() => router.push("/perfil/gotas-de-fe")}
+            className="flex-1 gap-1.5 rounded-2xl bg-card p-3.5 shadow-sm"
+          >
+            <View className="flex-row items-center gap-1.5">
+              <Ionicons name="water" size={16} color="#3b82f6" />
+              <Text className="text-xs font-semibold text-navy">Gotas de Fé</Text>
+            </View>
+            <Text className="text-xs text-navy/50">
+              {dashboard.faith.chaptersRead} de {dashboard.faith.totalChapters} capítulos
+            </Text>
+            {dashboard.faith.bestStreak > 0 && (
+              <Text className="text-xs font-medium text-mint">🙏 {dashboard.faith.bestStreak} dias</Text>
+            )}
+          </Pressable>
+        </View>
+      </View>
+
+      <View className="flex-row gap-3">
+        <Pressable
+          onPress={() => router.push("/(tabs)/rotina")}
+          className="flex-1 flex-row items-center gap-2.5 rounded-2xl bg-card p-3.5 shadow-sm"
+        >
+          <View className="h-9 w-9 items-center justify-center rounded-full bg-mint/15">
+            <Ionicons name="checkmark-done" size={16} color="#2ec4b6" />
+          </View>
+          <View className="flex-1">
+            <Text className="text-xs font-semibold text-navy">Rotina</Text>
+            <Text className="text-xs text-navy/50">
+              {dashboard.rotina.totalToday === 0
+                ? "Nada pra hoje"
+                : `${dashboard.rotina.doneToday} de ${dashboard.rotina.totalToday} feitos`}
+            </Text>
+          </View>
+        </Pressable>
+        <Pressable
+          onPress={() => router.push("/(tabs)/saude")}
+          className="flex-1 flex-row items-center gap-2.5 rounded-2xl bg-card p-3.5 shadow-sm"
+        >
+          <View className="h-9 w-9 items-center justify-center rounded-full bg-navy/5">
+            <Ionicons name="pulse" size={16} color="#0b1e3d" />
+          </View>
+          <View className="flex-1">
+            <Text className="text-xs font-semibold text-navy">Saúde</Text>
+            <Text className="text-xs text-navy/50">
+              {dashboard.saude
+                ? `${SAUDE_TYPE_LABELS[dashboard.saude.type] ?? dashboard.saude.type} · ${
+                    dashboard.saude.daysAgo === 0 ? "hoje" : `há ${dashboard.saude.daysAgo}d`
+                  }`
+                : "Nenhum registro ainda"}
+            </Text>
+          </View>
+        </Pressable>
+      </View>
+
+      <View className="gap-2">
         <Text className="text-base font-bold text-navy">Ações Rápidas</Text>
         <View className="flex-row gap-3">
           <QuickAction
-            icon="star-outline"
+            icon="star"
+            color="#f59e0b"
             label="Pontos"
             onPress={() => router.push("/perfil/fidelidade")}
           />
           <QuickAction
-            icon="pricetag-outline"
+            icon="pricetag"
+            color="#e63946"
             label="Ofertas"
             badge={dashboard.activePromotionsCount || undefined}
             onPress={() => router.push("/ofertas")}
           />
           <QuickAction
-            icon="newspaper-outline"
+            icon="newspaper"
+            color="#3b82f6"
             label="Notícia"
             onPress={() => router.push("/perfil/novidades")}
           />
           <QuickAction
-            icon="medkit-outline"
+            icon="medkit"
+            color="#2ec4b6"
             label="Recompra"
             onPress={() => router.push("/perfil/medicamentos")}
           />

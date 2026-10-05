@@ -1,6 +1,13 @@
+import { zonedParts } from "@/lib/timeZone";
+
+/**
+ * "Hoje" no fuso do celular de quem fez a requisição (ver lib/timeZone.ts),
+ * como meia-noite UTC daquele dia — o formato que as colunas @db.Date
+ * guardam. Antes usava o dia UTC, e no Brasil a Rotina virava às 21h.
+ */
 export function todayDate(): Date {
-  const now = new Date();
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const { year, month, day } = zonedParts(new Date());
+  return new Date(Date.UTC(year, month - 1, day));
 }
 
 export function todayDateString(): string {

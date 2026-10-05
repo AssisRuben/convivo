@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/lib/auth";
 import { useProfileDrawer } from "@/lib/profileDrawer";
 import { showAlert } from "@/lib/alert";
+import { UserAvatar } from "@/components/UserAvatar";
 
 const DRAWER_WIDTH = Math.min(260, Dimensions.get("window").width * 0.75);
 
@@ -119,9 +120,7 @@ export function ProfileDrawer() {
       >
         <ScrollView className="flex-1" contentContainerClassName="pb-8">
           <View className="items-center gap-1.5 border-b border-navy/5 px-4 pb-4 pt-6">
-            <View className="h-12 w-12 items-center justify-center rounded-full bg-navy/10">
-              <Ionicons name="person" size={20} color="#0b1e3d" />
-            </View>
+            <UserAvatar size={72} />
             <View className="items-center">
               <Text className="text-sm font-semibold text-navy">{user?.name}</Text>
               <Text className="text-xs text-navy/50">{user?.email}</Text>

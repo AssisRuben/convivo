@@ -31,6 +31,7 @@ export async function POST(request: Request) {
       startDate: new Date(body.startDate),
       endDate: new Date(body.endDate),
       routine: body.routine ?? undefined,
+      existingChecklistItemId: body.existingChecklistItemId ? String(body.existingChecklistItemId) : null,
     });
     const goals = await listGoalsForUser(userId);
     return Response.json({ goals });

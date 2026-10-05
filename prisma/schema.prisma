@@ -86,7 +86,8 @@ model User {
   medicationTrackings  MedicationTracking[]
   expoPushTokens       ExpoPushToken[]
   goals                Goal[]
-  wisdomProgress       WisdomProgress?
+  wisdomProgress       WisdomProgress[]
+  avatar               UserAvatar?
   faithProgress        FaithProgress[]
 }
 
@@ -136,9 +137,15 @@ model LoyaltyStampCycle {
 // próximo capítulo a liberar; só libera de fato quando a data de hoje é
 // diferente de lastReadDate (ver wisdomCore.ts). streakDays conta dias
 // seguidos lendo (reseta pra 1 se pular um dia, não impede continuar).
+//
+// Mais de um TÓPICO agora (Decisões e Vieses, Estoicismo, Odisseia — ver
+// constants/wisdomPills.ts), cada um com sua própria sequência de
+// capítulos e progresso/streak independente, chaveado por
+// userId+topicSlug — mesmo desenho de FaithProgress em Gotas de Fé.
 model WisdomProgress {
   id               String    @id @default(cuid())
-  userId           String    @unique
+  userId           String
+  topicSlug        String
   chaptersRead     Int       @default(0)
   streakDays       Int       @default(0)
   lastReadDate     DateTime? @db.Date
@@ -148,6 +155,8 @@ model WisdomProgress {
   updatedAt        DateTime  @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, topicSlug])
 }
 
 // Progresso em "Gotas de Fé" (devocional diário) — mesma dinâmica de
@@ -158,8 +167,8 @@ model WisdomProgress {
 // dados — editar/adicionar capítulo é mexer nestas tabelas, sem build nem
 // OTA. Lido por lib/reading/readingContent.ts (com cache em memória).
 enum ReadingKind {
-  WISDOM // Pílulas de sabedoria (um livro só, slug "pilulas-sabedoria")
-  FAITH // Gotas de Fé (um livro por slug: proverbios, marcos, ...)
+  WISDOM // tópico de Pílulas de sabedoria (slug = WisdomProgress.topicSlug)
+  FAITH // livro de Gotas de Fé (slug = FaithProgress.bookSlug)
 }
 
 model ReadingBook {
@@ -173,26 +182,7 @@ model ReadingBook {
   active    Boolean     @default(true)
   updatedAt DateTime    @updatedAt
 
-  topics   ReadingTopic[]
   chapters ReadingChapter[]
-}
-
-// Assunto: agrupa uma faixa de capítulos na lista (Pílulas). A progressão
-// continua uma trilha única — o assunto só organiza a tela.
-model ReadingTopic {
-  id           String @id @default(cuid())
-  bookSlug     String
-  title        String
-  subtitle     String
-  icon         String
-  color        String
-  firstChapter Int
-  lastChapter  Int
-  sortOrder    Int    @default(0)
-
-  book ReadingBook @relation(fields: [bookSlug], references: [slug], onDelete: Cascade)
-
-  @@index([bookSlug])
 }
 
 model ReadingChapter {
@@ -267,6 +257,10 @@ model Product {
   // espelho a partir do catálogo real.
   costCents           Int?
   imageUrl            String
+  // Última vez que a rotina de imagens (lib/catalog/imageBackfill.ts)
+  // tentou achar foto pra esse produto — sem isso ela retentava sempre os
+  // mesmos produtos sem foto e os novos nunca chegavam na vez.
+  imageCheckedAt      DateTime?
   stock               Int                    @default(0)
   codigoProduto       Int?                   @unique
   // Slug já mapeado (ver constants/catalogCategories.ts), não mais um
@@ -481,6 +475,24 @@ model CareChecklistItem {
   completions        CareChecklistCompletion[]
   reminderDispatches CareReminderDispatch[]
   goals              Goal[]
+  scheduleVersions   CareScheduleVersion[]
+}
+
+// Histórico da agenda (daysOfWeek) de um cuidado — só pra meta de Rotina
+// contar "X de Y dias" com os dias que valiam em cada período, em vez de
+// aplicar a agenda atual retroativamente. Sem nenhuma linha = a agenda
+// atual vale desde sempre (itens nunca editados). Ao editar os dias, grava
+// a agenda antiga (se ainda não houver histórico) e a nova a partir de hoje.
+model CareScheduleVersion {
+  id            String   @id @default(cuid())
+  itemId        String
+  daysOfWeek    Int[]    @default([])
+  effectiveFrom DateTime @db.Date
+  createdAt     DateTime @default(now())
+
+  item CareChecklistItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([itemId, effectiveFrom])
 }
 
 // Ficha de acompanhamento de um medicamento comprado — quantidade total,
@@ -637,4 +649,17 @@ model TimelineComment {
   user User @relation(fields: [userId], references: [id])
 
   @@index([userId, itemKey])
+}
+
+// Foto de perfil — reduzida no aparelho (~400px, JPEG) antes de enviar,
+// então cabe numa coluna de texto (base64, dezenas de KB) sem precisar de
+// serviço de armazenamento de arquivo. Tabela separada de User pra não
+// carregar a imagem em toda consulta de usuário.
+model UserAvatar {
+  userId     String   @id
+  mimeType   String
+  dataBase64 String
+  updatedAt  DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

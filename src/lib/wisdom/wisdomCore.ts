@@ -1,9 +1,16 @@
 import { prisma } from "@/lib/prisma";
 import { todayDate } from "@/lib/timeline/format";
-import { getReadingChapterCount } from "@/lib/reading/readingContent";
-import { WISDOM_BOOK_SLUG } from "@/lib/reading/types";
+import { getReadingBook, listReadingBooks } from "@/lib/reading/readingContent";
+
+/** Tópico de Pílulas (ReadingBook kind WISDOM) — conteúdo vem do Supabase.
+ * Slug de livro de Gotas de Fé não vale aqui. */
+async function getWisdomTopic(topicSlug: string) {
+  const book = await getReadingBook(topicSlug);
+  return book?.kind === "WISDOM" ? book : null;
+}
 
 export type WisdomProgressView = {
+  topicSlug: string;
   chaptersRead: number;
   streakDays: number;
   totalChapters: number;
@@ -11,6 +18,17 @@ export type WisdomProgressView = {
   // lidos continuam sempre revisitáveis, os mais à frente nem aparecem
   // como opção ainda.
   nextChapterAvailable: boolean;
+};
+
+export type WisdomTopicSummary = {
+  slug: string;
+  title: string;
+  subtitle: string;
+  icon: string;
+  color: string;
+  chaptersRead: number;
+  totalChapters: number;
+  streakDays: number;
 };
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -61,10 +79,12 @@ export function computeNextStreak(lastReadDate: Date | null, today: Date, curren
 }
 
 function toView(
+  topicSlug: string,
   totalChapters: number,
   row: { chaptersRead: number; streakDays: number; lastReadDate: Date | null }
 ): WisdomProgressView {
   return {
+    topicSlug,
     chaptersRead: row.chaptersRead,
     streakDays: row.streakDays,
     totalChapters,
@@ -72,44 +92,68 @@ function toView(
   };
 }
 
-export async function getWisdomProgressForUser(userId: string): Promise<WisdomProgressView> {
-  const [row, totalChapters] = await Promise.all([
-    prisma.wisdomProgress.findUnique({ where: { userId } }),
-    getReadingChapterCount(WISDOM_BOOK_SLUG),
+export async function getWisdomProgressForUser(userId: string, topicSlug: string): Promise<WisdomProgressView> {
+  const topic = await getWisdomTopic(topicSlug);
+  if (!topic) throw new Error("Tópico não encontrado");
+
+  const row = await prisma.wisdomProgress.findUnique({ where: { userId_topicSlug: { userId, topicSlug } } });
+  return toView(topicSlug, topic.chapters.length, row ?? { chaptersRead: 0, streakDays: 0, lastReadDate: null });
+}
+
+/** Resumo de todos os tópicos pro hub de "Pílulas de sabedoria" — um card por tópico. */
+export async function getWisdomTopicsSummaryForUser(userId: string): Promise<WisdomTopicSummary[]> {
+  const [rows, topics] = await Promise.all([
+    prisma.wisdomProgress.findMany({ where: { userId } }),
+    listReadingBooks("WISDOM"),
   ]);
-  return toView(totalChapters, row ?? { chaptersRead: 0, streakDays: 0, lastReadDate: null });
+  const byTopicSlug = new Map(rows.map((row) => [row.topicSlug, row]));
+
+  return topics.map((topic) => {
+    const row = byTopicSlug.get(topic.slug);
+    return {
+      slug: topic.slug,
+      title: topic.title,
+      subtitle: topic.subtitle,
+      icon: topic.icon,
+      color: topic.color,
+      chaptersRead: row?.chaptersRead ?? 0,
+      totalChapters: topic.chapters.length,
+      streakDays: row?.streakDays ?? 0,
+    };
+  });
 }
 
 /**
  * Marca um capítulo como concluído — só aceita o próximo da sequência
- * (chaptersRead + 1), e só se ele já estiver liberado hoje.
+ * (chaptersRead + 1) daquele tópico, e só se ele já estiver liberado hoje.
  */
 export async function completeChapterForUser(
   userId: string,
+  topicSlug: string,
   chapterNumber: number
 ): Promise<WisdomProgressView> {
-  const [existing, totalChapters] = await Promise.all([
-    prisma.wisdomProgress.findUnique({ where: { userId } }),
-    getReadingChapterCount(WISDOM_BOOK_SLUG),
-  ]);
+  const topic = await getWisdomTopic(topicSlug);
+  if (!topic) throw new Error("Tópico não encontrado");
+
+  const existing = await prisma.wisdomProgress.findUnique({ where: { userId_topicSlug: { userId, topicSlug } } });
   const current = existing ?? { chaptersRead: 0, streakDays: 0, lastReadDate: null };
 
-  if (chapterNumber !== current.chaptersRead + 1 || chapterNumber > totalChapters) {
+  if (chapterNumber !== current.chaptersRead + 1 || chapterNumber > topic.chapters.length) {
     throw new Error("Esse capítulo não está disponível agora");
   }
 
   const today = todayDate();
-  if (!nextChapterAvailableNow(current.chaptersRead, current.lastReadDate, today, totalChapters)) {
+  if (!nextChapterAvailableNow(current.chaptersRead, current.lastReadDate, today, topic.chapters.length)) {
     throw new Error("Volte amanhã para o próximo capítulo");
   }
 
   const streakDays = computeNextStreak(current.lastReadDate, today, current.streakDays);
 
   const updated = await prisma.wisdomProgress.upsert({
-    where: { userId },
-    create: { userId, chaptersRead: chapterNumber, streakDays, lastReadDate: today },
+    where: { userId_topicSlug: { userId, topicSlug } },
+    create: { userId, topicSlug, chaptersRead: chapterNumber, streakDays, lastReadDate: today },
     update: { chaptersRead: chapterNumber, streakDays, lastReadDate: today },
   });
 
-  return toView(totalChapters, updated);
+  return toView(topicSlug, topic.chapters.length, updated);
 }

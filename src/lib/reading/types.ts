@@ -15,20 +15,10 @@ export type ReadingBlock =
   // Aviso do autor no fim do capítulo (ex.: citações bíblicas de memória).
   | { type: "footnote"; text: string };
 
+/** WISDOM = um tópico de Pílulas (decisoes-vieses, estoicismo, odisseia);
+ * FAITH = um livro de Gotas de Fé (proverbios, marcos). Cada um é uma
+ * trilha própria, numerada a partir de 1, com progresso independente. */
 export type ReadingKind = "WISDOM" | "FAITH";
-
-/** Pílulas de sabedoria é um "livro" só, com este slug. */
-export const WISDOM_BOOK_SLUG = "pilulas-sabedoria";
-
-/** Assunto: agrupa uma faixa de capítulos na lista (só Pílulas usa hoje). */
-export type ReadingTopicView = {
-  title: string;
-  subtitle: string;
-  icon: string;
-  color: string;
-  firstChapter: number;
-  lastChapter: number;
-};
 
 export type ReadingChapterSummary = { number: number; title: string; subtitle: string };
 
@@ -42,6 +32,5 @@ export type ReadingBookView = {
   subtitle: string;
   icon: string;
   color: string;
-  topics: ReadingTopicView[];
   chapters: ReadingChapterSummary[];
 };
