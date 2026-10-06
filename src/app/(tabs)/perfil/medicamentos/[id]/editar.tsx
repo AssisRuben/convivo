@@ -13,6 +13,7 @@ type FichaMedicamento = {
   unitsPerDose: number;
   horarios: string[];
   treatmentDays?: number | null;
+  startDate?: string;
 };
 
 /**

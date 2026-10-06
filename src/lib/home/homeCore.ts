@@ -6,6 +6,7 @@ import {
   monthlyDoseSummary,
   supplyCoversTreatment,
   treatmentProgress,
+  medicationStart,
 } from "@/lib/medications/medicationCore";
 import { todayDate } from "@/lib/timeline/format";
 import { getLoyaltyProgress } from "@/lib/loyalty/loyaltyCore";
@@ -112,7 +113,7 @@ async function getTodayDoses(userId: string, now: Date): Promise<HomeDose[]> {
       // o mês inteiro (inclui hoje): status de hoje + soma do uso contínuo
       completions: { where: { date: { gte: monthStart } }, select: { date: true } },
       medicationTracking: {
-        select: { id: true, purchaseDate: true, treatmentDays: true, active: true },
+        select: { id: true, purchaseDate: true, startDate: true, treatmentDays: true, active: true },
       },
     },
   });
@@ -136,13 +137,13 @@ async function getTodayDoses(userId: string, now: Date): Promise<HomeDose[]> {
     const tracking = item.medicationTracking;
     if (tracking) {
       if (!tracking.active) continue;
-      const progress = treatmentProgress(tracking.purchaseDate, tracking.treatmentDays, today);
+      const progress = treatmentProgress(medicationStart(tracking), tracking.treatmentDays, today);
       if (progress) {
         if (progress.ended || progress.day < 1) continue;
         period = { kind: "tratamento", day: progress.day, totalDays: progress.totalDays };
       } else {
         const ficha = porFicha.get(tracking.id)!;
-        const resumo = monthlyDoseSummary(tracking.purchaseDate, ficha.dosesPerDay, ficha.dates, today);
+        const resumo = monthlyDoseSummary(medicationStart(tracking), ficha.dosesPerDay, ficha.dates, today);
         period = {
           kind: "continuo",
           month: today.getUTCMonth() + 1,
@@ -202,7 +203,7 @@ async function getRepurchaseReady(userId: string): Promise<HomeRepurchaseItem[]>
   for (const tracking of trackings) {
     const dosesPerDay = Math.max(tracking.checklistItems.length, 1);
     const runOutDate = estimateRunOutDate(
-      tracking.purchaseDate,
+      medicationStart(tracking),
       tracking.totalUnits,
       tracking.unitsPerDose,
       dosesPerDay
@@ -211,7 +212,7 @@ async function getRepurchaseReady(userId: string): Promise<HomeRepurchaseItem[]>
     if (daysUntilRunOut > REPURCHASE_READY_THRESHOLD_DAYS) continue;
     // tratamento com prazo que acaba antes do remédio (ou já acabou) não
     // precisa de recompra
-    if (supplyCoversTreatment(tracking.purchaseDate, tracking.treatmentDays, today, daysUntilRunOut)) {
+    if (supplyCoversTreatment(medicationStart(tracking), tracking.treatmentDays, today, daysUntilRunOut)) {
       continue;
     }
 

@@ -508,8 +508,14 @@ model MedicationTracking {
   purchaseDate  DateTime
   totalUnits    Int
   unitsPerDose  Int
-  // Duração do tratamento em dias, contada a partir de purchaseDate (dia 1
-  // = dia da compra). Null = uso contínuo (sem data pra acabar). Passou do
+  // Quando a pessoa começou a tomar ("Comecei a tomar em") — é daqui que
+  // contam o fim do estoque, o dia do tratamento e a soma do mês. A data da
+  // compra ficou só como registro: contar dela fazia um remédio cadastrado
+  // hoje, comprado semanas antes, aparecer como "já deve ter acabado".
+  // Null só em linha antiga não migrada — o código cai em purchaseDate.
+  startDate     DateTime? @db.Date
+  // Duração do tratamento em dias, contada a partir de startDate (dia 1 =
+  // primeiro dia). Null = uso contínuo (sem data pra acabar). Passou do
   // último dia: some da Home, para de lembrar e não entra em recompra.
   treatmentDays Int?
   active        Boolean  @default(true)

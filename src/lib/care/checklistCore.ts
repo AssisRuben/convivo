@@ -4,7 +4,7 @@ import {
   checkRoutineStreakMilestones,
 } from "@/lib/timeline/achievements";
 import { todayDate } from "@/lib/timeline/format";
-import { treatmentProgress } from "@/lib/medications/medicationCore";
+import { medicationStart, treatmentProgress } from "@/lib/medications/medicationCore";
 import type { CareCategory } from "@/lib/generated/prisma/client";
 
 /**
@@ -103,7 +103,7 @@ export async function listChecklistItemsForUser(userId: string): Promise<Checkli
     orderBy: { createdAt: "asc" },
     include: {
       completions: { where: { date: today }, select: { id: true } },
-      medicationTracking: { select: { purchaseDate: true, treatmentDays: true } },
+      medicationTracking: { select: { purchaseDate: true, startDate: true, treatmentDays: true } },
       goals: { where: { endDate: { gte: today } }, select: { id: true, title: true } },
     },
   });
@@ -113,7 +113,7 @@ export async function listChecklistItemsForUser(userId: string): Promise<Checkli
     // 7 dias) sai da Rotina sozinho — mesma regra da Home e dos lembretes.
     .filter((item) => {
       const tracking = item.medicationTracking;
-      return !(tracking && treatmentProgress(tracking.purchaseDate, tracking.treatmentDays, today)?.ended);
+      return !(tracking && treatmentProgress(medicationStart(tracking), tracking.treatmentDays, today)?.ended);
     })
     .map((item) => ({
     id: item.id,

@@ -6,7 +6,11 @@ const TIME_FORMAT = /^([01]\d|2[0-3]):[0-5]\d$/;
 export type MedicationTrackingInput = {
   productName: string;
   codigoProduto?: number | null;
-  purchaseDate: string; // "YYYY-MM-DD"
+  /** "YYYY-MM-DD". Ausente no cadastro manual (remédio comprado em outro
+   * lugar, sem compra no histórico) — vira a data de início. */
+  purchaseDate?: string | null;
+  /** "Comecei a tomar em", "YYYY-MM-DD". Ausente (app antigo) = hoje. */
+  startDate?: string | null;
   totalUnits: number;
   unitsPerDose: number;
   horarios: string[]; // ["08:00", "20:00", ...]
@@ -21,6 +25,7 @@ export type MedicationTrackingView = {
   productName: string;
   codigoProduto: number | null;
   purchaseDate: string;
+  startDate: string;
   totalUnits: number;
   unitsPerDose: number;
   horarios: string[];
@@ -47,8 +52,14 @@ export function validateInput(input: MedicationTrackingInput): void {
   for (const horario of input.horarios) {
     if (!TIME_FORMAT.test(horario)) throw new Error(`Horário inválido: ${horario}`);
   }
-  if (Number.isNaN(new Date(input.purchaseDate).getTime())) {
+  if (input.purchaseDate != null && !isValidDay(input.purchaseDate)) {
     throw new Error("Data da compra inválida");
+  }
+  if (input.startDate != null) {
+    if (!isValidDay(input.startDate)) throw new Error("Data de início inválida");
+    if (new Date(input.startDate).getTime() > todayDate().getTime()) {
+      throw new Error("A data de início não pode ser no futuro");
+    }
   }
   if (input.treatmentDays != null) {
     if (
@@ -61,9 +72,24 @@ export function validateInput(input: MedicationTrackingInput): void {
   }
 }
 
+const DAY_FORMAT = /^\d{4}-\d{2}-\d{2}$/;
+
+function isValidDay(value: string): boolean {
+  return DAY_FORMAT.test(value) && !Number.isNaN(new Date(value).getTime());
+}
+
 /**
- * Em que dia do tratamento a pessoa está: dia 1 = dia da compra
- * (purchaseDate). `null` pra uso contínuo (treatmentDays null). `ended`
+ * De onde contam o fim do estoque, o dia do tratamento e a soma do mês:
+ * o dia em que a pessoa começou a tomar. Linha antiga sem startDate cai na
+ * data da compra (comportamento anterior).
+ */
+export function medicationStart(tracking: { startDate?: Date | null; purchaseDate: Date }): Date {
+  return tracking.startDate ?? tracking.purchaseDate;
+}
+
+/**
+ * Em que dia do tratamento a pessoa está: dia 1 = primeiro dia de uso
+ * (medicationStart). `null` pra uso contínuo (treatmentDays null). `ended`
  * quando hoje já passou do último dia — quem consome esconde a dose /
  * para de lembrar.
  */
@@ -147,6 +173,7 @@ export async function createMedicationTracking(
   input: MedicationTrackingInput
 ): Promise<void> {
   validateInput(input);
+  const startDate = input.startDate ? new Date(input.startDate) : todayDate();
 
   await prisma.$transaction(async (tx) => {
     const tracking = await tx.medicationTracking.create({
@@ -154,7 +181,8 @@ export async function createMedicationTracking(
         userId,
         productName: input.productName.trim(),
         codigoProduto: input.codigoProduto ?? null,
-        purchaseDate: new Date(input.purchaseDate),
+        purchaseDate: input.purchaseDate ? new Date(input.purchaseDate) : startDate,
+        startDate,
         totalUnits: input.totalUnits,
         unitsPerDose: input.unitsPerDose,
         treatmentDays: input.treatmentDays ?? null,
@@ -202,7 +230,7 @@ export async function listMedicationTrackingsForUser(
       0
     );
     const runOutDate = estimateRunOutDate(
-      tracking.purchaseDate,
+      medicationStart(tracking),
       tracking.totalUnits,
       tracking.unitsPerDose,
       dosesPerDay
@@ -213,6 +241,7 @@ export async function listMedicationTrackingsForUser(
       productName: tracking.productName,
       codigoProduto: tracking.codigoProduto,
       purchaseDate: tracking.purchaseDate.toISOString().slice(0, 10),
+      startDate: medicationStart(tracking).toISOString().slice(0, 10),
       totalUnits: tracking.totalUnits,
       unitsPerDose: tracking.unitsPerDose,
       horarios,
@@ -231,6 +260,8 @@ export type MedicationTrackingUpdate = {
   unitsPerDose: number;
   horarios: string[];
   treatmentDays: number | null;
+  /** Ausente (app antigo) = mantém a data de início atual. */
+  startDate?: string | null;
 };
 
 /**
@@ -277,6 +308,7 @@ export async function updateMedicationTracking(
     productName: tracking.productName,
     codigoProduto: tracking.codigoProduto,
     purchaseDate: tracking.purchaseDate.toISOString().slice(0, 10),
+    startDate: update.startDate ?? null,
     totalUnits: update.totalUnits,
     unitsPerDose: update.unitsPerDose,
     horarios,
@@ -292,6 +324,7 @@ export async function updateMedicationTracking(
         totalUnits: update.totalUnits,
         unitsPerDose: update.unitsPerDose,
         treatmentDays: update.treatmentDays,
+        ...(update.startDate ? { startDate: new Date(update.startDate) } : {}),
       },
     });
     if (desativar.length > 0) {

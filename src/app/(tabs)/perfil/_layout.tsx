@@ -31,6 +31,7 @@ export default function PerfilLayout() {
       <Stack.Screen name="historico-compras" />
       <Stack.Screen name="medicamentos/index" />
       <Stack.Screen name="medicamentos/configurar" options={backButtonOptions} />
+      <Stack.Screen name="medicamentos/novo" options={backButtonOptions} />
       <Stack.Screen name="medicamentos/[id]/recomprar" options={backButtonOptions} />
       <Stack.Screen name="medicamentos/[id]/editar" options={backButtonOptions} />
       <Stack.Screen name="metas/index" />

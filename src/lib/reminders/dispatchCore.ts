@@ -7,6 +7,7 @@ import {
   daysBetween,
   supplyCoversTreatment,
   treatmentProgress,
+  medicationStart,
 } from "@/lib/medications/medicationCore";
 import { dueTipIndexes } from "@/lib/goals/goalCore";
 import { pickTipForIndex } from "@/lib/goals/goalTips";
@@ -53,7 +54,7 @@ export async function dispatchDueRoutineReminders(now: Date = new Date()): Promi
     include: {
       reminderDispatches: { where: { date: today } },
       completions: { where: { date: today } },
-      medicationTracking: { select: { purchaseDate: true, treatmentDays: true } },
+      medicationTracking: { select: { purchaseDate: true, startDate: true, treatmentDays: true } },
     },
   });
 
@@ -63,7 +64,7 @@ export async function dispatchDueRoutineReminders(now: Date = new Date()): Promi
     // Tratamento com prazo (ex.: antibiótico de 7 dias) que já terminou —
     // para de lembrar sozinho, sem a pessoa precisar apagar a ficha.
     const tracking = item.medicationTracking;
-    if (tracking && treatmentProgress(tracking.purchaseDate, tracking.treatmentDays, today)?.ended) {
+    if (tracking && treatmentProgress(medicationStart(tracking), tracking.treatmentDays, today)?.ended) {
       continue;
     }
     // Já marcado como feito hoje (ver toggleComplete em (tabs)/rotina.tsx)
@@ -105,14 +106,14 @@ export async function dispatchMedicationRepurchaseAlerts(now: Date = new Date())
   for (const tracking of trackings) {
     const dosesPerDay = Math.max(tracking.checklistItems.length, 1);
     const runOutDate = estimateRunOutDate(
-      tracking.purchaseDate,
+      medicationStart(tracking),
       tracking.totalUnits,
       tracking.unitsPerDose,
       dosesPerDay
     );
     if (daysBetween(today, runOutDate) !== 1) continue;
     // tratamento com prazo que termina junto com o remédio: nada a recomprar
-    if (supplyCoversTreatment(tracking.purchaseDate, tracking.treatmentDays, today, 1)) continue;
+    if (supplyCoversTreatment(medicationStart(tracking), tracking.treatmentDays, today, 1)) continue;
 
     await sendPushToUser(tracking.userId, {
       title: "Seu remédio está acabando 🔔",

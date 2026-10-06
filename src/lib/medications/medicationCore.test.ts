@@ -3,6 +3,7 @@ import {
   estimateRunOutDate,
   daysBetween,
   diffHorarios,
+  medicationStart,
   monthlyDoseSummary,
   supplyCoversTreatment,
   treatmentProgress,
@@ -257,5 +258,33 @@ describe("diffHorarios — edição da ficha x itens da Rotina", () => {
       desativar: ["i20", "i8b"],
       criar: [],
     });
+  });
+});
+
+describe("data de início (Comecei a tomar em)", () => {
+  it("cadastro manual: sem data da compra é válido", () => {
+    expect(() => validateInput({ ...VALID_INPUT, purchaseDate: null, codigoProduto: null })).not.toThrow();
+  });
+
+  it("data de início no futuro é recusada", () => {
+    expect(() => validateInput({ ...VALID_INPUT, startDate: "2999-01-01" })).toThrow(/futuro/);
+  });
+
+  it("data de início mal formatada é recusada", () => {
+    expect(() => validateInput({ ...VALID_INPUT, startDate: "06/10/2026" })).toThrow(/início/);
+  });
+
+  it("conta a partir do início, não da compra: comprado em maio, começou hoje = não acabou", () => {
+    const tracking = { purchaseDate: new Date("2026-05-07"), startDate: new Date("2026-10-06") };
+    const today = new Date("2026-10-06");
+    expect(medicationStart(tracking)).toEqual(new Date("2026-10-06"));
+    expect(treatmentProgress(medicationStart(tracking), 5, today)).toEqual({ day: 1, totalDays: 5, ended: false });
+    // 10 comprimidos, 1 por dia: acaba em 10 dias, não "já deve ter acabado"
+    const runOut = estimateRunOutDate(medicationStart(tracking), 10, 1, 1);
+    expect(daysBetween(today, runOut)).toBe(10);
+  });
+
+  it("linha antiga sem data de início cai na data da compra", () => {
+    expect(medicationStart({ purchaseDate: new Date("2026-05-07"), startDate: null })).toEqual(new Date("2026-05-07"));
   });
 });

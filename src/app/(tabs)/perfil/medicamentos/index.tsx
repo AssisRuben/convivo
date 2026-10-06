@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
-import { ActivityIndicator, FlatList, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, FlatList, Modal, Pressable, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { apiFetch } from "@/lib/api";
 import { showAlert } from "@/lib/alert";
@@ -12,6 +12,8 @@ type ApiMedicationTracking = {
   productName: string;
   codigoProduto: number | null;
   purchaseDate: string;
+  /** "Comecei a tomar em" (ausente em servidor antigo). */
+  startDate?: string;
   totalUnits: number;
   unitsPerDose: number;
   horarios: string[];
@@ -32,6 +34,58 @@ export default function MedicamentosScreen() {
   const [items, setItems] = useState<ApiMedicationTracking[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+
+  // Duas portas de entrada: escolher numa compra feita na farmácia (já vem
+  // nome e quantidade) ou digitar o nome — remédio comprado em outro lugar
+  // não tinha como ser cadastrado antes.
+  function chooseAdd(path: "/perfil/historico-compras" | "/perfil/medicamentos/novo") {
+    setAddOpen(false);
+    router.push(path);
+  }
+
+  const addButton = (
+    <Pressable
+      onPress={() => setAddOpen(true)}
+      className="flex-row items-center justify-center gap-2 rounded-full bg-mint py-3"
+    >
+      <Ionicons name="add-circle" size={18} color="#fff" />
+      <Text className="font-semibold text-white">Adicionar remédio</Text>
+    </Pressable>
+  );
+
+  const addSheet = (
+    <Modal visible={addOpen} transparent animationType="fade" onRequestClose={() => setAddOpen(false)}>
+      <Pressable className="flex-1 justify-end bg-black/40" onPress={() => setAddOpen(false)}>
+        <Pressable className="gap-2 rounded-t-3xl bg-cream p-5 pb-10" onPress={() => {}}>
+          <Text className="mb-1 text-center text-base font-bold text-navy">Adicionar remédio</Text>
+          <Pressable
+            onPress={() => chooseAdd("/perfil/historico-compras")}
+            className="flex-row items-center gap-3 rounded-2xl bg-card p-4"
+          >
+            <Ionicons name="receipt-outline" size={22} color="#0b1e3d" />
+            <View className="flex-1">
+              <Text className="text-base font-medium text-navy">Escolher das minhas compras</Text>
+              <Text className="text-xs text-navy/50">Comprou aqui na farmácia? Já vem com nome e quantidade.</Text>
+            </View>
+          </Pressable>
+          <Pressable
+            onPress={() => chooseAdd("/perfil/medicamentos/novo")}
+            className="flex-row items-center gap-3 rounded-2xl bg-card p-4"
+          >
+            <Ionicons name="create-outline" size={22} color="#0b1e3d" />
+            <View className="flex-1">
+              <Text className="text-base font-medium text-navy">Digitar o nome</Text>
+              <Text className="text-xs text-navy/50">Pra remédio comprado em outro lugar.</Text>
+            </View>
+          </Pressable>
+          <Pressable onPress={() => setAddOpen(false)} className="mt-1 items-center rounded-full py-3">
+            <Text className="text-sm font-semibold text-navy/60">Cancelar</Text>
+          </Pressable>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
   const loadedOnce = useRef(false);
 
   const load = useCallback(async () => {
@@ -90,16 +144,27 @@ export default function MedicamentosScreen() {
   }
 
   return (
+    <>
     <FlatList
       className="flex-1 bg-cream"
       data={items}
       keyExtractor={(item) => item.id}
       contentContainerClassName="gap-3 p-4 pb-24"
+      ListHeaderComponent={items.length > 0 ? addButton : null}
       ListEmptyComponent={
-        <Text className="mt-8 text-center text-navy/60">
-          Nenhum medicamento acompanhado ainda — toque numa compra em &ldquo;Histórico de
-          compras&rdquo; pra começar.
-        </Text>
+        <View className="mt-6 gap-4 rounded-2xl bg-card p-5">
+          <View className="items-center gap-2">
+            <Ionicons name="medkit" size={32} color="#2ec4b6" />
+            <Text className="text-center text-base font-semibold text-navy">
+              Cadastre seu remédio
+            </Text>
+            <Text className="text-center text-sm text-navy/60">
+              O app lembra na hora de tomar, mostra as doses do dia na tela inicial e avisa
+              antes de acabar.
+            </Text>
+          </View>
+          {addButton}
+        </View>
       }
       renderItem={({ item }) => {
         const low = item.daysUntilRunOut <= 3;
@@ -115,6 +180,7 @@ export default function MedicamentosScreen() {
                   {item.treatmentDays
                     ? `Tratamento de ${item.treatmentDays} dia${item.treatmentDays > 1 ? "s" : ""}`
                     : "Uso contínuo"}
+                  {item.startDate ? ` · começou em ${formatDate(item.startDate)}` : ""}
                 </Text>
               </View>
               <Pressable
@@ -156,20 +222,26 @@ export default function MedicamentosScreen() {
               </Text>
             </View>
 
-            <Pressable
-              onPress={() =>
-                router.push({
-                  pathname: "/perfil/medicamentos/[id]/recomprar",
-                  params: { id: item.id },
-                })
-              }
-              className="mt-3 items-center rounded-full bg-navy py-2.5"
-            >
-              <Text className="text-sm font-semibold text-white">Confirmar compra</Text>
-            </Pressable>
+            {/* Cadastrado à mão (sem produto da farmácia vinculado) não tem
+                recompra rápida — o servidor recusaria. */}
+            {item.codigoProduto != null && (
+              <Pressable
+                onPress={() =>
+                  router.push({
+                    pathname: "/perfil/medicamentos/[id]/recomprar",
+                    params: { id: item.id },
+                  })
+                }
+                className="mt-3 items-center rounded-full bg-navy py-2.5"
+              >
+                <Text className="text-sm font-semibold text-white">Confirmar compra</Text>
+              </Pressable>
+            )}
           </View>
         );
       }}
     />
+    {addSheet}
+    </>
   );
 }

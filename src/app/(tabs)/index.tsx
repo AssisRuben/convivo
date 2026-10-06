@@ -317,10 +317,36 @@ export default function HomeScreen() {
           {doses.map((dose) => (
             <DoseRow key={dose.checklistItemId} dose={dose} onPress={() => toggleDose(dose)} />
           ))}
-          <Text className="px-1 text-[11px] text-navy/50">
-            Toque no remédio para marcar como tomado (ou desmarcar).
-          </Text>
+          <View className="flex-row items-center justify-between px-1">
+            <Text className="flex-1 text-[11px] text-navy/50">
+              Toque no remédio para marcar como tomado (ou desmarcar).
+            </Text>
+            <Pressable onPress={() => router.push("/perfil/medicamentos")} hitSlop={8}>
+              <Text className="text-xs font-semibold text-mint">+ Adicionar remédio</Text>
+            </Pressable>
+          </View>
         </View>
+      )}
+
+      {/* Sem dose hoje (nenhum remédio cadastrado, ou nenhum pra hoje): porta
+          de entrada direto pro cadastro — antes só se chegava lá pelo Menu >
+          Histórico de compras, e quem testou não achou. */}
+      {doses.length === 0 && (
+        <Pressable
+          onPress={() => router.push("/perfil/medicamentos")}
+          className="flex-row items-center gap-3 rounded-2xl bg-mint/10 p-4"
+        >
+          <View className="h-11 w-11 items-center justify-center rounded-full bg-mint/20">
+            <Ionicons name="medkit" size={22} color="#2ec4b6" />
+          </View>
+          <View className="flex-1">
+            <Text className="font-semibold text-navy">Meus remédios</Text>
+            <Text className="text-xs text-navy/60">
+              Cadastre seu remédio e receba lembretes na hora certa.
+            </Text>
+          </View>
+          <Ionicons name="add-circle" size={26} color="#2ec4b6" />
+        </Pressable>
       )}
 
       {dashboard.repurchaseReady.length > 0 && (

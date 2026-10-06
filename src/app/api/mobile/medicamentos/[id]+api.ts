@@ -68,6 +68,7 @@ export async function PATCH(request: Request, { id }: Record<string, string>) {
       unitsPerDose: Number(body.unitsPerDose),
       horarios: Array.isArray(body.horarios) ? body.horarios.map(String) : [],
       treatmentDays: body.treatmentDays == null ? null : Number(body.treatmentDays),
+      startDate: typeof body.startDate === "string" ? body.startDate : null,
     });
     const items = await listMedicationTrackingsForUser(userId);
     return Response.json({ items });
