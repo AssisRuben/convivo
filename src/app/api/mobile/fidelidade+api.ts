@@ -1,5 +1,6 @@
 import { getApiUserId } from "@/lib/apiAuth";
 import { getLoyaltyProgress } from "@/lib/loyalty/loyaltyCore";
+import { getCarePointsSummary } from "@/lib/points/pointsCore";
 
 export async function GET(request: Request) {
   const userId = await getApiUserId(request);
@@ -7,6 +8,6 @@ export async function GET(request: Request) {
     return Response.json({ error: "Não autenticado" }, { status: 401 });
   }
 
-  const progress = await getLoyaltyProgress(userId);
-  return Response.json(progress);
+  const [progress, carePoints] = await Promise.all([getLoyaltyProgress(userId), getCarePointsSummary(userId)]);
+  return Response.json({ ...progress, carePoints });
 }

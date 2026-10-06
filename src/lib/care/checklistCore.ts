@@ -4,6 +4,7 @@ import {
   checkRoutineStreakMilestones,
 } from "@/lib/timeline/achievements";
 import { todayDate } from "@/lib/timeline/format";
+import { awardCarePoints, CARE_POINTS, pointsKey, revokeCarePoints } from "@/lib/points/pointsCore";
 import { medicationStart, treatmentProgress } from "@/lib/medications/medicationCore";
 import type { CareCategory } from "@/lib/generated/prisma/client";
 
@@ -215,7 +216,7 @@ export async function deactivateChecklistItemForUser(userId: string, id: string)
 }
 
 export async function completeChecklistItemForUser(userId: string, itemId: string): Promise<void> {
-  await requireOwnedItem(userId, itemId);
+  const item = await requireOwnedItem(userId, itemId);
   const date = todayDate();
 
   await prisma.careChecklistCompletion.upsert({
@@ -230,6 +231,14 @@ export async function completeChecklistItemForUser(userId: string, itemId: strin
   // precisa delas na resposta; o servidor é um processo contínuo, então
   // elas terminam normalmente em segundo plano.
   void (async () => {
+    // Pontos de cuidado: dose de remédio vale mais que os outros cuidados.
+    const isDose = item.category === "MEDICACAO";
+    await awardCarePoints(
+      userId,
+      isDose ? "DOSE" : "ROTINA",
+      pointsKey.check(itemId, date),
+      isDose ? CARE_POINTS.DOSE : CARE_POINTS.ROTINA
+    );
     await checkCareCompletionAchievement(userId, date);
     await checkRoutineStreakMilestones(userId, date);
   })().catch((error) => console.error("[rotina] conquistas após marcar:", error));
@@ -244,4 +253,6 @@ export async function uncompleteChecklistItemForUser(userId: string, itemId: str
     .catch(() => {
       // não havia conclusão hoje pra remover — ok, é idempotente
     });
+  // desmarcou: o ponto daquele cuidado hoje sai junto
+  await revokeCarePoints(userId, pointsKey.check(itemId, date));
 }

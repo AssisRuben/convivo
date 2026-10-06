@@ -149,6 +149,15 @@ export type ProfileInput = Partial<Omit<ApiProfile, "id" | "email" | "cpfVerifie
 
 export type CpfVerificationResult = "verified" | "mismatch" | "locked" | null;
 
+export type ApiCarePointsSummary = {
+  balance: number;
+  pointsPerReward: number;
+  rewardCents: number;
+  monthRewardCents: number;
+  monthCapCents: number;
+  todayPoints: number;
+};
+
 export type ApiLoyaltyProgress = {
   stampsFilled: number;
   stampsTotal: number;
@@ -156,6 +165,8 @@ export type ApiLoyaltyProgress = {
   totalRewardCents: number;
   minOrderCents: number;
   rewardPerCycleCents: number;
+  /** Ausente em servidor antigo. */
+  carePoints?: ApiCarePointsSummary;
 };
 
 export type ApiHomeNextDose = {

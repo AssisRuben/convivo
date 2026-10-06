@@ -88,6 +88,7 @@ model User {
   goals                Goal[]
   wisdomProgress       WisdomProgress[]
   avatar               UserAvatar?
+  carePoints           CarePointsEntry[]
   faithProgress        FaithProgress[]
 }
 
@@ -100,6 +101,8 @@ enum WalletEntrySource {
   LOYALTY_STAMP_REWARD
   VENDEDOR_PURCHASE_COMMISSION
   WALLET_REDEMPTION
+  // Pontos de cuidado convertidos em crédito (ver CarePointsEntry).
+  CARE_POINTS
 }
 
 // Extrato de crédito do usuário (hoje só bônus de indicação; comissão por
@@ -678,4 +681,26 @@ model UserAvatar {
   updatedAt  DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Pontos de cuidado: hábito de saúde (dose marcada, medição, capítulo lido,
+// desafio) vira ponto; a cada 500 pontos, R$ 5 de crédito na carteira, com
+// teto mensal (ver lib/points/pointsCore.ts). Ledger: ganho positivo,
+// conversão negativa. refKey torna cada ganho idempotente (ex.:
+// "check:<item>:<dia>") — marcar de novo o mesmo cuidado não soma de novo,
+// e desmarcar apaga o lançamento daquele dia.
+model CarePointsEntry {
+  id        String   @id @default(cuid())
+  userId    String
+  points    Int
+  // DOSE, ROTINA, MEDICAO, LEITURA, DESAFIO, CONVERSAO — texto livre de
+  // propósito (enum no Postgres exige migration pra cada motivo novo).
+  reason    String
+  refKey    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, refKey])
+  @@index([userId, createdAt])
 }

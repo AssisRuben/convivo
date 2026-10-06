@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { awardCarePoints, CARE_POINTS, pointsKey } from "@/lib/points/pointsCore";
 import { todayDate } from "@/lib/timeline/format";
 import { getReadingBook, listReadingBooks } from "@/lib/reading/readingContent";
 
@@ -155,5 +156,6 @@ export async function completeChapterForUser(
     update: { chaptersRead: chapterNumber, streakDays, lastReadDate: today },
   });
 
+  void awardCarePoints(userId, "LEITURA", pointsKey.leitura("wisdom", topicSlug, chapterNumber), CARE_POINTS.LEITURA);
   return toView(topicSlug, topic.chapters.length, updated);
 }

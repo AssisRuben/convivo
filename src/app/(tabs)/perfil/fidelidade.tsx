@@ -4,6 +4,7 @@ import { ActivityIndicator, Animated, ScrollView, Text, View } from "react-nativ
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { apiFetch, type ApiLoyaltyProgress } from "@/lib/api";
+import { CarePointsCard } from "@/components/CarePointsCard";
 
 function formatPrice(cents: number): string {
   return (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -290,6 +291,12 @@ export default function FidelidadeScreen() {
               {formatPrice(progress.totalRewardCents)} em créditos ganhos até agora
             </Text>
           </View>
+        </View>
+      )}
+
+      {progress.carePoints && (
+        <View className="mt-6">
+          <CarePointsCard summary={progress.carePoints} />
         </View>
       )}
 

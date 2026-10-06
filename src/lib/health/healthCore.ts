@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { awardCarePoints, CARE_POINTS, pointsKey } from "@/lib/points/pointsCore";
 import {
   checkGlicemiaAchievement,
   checkPressureMilestones,
@@ -41,6 +42,8 @@ export async function addMeasurementsForUser(
   await prisma.healthMeasurement.createMany({
     data: entries.map((values) => ({ userId, ...values })),
   });
+  // Pontos de cuidado: uma vez por dia, quantas medições forem
+  void awardCarePoints(userId, "MEDICAO", pointsKey.medicao(), CARE_POINTS.MEDICAO);
   await checkAchievementsForTypes(
     userId,
     entries.map((e) => e.type)
