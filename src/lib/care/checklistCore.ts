@@ -224,8 +224,15 @@ export async function completeChecklistItemForUser(userId: string, itemId: strin
     create: { itemId, date },
   });
 
-  await checkCareCompletionAchievement(userId, date);
-  await checkRoutineStreakMilestones(userId, date);
+  // Conquistas (dia completo, marcos de sequência) rodam depois de
+  // responder: são várias consultas em sequência — a de sequência faz uma
+  // por dia pra trás — e seguravam o "marcar dose" por segundos. Ninguém
+  // precisa delas na resposta; o servidor é um processo contínuo, então
+  // elas terminam normalmente em segundo plano.
+  void (async () => {
+    await checkCareCompletionAchievement(userId, date);
+    await checkRoutineStreakMilestones(userId, date);
+  })().catch((error) => console.error("[rotina] conquistas após marcar:", error));
 }
 
 export async function uncompleteChecklistItemForUser(userId: string, itemId: string): Promise<void> {
