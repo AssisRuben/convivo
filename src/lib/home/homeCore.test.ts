@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 // vi.mock abaixo é içado pro topo pelo vitest — o import já recebe os mocks
-import { getHomeDashboardForUser } from "@/lib/home/homeCore";
+import { getHomeDashboardForUser, pickDailyReading } from "@/lib/home/homeCore";
 
 const findItems = vi.fn();
 const findTrackings = vi.fn();
@@ -20,6 +20,9 @@ vi.mock("@/lib/loyalty/loyaltyCore", () => ({
   getLoyaltyProgress: async () => ({ stampsFilled: 0, stampsTotal: 10, totalRewardCents: 0 }),
 }));
 vi.mock("@/lib/catalog/catalogDb", () => ({ getActivePromotions: async () => [] }));
+// card "Bom dia" (pontos e sequência) — fora do escopo destes testes
+vi.mock("@/lib/points/pointsCore", () => ({ getCarePointsSummary: async () => null }));
+vi.mock("@/lib/care/checklistCore", () => ({ getOverallRoutineStreak: async () => 0 }));
 // "hoje" fixo: 05/10/2026 (todayDate usa a data UTC)
 vi.mock("@/lib/timeline/format", () => ({
   todayDate: () => new Date("2026-10-05T00:00:00Z"),
@@ -128,5 +131,32 @@ describe("getHomeDashboardForUser — medicamentos de hoje", () => {
     ]);
     const { todayDoses } = await getHomeDashboardForUser("u1", AGORA);
     expect(todayDoses.map((x) => x.checklistItemId)).toEqual(["seg"]);
+  });
+});
+
+describe("pickDailyReading — leitura sugerida no Bom dia", () => {
+  const t = (slug: string, chaptersRead: number, totalChapters: number, nextChapterAvailable: boolean) => ({
+    slug,
+    title: slug,
+    color: "#000",
+    chaptersRead,
+    totalChapters,
+    nextChapterAvailable,
+  });
+
+  it("prefere continuar uma trilha já começada", () => {
+    expect(pickDailyReading([t("nova", 0, 8, true), t("andando", 3, 8, true)])).toMatchObject({ slug: "andando", chapter: 4 });
+  });
+
+  it("sem nenhuma começada, sugere a primeira do capítulo 1", () => {
+    expect(pickDailyReading([t("a", 0, 8, true), t("b", 0, 8, true)])).toMatchObject({ slug: "a", chapter: 1 });
+  });
+
+  it("já leu o de hoje (bloqueado até amanhã): pula pra outra liberada", () => {
+    expect(pickDailyReading([t("lida-hoje", 3, 8, false), t("outra", 1, 8, true)])).toMatchObject({ slug: "outra" });
+  });
+
+  it("nada liberado hoje: null", () => {
+    expect(pickDailyReading([t("lida-hoje", 3, 8, false), t("terminada", 8, 8, false)])).toBeNull();
   });
 });

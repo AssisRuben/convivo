@@ -9,6 +9,7 @@ import { showAlert } from "@/lib/alert";
 import { HOME_CACHE_KEY, ROTINA_CACHE_KEY, fetchHomeDashboard } from "@/lib/tabPrefetch";
 import { getCached, loadCached, setCached } from "@/lib/tabDataCache";
 import { UserAvatar } from "@/components/UserAvatar";
+import { GoodMorningCard } from "@/components/GoodMorningCard";
 
 function readCachedDashboard() {
   return getCached<ApiHomeDashboard>(HOME_CACHE_KEY);
@@ -69,6 +70,14 @@ function DoseRow({ dose, onPress }: { dose: ApiHomeDose; onPress: () => void }) 
 
 function formatPrice(cents: number): string {
   return (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+/** Saudação pela hora do celular. */
+function greeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Bom dia";
+  if (hour < 18) return "Boa tarde";
+  return "Boa noite";
 }
 
 function firstName(fullName: string | undefined): string {
@@ -284,7 +293,7 @@ export default function HomeScreen() {
         <View className="flex-row items-center gap-3">
           <UserAvatar size={64} />
           <View>
-            <Text className="text-sm text-navy/60">Olá,</Text>
+            <Text className="text-sm text-navy/60">{greeting()},</Text>
             <Text className="text-lg font-bold text-navy">{firstName(user?.name)}.</Text>
           </View>
         </View>
@@ -297,6 +306,8 @@ export default function HomeScreen() {
           </Pressable>
         </View>
       </View>
+
+      <GoodMorningCard dashboard={dashboard} dosesTaken={tomadas} dosesTotal={doses.length} />
 
       <Pressable
         onPress={() => router.push("/(tabs)/catalogo")}

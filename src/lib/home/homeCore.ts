@@ -15,6 +15,30 @@ import { getActivePromotions } from "@/lib/catalog/catalogDb";
 import { getWisdomTopicsSummaryForUser } from "@/lib/wisdom/wisdomCore";
 import { getFaithBooksSummaryForUser } from "@/lib/faith/faithCore";
 import type { HealthMeasurementType } from "@/lib/generated/prisma/client";
+import { getCarePointsSummary, type CarePointsSummary } from "@/lib/points/pointsCore";
+import { getOverallRoutineStreak } from "@/lib/care/checklistCore";
+
+/** Leitura do dia sugerida no "Bom dia": próximo capítulo liberado hoje. */
+export type HomeDailyReading = {
+  slug: string;
+  title: string;
+  chapter: number;
+  color: string;
+};
+
+/**
+ * Qual leitura sugerir hoje numa trilha (Pílulas ou Gotas): primeiro um
+ * livro/tópico já começado com capítulo liberado hoje (continuidade vale
+ * mais que começar outro); senão o primeiro ainda não começado. null =
+ * nada liberado hoje (já leu o do dia ou terminou tudo). Pura.
+ */
+export function pickDailyReading(
+  trails: { slug: string; title: string; color: string; chaptersRead: number; totalChapters: number; nextChapterAvailable?: boolean }[]
+): HomeDailyReading | null {
+  const available = trails.filter((t) => t.nextChapterAvailable && t.chaptersRead < t.totalChapters);
+  const chosen = available.find((t) => t.chaptersRead > 0) ?? available.find((t) => t.chaptersRead === 0);
+  return chosen ? { slug: chosen.slug, title: chosen.title, chapter: chosen.chaptersRead + 1, color: chosen.color } : null;
+}
 
 export type HomeNextDose = {
   checklistItemId: string;
@@ -81,6 +105,11 @@ export type HomeDashboardView = {
   /** Remédios cadastrados (ativos) — o card "Meus remédios" muda o texto
    * entre "cadastre" e "ver meus remédios". */
   activeMedicationsCount: number;
+  /** Card "Bom dia": pontos de hoje, sequência de dias e leituras do dia. */
+  carePoints: CarePointsSummary;
+  routineStreak: number;
+  dailyWisdom: HomeDailyReading | null;
+  dailyFaith: HomeDailyReading | null;
   wisdom: HomeTrailSummary;
   faith: HomeTrailSummary;
   rotina: HomeRotinaSummary;
@@ -277,7 +306,7 @@ async function getSaudeSummary(userId: string, now: Date): Promise<HomeSaudeSumm
 }
 
 export async function getHomeDashboardForUser(userId: string, now: Date = new Date()): Promise<HomeDashboardView> {
-  const [todayDoses, repurchaseReady, loyalty, promotions, wisdomTopics, faithBooks, rotina, saude, activeMedicationsCount] = await Promise.all([
+  const [todayDoses, repurchaseReady, loyalty, promotions, wisdomTopics, faithBooks, rotina, saude, activeMedicationsCount, carePoints, routineStreak] = await Promise.all([
     getTodayDoses(userId, now),
     getRepurchaseReady(userId),
     getLoyaltyProgress(userId),
@@ -287,6 +316,8 @@ export async function getHomeDashboardForUser(userId: string, now: Date = new Da
     getRotinaSummary(userId, now),
     getSaudeSummary(userId, now),
     prisma.medicationTracking.count({ where: { userId, active: true } }),
+    getCarePointsSummary(userId),
+    getOverallRoutineStreak(userId),
   ]);
 
   return {
@@ -302,6 +333,10 @@ export async function getHomeDashboardForUser(userId: string, now: Date = new Da
     // lista inteira aqui — a tela de Ofertas busca a lista completa à parte.
     activePromotionsCount: promotions.length,
     activeMedicationsCount,
+    carePoints,
+    routineStreak,
+    dailyWisdom: pickDailyReading(wisdomTopics),
+    dailyFaith: pickDailyReading(faithBooks),
     wisdom: summarizeTrail(wisdomTopics),
     faith: summarizeTrail(faithBooks),
     rotina,

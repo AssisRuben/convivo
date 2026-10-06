@@ -20,6 +20,8 @@ export type FaithBookSummary = {
   chaptersRead: number;
   totalChapters: number;
   streakDays: number;
+  /** Próximo capítulo liberado hoje (um por dia) — o "Bom dia" da Home convida a ler. */
+  nextChapterAvailable: boolean;
 };
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -116,6 +118,12 @@ export async function getFaithBooksSummaryForUser(userId: string): Promise<Faith
       chaptersRead: row?.chaptersRead ?? 0,
       totalChapters: book.chapters.length,
       streakDays: row?.streakDays ?? 0,
+      nextChapterAvailable: nextChapterAvailableNow(
+        row?.chaptersRead ?? 0,
+        row?.lastReadDate ?? null,
+        todayDate(),
+        book.chapters.length
+      ),
     };
   });
 }

@@ -30,6 +30,8 @@ export type WisdomTopicSummary = {
   chaptersRead: number;
   totalChapters: number;
   streakDays: number;
+  /** Próximo capítulo liberado hoje (um por dia) — o "Bom dia" da Home convida a ler. */
+  nextChapterAvailable: boolean;
 };
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -120,6 +122,12 @@ export async function getWisdomTopicsSummaryForUser(userId: string): Promise<Wis
       chaptersRead: row?.chaptersRead ?? 0,
       totalChapters: topic.chapters.length,
       streakDays: row?.streakDays ?? 0,
+      nextChapterAvailable: nextChapterAvailableNow(
+        row?.chaptersRead ?? 0,
+        row?.lastReadDate ?? null,
+        todayDate(),
+        topic.chapters.length
+      ),
     };
   });
 }
