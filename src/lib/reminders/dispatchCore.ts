@@ -8,6 +8,7 @@ import {
   supplyCoversTreatment,
   treatmentProgress,
   medicationStart,
+  stockBase,
 } from "@/lib/medications/medicationCore";
 import { dueTipIndexes } from "@/lib/goals/goalCore";
 import { pickTipForIndex } from "@/lib/goals/goalTips";
@@ -106,7 +107,7 @@ export async function dispatchMedicationRepurchaseAlerts(now: Date = new Date())
   for (const tracking of trackings) {
     const dosesPerDay = Math.max(tracking.checklistItems.length, 1);
     const runOutDate = estimateRunOutDate(
-      medicationStart(tracking),
+      stockBase(tracking),
       tracking.totalUnits,
       tracking.unitsPerDose,
       dosesPerDay
@@ -117,7 +118,11 @@ export async function dispatchMedicationRepurchaseAlerts(now: Date = new Date())
 
     await sendPushToUser(tracking.userId, {
       title: "Seu remédio está acabando 🔔",
-      body: `${tracking.productName} acaba amanhã. Toque pra recomprar com 1 clique.`,
+      // Recompra rápida só existe com produto da farmácia vinculado —
+      // remédio digitado à mão não tem como ser recomprado pelo app.
+      body: tracking.codigoProduto
+        ? `${tracking.productName} acaba amanhã. Toque pra recomprar com 1 clique.`
+        : `${tracking.productName} acaba amanhã. Lembre de comprar mais.`,
       data: { screen: "medicamentos" },
     });
     await prisma.medicationRepurchaseAlert.create({

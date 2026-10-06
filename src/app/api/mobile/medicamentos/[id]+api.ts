@@ -39,7 +39,7 @@ export async function GET(request: Request, { id }: Record<string, string>) {
       { status: 400 }
     );
   }
-  if (catalogProduct.estoqueAtual < tracking.totalUnits) {
+  if (catalogProduct.estoqueAtual < tracking.packQuantity) {
     return Response.json(
       { error: `Estoque insuficiente — restam ${catalogProduct.estoqueAtual} unidade(s)` },
       { status: 400 }
@@ -48,8 +48,9 @@ export async function GET(request: Request, { id }: Record<string, string>) {
 
   return Response.json({
     productName: catalogProduct.nome,
-    totalUnits: tracking.totalUnits,
-    subtotalCents: catalogProduct.precoCents * tracking.totalUnits,
+    // caixas (totalUnits é comprimidos) — campo mantém o nome pro app antigo
+    totalUnits: tracking.packQuantity,
+    subtotalCents: catalogProduct.precoCents * tracking.packQuantity,
   });
 }
 
@@ -69,6 +70,7 @@ export async function PATCH(request: Request, { id }: Record<string, string>) {
       horarios: Array.isArray(body.horarios) ? body.horarios.map(String) : [],
       treatmentDays: body.treatmentDays == null ? null : Number(body.treatmentDays),
       startDate: typeof body.startDate === "string" ? body.startDate : null,
+      packQuantity: body.packQuantity == null ? null : Number(body.packQuantity),
     });
     const items = await listMedicationTrackingsForUser(userId);
     return Response.json({ items });

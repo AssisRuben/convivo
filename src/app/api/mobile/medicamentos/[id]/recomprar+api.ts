@@ -39,7 +39,8 @@ export async function POST(request: Request, { id }: Record<string, string>) {
   try {
     const { order, checkoutUrl } = await createOrderForItems(
       userId,
-      [{ codigoProduto: tracking.codigoProduto, quantity: tracking.totalUnits }],
+      // Caixas, não comprimidos: totalUnits é a contagem de comprimidos.
+      [{ codigoProduto: tracking.codigoProduto, quantity: tracking.packQuantity }],
       {
         fulfillmentType,
         address,

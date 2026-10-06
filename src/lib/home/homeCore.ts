@@ -7,6 +7,7 @@ import {
   supplyCoversTreatment,
   treatmentProgress,
   medicationStart,
+  stockBase,
 } from "@/lib/medications/medicationCore";
 import { todayDate } from "@/lib/timeline/format";
 import { getLoyaltyProgress } from "@/lib/loyalty/loyaltyCore";
@@ -77,6 +78,9 @@ export type HomeDashboardView = {
   repurchaseReady: HomeRepurchaseItem[];
   loyalty: HomeLoyaltySummary;
   activePromotionsCount: number;
+  /** Remédios cadastrados (ativos) — o card "Meus remédios" muda o texto
+   * entre "cadastre" e "ver meus remédios". */
+  activeMedicationsCount: number;
   wisdom: HomeTrailSummary;
   faith: HomeTrailSummary;
   rotina: HomeRotinaSummary;
@@ -203,7 +207,7 @@ async function getRepurchaseReady(userId: string): Promise<HomeRepurchaseItem[]>
   for (const tracking of trackings) {
     const dosesPerDay = Math.max(tracking.checklistItems.length, 1);
     const runOutDate = estimateRunOutDate(
-      medicationStart(tracking),
+      stockBase(tracking),
       tracking.totalUnits,
       tracking.unitsPerDose,
       dosesPerDay
@@ -273,7 +277,7 @@ async function getSaudeSummary(userId: string, now: Date): Promise<HomeSaudeSumm
 }
 
 export async function getHomeDashboardForUser(userId: string, now: Date = new Date()): Promise<HomeDashboardView> {
-  const [todayDoses, repurchaseReady, loyalty, promotions, wisdomTopics, faithBooks, rotina, saude] = await Promise.all([
+  const [todayDoses, repurchaseReady, loyalty, promotions, wisdomTopics, faithBooks, rotina, saude, activeMedicationsCount] = await Promise.all([
     getTodayDoses(userId, now),
     getRepurchaseReady(userId),
     getLoyaltyProgress(userId),
@@ -282,6 +286,7 @@ export async function getHomeDashboardForUser(userId: string, now: Date = new Da
     getFaithBooksSummaryForUser(userId),
     getRotinaSummary(userId, now),
     getSaudeSummary(userId, now),
+    prisma.medicationTracking.count({ where: { userId, active: true } }),
   ]);
 
   return {
@@ -296,6 +301,7 @@ export async function getHomeDashboardForUser(userId: string, now: Date = new Da
     // getActivePromotions(1) só pra saber "tem alguma?" sem carregar a
     // lista inteira aqui — a tela de Ofertas busca a lista completa à parte.
     activePromotionsCount: promotions.length,
+    activeMedicationsCount,
     wisdom: summarizeTrail(wisdomTopics),
     faith: summarizeTrail(faithBooks),
     rotina,

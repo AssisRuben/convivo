@@ -1,5 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { todayDate } from "@/lib/timeline/format";
+import { unitsPerPackageFromName } from "@/lib/medications/packageCount";
+
+export { unitsPerPackageFromName };
 
 const TIME_FORMAT = /^([01]\d|2[0-3]):[0-5]\d$/;
 
@@ -11,7 +14,10 @@ export type MedicationTrackingInput = {
   purchaseDate?: string | null;
   /** "Comecei a tomar em", "YYYY-MM-DD". Ausente (app antigo) = hoje. */
   startDate?: string | null;
+  /** Comprimidos/unidades que a pessoa tem AGORA (contagem de hoje). */
   totalUnits: number;
+  /** Caixas a pedir na recompra rápida (padrão 1). */
+  packQuantity?: number | null;
   unitsPerDose: number;
   horarios: string[]; // ["08:00", "20:00", ...]
   /** Dias de tratamento; null/ausente = uso contínuo. */
@@ -27,6 +33,9 @@ export type MedicationTrackingView = {
   purchaseDate: string;
   startDate: string;
   totalUnits: number;
+  /** Quanto deve restar hoje, pela posologia, desde a última contagem. */
+  unitsRemaining: number;
+  packQuantity: number;
   unitsPerDose: number;
   horarios: string[];
   /** null = uso contínuo. */
@@ -51,6 +60,12 @@ export function validateInput(input: MedicationTrackingInput): void {
   }
   for (const horario of input.horarios) {
     if (!TIME_FORMAT.test(horario)) throw new Error(`Horário inválido: ${horario}`);
+  }
+  if (
+    input.packQuantity != null &&
+    (!Number.isInteger(input.packQuantity) || input.packQuantity <= 0 || input.packQuantity > 50)
+  ) {
+    throw new Error("Quantidade de caixas inválida");
   }
   if (input.purchaseDate != null && !isValidDay(input.purchaseDate)) {
     throw new Error("Data da compra inválida");
@@ -86,6 +101,33 @@ function isValidDay(value: string): boolean {
 export function medicationStart(tracking: { startDate?: Date | null; purchaseDate: Date }): Date {
   return tracking.startDate ?? tracking.purchaseDate;
 }
+
+/**
+ * De onde conta o estoque: o dia da última contagem ("quantos você tem
+ * agora", "Comprei mais"). Separado do início do tratamento — quem começou
+ * há 20 dias e informa os 10 comprimidos que tem hoje não pode ter 20 dias
+ * de consumo descontados desses 10.
+ */
+export function stockBase(tracking: {
+  stockCountedAt?: Date | null;
+  startDate?: Date | null;
+  purchaseDate: Date;
+}): Date {
+  return tracking.stockCountedAt ?? medicationStart(tracking);
+}
+
+/** Quanto deve restar hoje, pela posologia, desde a última contagem. */
+export function unitsRemaining(
+  totalUnits: number,
+  unitsPerDose: number,
+  dosesPerDay: number,
+  countedAt: Date,
+  today: Date
+): number {
+  const elapsed = Math.max(daysBetween(startOfDayUtc(countedAt), today), 0);
+  return Math.max(totalUnits - elapsed * unitsPerDose * Math.max(dosesPerDay, 1), 0);
+}
+
 
 /**
  * Em que dia do tratamento a pessoa está: dia 1 = primeiro dia de uso
@@ -183,6 +225,9 @@ export async function createMedicationTracking(
         codigoProduto: input.codigoProduto ?? null,
         purchaseDate: input.purchaseDate ? new Date(input.purchaseDate) : startDate,
         startDate,
+        // "Quantos você tem agora" — a contagem é de hoje.
+        stockCountedAt: todayDate(),
+        packQuantity: input.packQuantity ?? 1,
         totalUnits: input.totalUnits,
         unitsPerDose: input.unitsPerDose,
         treatmentDays: input.treatmentDays ?? null,
@@ -230,7 +275,7 @@ export async function listMedicationTrackingsForUser(
       0
     );
     const runOutDate = estimateRunOutDate(
-      medicationStart(tracking),
+      stockBase(tracking),
       tracking.totalUnits,
       tracking.unitsPerDose,
       dosesPerDay
@@ -243,6 +288,14 @@ export async function listMedicationTrackingsForUser(
       purchaseDate: tracking.purchaseDate.toISOString().slice(0, 10),
       startDate: medicationStart(tracking).toISOString().slice(0, 10),
       totalUnits: tracking.totalUnits,
+      unitsRemaining: unitsRemaining(
+        tracking.totalUnits,
+        tracking.unitsPerDose,
+        dosesPerDay,
+        stockBase(tracking),
+        today
+      ),
+      packQuantity: tracking.packQuantity,
       unitsPerDose: tracking.unitsPerDose,
       horarios,
       treatmentDays: tracking.treatmentDays,
@@ -262,6 +315,8 @@ export type MedicationTrackingUpdate = {
   treatmentDays: number | null;
   /** Ausente (app antigo) = mantém a data de início atual. */
   startDate?: string | null;
+  /** Ausente (app antigo) = mantém. */
+  packQuantity?: number | null;
 };
 
 /**
@@ -313,7 +368,11 @@ export async function updateMedicationTracking(
     unitsPerDose: update.unitsPerDose,
     horarios,
     treatmentDays: update.treatmentDays,
+    packQuantity: update.packQuantity ?? null,
   });
+  // A quantidade no formulário de edição é "quantos você tem agora": mudou
+  // = contagem nova, de hoje. Não mudou = mantém a contagem anterior.
+  const recount = update.totalUnits !== tracking.totalUnits;
 
   const { desativar, criar } = diffHorarios(tracking.checklistItems, horarios);
 
@@ -325,8 +384,15 @@ export async function updateMedicationTracking(
         unitsPerDose: update.unitsPerDose,
         treatmentDays: update.treatmentDays,
         ...(update.startDate ? { startDate: new Date(update.startDate) } : {}),
+        ...(update.packQuantity ? { packQuantity: update.packQuantity } : {}),
+        ...(recount ? { stockCountedAt: todayDate() } : {}),
       },
     });
+    // Contagem nova = previsão nova: libera de novo o aviso "acaba amanhã"
+    // (é um por ficha; sem isso, depois de repor nunca mais avisava).
+    if (recount) {
+      await tx.medicationRepurchaseAlert.deleteMany({ where: { medicationTrackingId: id } });
+    }
     if (desativar.length > 0) {
       await tx.careChecklistItem.updateMany({
         where: { id: { in: desativar } },
@@ -346,6 +412,38 @@ export async function updateMedicationTracking(
       });
     }
   });
+}
+
+/**
+ * "Comprei mais": soma ao que deve restar hoje e zera a contagem pra hoje.
+ */
+export async function addMedicationStock(userId: string, id: string, units: number): Promise<void> {
+  if (!Number.isInteger(units) || units <= 0 || units > 10000) {
+    throw new Error("Quantidade inválida");
+  }
+  const tracking = await prisma.medicationTracking.findUnique({
+    where: { id },
+    include: { checklistItems: { where: { active: true } } },
+  });
+  if (!tracking || tracking.userId !== userId || !tracking.active) {
+    throw new Error("Sem permissão pra alterar esse medicamento");
+  }
+  const today = todayDate();
+  const remaining = unitsRemaining(
+    tracking.totalUnits,
+    tracking.unitsPerDose,
+    Math.max(tracking.checklistItems.length, 1),
+    stockBase(tracking),
+    today
+  );
+  await prisma.$transaction([
+    prisma.medicationTracking.update({
+      where: { id },
+      data: { totalUnits: remaining + units, stockCountedAt: today },
+    }),
+    // previsão nova: libera de novo o aviso "acaba amanhã"
+    prisma.medicationRepurchaseAlert.deleteMany({ where: { medicationTrackingId: id } }),
+  ]);
 }
 
 export async function deactivateMedicationTracking(userId: string, id: string): Promise<void> {

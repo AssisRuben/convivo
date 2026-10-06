@@ -506,7 +506,17 @@ model MedicationTracking {
   productName   String
   codigoProduto Int?
   purchaseDate  DateTime
+  // Comprimidos/unidades que a pessoa tinha em stockCountedAt ("quantos
+  // você tem agora" no cadastro, ou depois de "Comprei mais"/editar). A
+  // previsão de quando acaba conta de stockCountedAt, não da compra nem do
+  // início do tratamento. NÃO é o número de caixas — ver packQuantity.
   totalUnits    Int
+  // Dia da última contagem de totalUnits. Null só em linha antiga não
+  // migrada — o código cai em startDate/purchaseDate.
+  stockCountedAt DateTime? @db.Date
+  // Quantas caixas pedir na recompra rápida. Antes a recompra pedia
+  // totalUnits (comprimidos) como se fossem caixas.
+  packQuantity  Int      @default(1)
   unitsPerDose  Int
   // Quando a pessoa começou a tomar ("Comecei a tomar em") — é daqui que
   // contam o fim do estoque, o dia do tratamento e a soma do mês. A data da

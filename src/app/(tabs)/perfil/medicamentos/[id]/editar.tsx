@@ -14,6 +14,8 @@ type FichaMedicamento = {
   horarios: string[];
   treatmentDays?: number | null;
   startDate?: string;
+  /** Quanto deve restar hoje (ausente em servidor antigo). */
+  unitsRemaining?: number;
 };
 
 /**
@@ -60,7 +62,9 @@ export default function EditarMedicamentoScreen() {
   return (
     <MedicationForm
       productName={ficha.productName}
-      initial={ficha}
+      // A quantidade no formulário é "quantos você tem agora": parte do que
+      // deve restar hoje, não do que tinha na última contagem.
+      initial={{ ...ficha, totalUnits: ficha.unitsRemaining ?? ficha.totalUnits }}
       submitLabel="Salvar alterações"
       onSubmit={async (values) => {
         const res = await apiFetch(`/api/mobile/medicamentos/${ficha.id}`, {

@@ -222,6 +222,8 @@ export type ApiHomeDashboard = {
   repurchaseReady: ApiHomeRepurchaseItem[];
   loyalty: { stampsFilled: number; stampsTotal: number; totalRewardCents: number };
   activePromotionsCount: number;
+  /** Ausente em servidor antigo. */
+  activeMedicationsCount?: number;
   wisdom: ApiHomeTrailSummary;
   faith: ApiHomeTrailSummary;
   rotina: ApiHomeRotinaSummary;

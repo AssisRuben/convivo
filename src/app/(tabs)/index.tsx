@@ -273,6 +273,9 @@ export default function HomeScreen() {
   }
 
   const doses = dosesOf(dashboard);
+  // Servidor antigo não manda a contagem: trata como "sem remédio" (o
+  // card leva pro cadastro, que também mostra a lista).
+  const hasMedications = (dashboard.activeMedicationsCount ?? 0) > 0;
   const tomadas = doses.filter((d) => d.taken).length;
 
   return (
@@ -321,7 +324,7 @@ export default function HomeScreen() {
             <Text className="flex-1 text-[11px] text-navy/50">
               Toque no remédio para marcar como tomado (ou desmarcar).
             </Text>
-            <Pressable onPress={() => router.push("/perfil/medicamentos")} hitSlop={8}>
+            <Pressable onPress={() => router.push("/perfil/medicamentos/novo")} hitSlop={8}>
               <Text className="text-xs font-semibold text-mint">+ Adicionar remédio</Text>
             </Pressable>
           </View>
@@ -333,7 +336,9 @@ export default function HomeScreen() {
           Histórico de compras, e quem testou não achou. */}
       {doses.length === 0 && (
         <Pressable
-          onPress={() => router.push("/perfil/medicamentos")}
+          onPress={() =>
+            router.push(hasMedications ? "/perfil/medicamentos" : "/perfil/medicamentos/novo")
+          }
           className="flex-row items-center gap-3 rounded-2xl bg-mint/10 p-4"
         >
           <View className="h-11 w-11 items-center justify-center rounded-full bg-mint/20">
@@ -342,10 +347,16 @@ export default function HomeScreen() {
           <View className="flex-1">
             <Text className="font-semibold text-navy">Meus remédios</Text>
             <Text className="text-xs text-navy/60">
-              Cadastre seu remédio e receba lembretes na hora certa.
+              {hasMedications
+                ? "Nenhuma dose pra hoje · toque pra ver seus remédios"
+                : "Cadastre seu remédio e receba lembretes na hora certa."}
             </Text>
           </View>
-          <Ionicons name="add-circle" size={26} color="#2ec4b6" />
+          <Ionicons
+            name={hasMedications ? "chevron-forward" : "add-circle"}
+            size={hasMedications ? 18 : 26}
+            color="#2ec4b6"
+          />
         </Pressable>
       )}
 
@@ -371,12 +382,28 @@ export default function HomeScreen() {
                     : `Acaba em ${med.daysUntilRunOut} dia${med.daysUntilRunOut > 1 ? "s" : ""}`}
                 </Text>
               </View>
-              <Pressable
-                onPress={() => quickRepurchase(med.medicationTrackingId)}
-                className="rounded-full bg-mint px-4 py-2.5"
-              >
-                <Text className="text-xs font-semibold text-white">Recompra Rápida</Text>
-              </Pressable>
+              {/* Remédio digitado à mão não tem produto da farmácia — a
+                  recompra daria erro; o atalho vira "Comprei mais". */}
+              {med.codigoProduto != null ? (
+                <Pressable
+                  onPress={() => quickRepurchase(med.medicationTrackingId)}
+                  className="rounded-full bg-mint px-4 py-2.5"
+                >
+                  <Text className="text-xs font-semibold text-white">Recompra Rápida</Text>
+                </Pressable>
+              ) : (
+                <Pressable
+                  onPress={() =>
+                    router.push({
+                      pathname: "/perfil/medicamentos",
+                      params: { comprei: med.medicationTrackingId },
+                    })
+                  }
+                  className="rounded-full border border-mint px-4 py-2.5"
+                >
+                  <Text className="text-xs font-semibold text-mint">Comprei mais</Text>
+                </Pressable>
+              )}
             </View>
           ))}
         </View>

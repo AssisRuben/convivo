@@ -137,6 +137,23 @@ export async function listCatalogForBrowsing(opts: {
   return res.rows.map(rowToCatalogProduct);
 }
 
+/**
+ * Grupo de origem (produto_catalogo.grupo) de vários produtos de uma vez —
+ * sem filtro de estoque/controlado, é só pra classificar (ex.: tirar
+ * absorvente e fralda das sugestões de remédio). Produto que não aparece
+ * no catálogo fica de fora do mapa.
+ */
+export async function getCatalogGroups(codigos: number[]): Promise<Map<number, string | null>> {
+  const pool = getPool();
+  if (!pool || codigos.length === 0) return new Map();
+
+  const res = await pool.query<{ codigo: number; grupo: string | null }>(
+    `SELECT codigo, grupo FROM produto_catalogo WHERE codigo = ANY($1::int[])`,
+    [codigos]
+  );
+  return new Map(res.rows.map((row) => [row.codigo, row.grupo]));
+}
+
 export async function getCatalogProductByCodigo(codigo: number): Promise<CatalogProduct | null> {
   const pool = getPool();
   if (!pool) return null;

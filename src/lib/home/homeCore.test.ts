@@ -8,7 +8,7 @@ const findTrackings = vi.fn();
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     careChecklistItem: { findMany: (...args: unknown[]) => findItems(...args) },
-    medicationTracking: { findMany: (...args: unknown[]) => findTrackings(...args) },
+    medicationTracking: { findMany: (...args: unknown[]) => findTrackings(...args), count: async () => 0 },
     // resumo de Saúde da Home (sem medição)
     healthMeasurement: { findFirst: async () => null },
   },

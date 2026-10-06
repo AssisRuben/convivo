@@ -4,6 +4,9 @@ import {
   daysBetween,
   diffHorarios,
   medicationStart,
+  stockBase,
+  unitsPerPackageFromName,
+  unitsRemaining,
   monthlyDoseSummary,
   supplyCoversTreatment,
   treatmentProgress,
@@ -286,5 +289,36 @@ describe("data de início (Comecei a tomar em)", () => {
 
   it("linha antiga sem data de início cai na data da compra", () => {
     expect(medicationStart({ purchaseDate: new Date("2026-05-07"), startDate: null })).toEqual(new Date("2026-05-07"));
+  });
+});
+
+describe("estoque separado do tratamento", () => {
+  const d = (s: string) => new Date(s + "T00:00:00Z");
+
+  it("comprimidos por caixa a partir do nome", () => {
+    expect(unitsPerPackageFromName("CONVI OMEGA 3 1000MG 120CAP")).toBe(120);
+    expect(unitsPerPackageFromName("AZITROMICINA 500MG 5CP REV")).toBe(5);
+    expect(unitsPerPackageFromName("ALLEGRA 180MG 10CP REV")).toBe(10);
+    expect(unitsPerPackageFromName("CEFTRIAXONA SOD 1G C/DIL FA")).toBeNull();
+    // "500MG" não é contagem de comprimidos
+    expect(unitsPerPackageFromName("DIPIRONA 500MG")).toBeNull();
+  });
+
+  it("conta o estoque da última contagem, não do início do tratamento", () => {
+    // começou há 20 dias, informou hoje que tem 10: restam 10, não zero
+    const tracking = { purchaseDate: d("2026-09-01"), startDate: d("2026-09-16"), stockCountedAt: d("2026-10-06") };
+    expect(stockBase(tracking)).toEqual(d("2026-10-06"));
+    expect(unitsRemaining(10, 1, 1, stockBase(tracking), d("2026-10-06"))).toBe(10);
+    expect(daysBetween(d("2026-10-06"), estimateRunOutDate(stockBase(tracking), 10, 1, 1))).toBe(10);
+  });
+
+  it("restante desconta o consumo desde a contagem e não fica negativo", () => {
+    expect(unitsRemaining(120, 1, 2, d("2026-10-01"), d("2026-10-06"))).toBe(110);
+    expect(unitsRemaining(5, 1, 1, d("2026-09-01"), d("2026-10-06"))).toBe(0);
+  });
+
+  it("linha antiga sem contagem cai no início, e depois na compra", () => {
+    expect(stockBase({ purchaseDate: d("2026-05-07"), startDate: d("2026-09-28"), stockCountedAt: null })).toEqual(d("2026-09-28"));
+    expect(stockBase({ purchaseDate: d("2026-05-07"), startDate: null, stockCountedAt: null })).toEqual(d("2026-05-07"));
   });
 });
