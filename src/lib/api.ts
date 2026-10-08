@@ -11,6 +11,13 @@ import { triggerForceLogout } from "@/lib/authEvents";
 // apontasse pra um host diferente do que serviu a página.
 const API_URL = Platform.OS === "web" ? "" : process.env.EXPO_PUBLIC_API_URL!;
 
+/** Endereço absoluto de uma rota do servidor — pra link que sai do app
+ * (ex.: relatório pro médico). No web, a origem da própria página. */
+export function absoluteApiUrl(path: string): string {
+  const base = API_URL || (typeof window !== "undefined" ? window.location.origin : "");
+  return `${base}${path}`;
+}
+
 /**
  * Wrapper de fetch centralizado — injeta o token JWT salvo (se houver) em
  * todo request. Usado por todas as telas que falam com o backend próprio

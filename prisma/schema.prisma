@@ -89,6 +89,7 @@ model User {
   wisdomProgress       WisdomProgress[]
   avatar               UserAvatar?
   carePoints           CarePointsEntry[]
+  reportShares         ReportShare[]
   faithProgress        FaithProgress[]
 }
 
@@ -703,4 +704,24 @@ model CarePointsEntry {
 
   @@unique([userId, refKey])
   @@index([userId, createdAt])
+}
+
+// Link do relatório mensal pro médico (lib/report/reportCore.ts): criado só
+// quando a própria pessoa toca em "Relatório para o médico"; token
+// aleatório (não dá pra adivinhar) e expira em 7 dias. O relatório é
+// montado na hora em que o link é aberto, com os dados daquele mês.
+model ReportShare {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  // "YYYY-MM"
+  month     String
+  // fuso do celular de quem gerou — datas do relatório no relógio dele
+  timeZone  String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }

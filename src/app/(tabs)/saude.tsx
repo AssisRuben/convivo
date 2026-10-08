@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import Svg, { Circle, Line, Polyline } from "react-native-svg";
 import { type ApiHealthMeasurement } from "@/lib/api";
 import { LoadingScreen } from "@/components/LoadingScreen";
+import { DoctorReportButton } from "@/components/DoctorReportButton";
 import { SAUDE_CACHE_KEY, fetchSaude } from "@/lib/tabPrefetch";
 import { getCached, loadCached } from "@/lib/tabDataCache";
 
@@ -302,6 +303,8 @@ export default function SaudeScreen() {
         <Ionicons name="create-outline" size={18} color="#fff" />
         <Text className="font-semibold text-white">Lançamentos</Text>
       </Pressable>
+
+      <DoctorReportButton />
     </ScrollView>
   );
 }
