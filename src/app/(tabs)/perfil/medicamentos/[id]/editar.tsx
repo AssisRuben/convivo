@@ -12,6 +12,7 @@ type FichaMedicamento = {
   totalUnits: number;
   unitsPerDose: number;
   horarios: string[];
+  daysOfWeek?: number[];
   treatmentDays?: number | null;
   startDate?: string;
   /** Quanto deve restar hoje (ausente em servidor antigo). */

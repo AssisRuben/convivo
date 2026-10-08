@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { currentTimeZone, getRequestContextStorage, zonedParts } from "@/lib/timeZone";
 import { todayDate } from "@/lib/timeline/format";
 import { daysBetween, medicationStart } from "@/lib/medications/medicationCore";
+import { countScheduledDays, trackingDaysOfWeek } from "@/lib/medications/doseSchedule";
 import type { HealthMeasurementType } from "@/lib/generated/prisma/client";
 
 /**
@@ -146,7 +147,8 @@ export async function buildMonthlyReport(userId: string, month: string): Promise
       const lastDay = new Date(trackingStart.getTime() + (tracking.treatmentDays - 1) * MS_PER_DAY);
       if (lastDay.getTime() < to.getTime()) to = lastDay;
     }
-    const days = Math.max(daysBetween(from, to) + 1, 0);
+    // só os dias programados (remédio toda quinta: ~4 doses no mês)
+    const days = countScheduledDays(from, to, trackingDaysOfWeek(items));
     const taken = tracking.checklistItems.reduce((sum, i) => sum + i.completions.length, 0);
     const expected = days * dosesPerDay;
     if (expected === 0) continue;

@@ -9,6 +9,7 @@ import {
   medicationStart,
   stockBase,
 } from "@/lib/medications/medicationCore";
+import { normalizeDaysOfWeek, trackingDaysOfWeek } from "@/lib/medications/doseSchedule";
 import { todayDate } from "@/lib/timeline/format";
 import { getLoyaltyProgress } from "@/lib/loyalty/loyaltyCore";
 import { getActivePromotions } from "@/lib/catalog/catalogDb";
@@ -155,10 +156,14 @@ export async function getTodayDoses(userId: string, now: Date): Promise<HomeDose
 
   // Doses por dia e conclusões do mês de cada ficha — somando TODOS os
   // horários dela, não só o da linha.
-  const porFicha = new Map<string, { dosesPerDay: number; dates: Date[] }>();
+  const porFicha = new Map<string, { dosesPerDay: number; dates: Date[]; daysOfWeek: number[] }>();
   for (const item of items) {
     if (!item.medicationTrackingId) continue;
-    const acc = porFicha.get(item.medicationTrackingId) ?? { dosesPerDay: 0, dates: [] };
+    const acc = porFicha.get(item.medicationTrackingId) ?? {
+      dosesPerDay: 0,
+      dates: [],
+      daysOfWeek: normalizeDaysOfWeek(item.daysOfWeek),
+    };
     acc.dosesPerDay += 1;
     acc.dates.push(...item.completions.map((c) => c.date));
     porFicha.set(item.medicationTrackingId, acc);
@@ -178,7 +183,13 @@ export async function getTodayDoses(userId: string, now: Date): Promise<HomeDose
         period = { kind: "tratamento", day: progress.day, totalDays: progress.totalDays };
       } else {
         const ficha = porFicha.get(tracking.id)!;
-        const resumo = monthlyDoseSummary(medicationStart(tracking), ficha.dosesPerDay, ficha.dates, today);
+        const resumo = monthlyDoseSummary(
+          medicationStart(tracking),
+          ficha.dosesPerDay,
+          ficha.dates,
+          today,
+          ficha.daysOfWeek
+        );
         period = {
           kind: "continuo",
           month: today.getUTCMonth() + 1,
@@ -241,7 +252,8 @@ async function getRepurchaseReady(userId: string): Promise<HomeRepurchaseItem[]>
       stockBase(tracking),
       tracking.totalUnits,
       tracking.unitsPerDose,
-      dosesPerDay
+      dosesPerDay,
+      trackingDaysOfWeek(tracking.checklistItems)
     );
     const daysUntilRunOut = daysBetween(today, runOutDate);
     if (daysUntilRunOut > REPURCHASE_READY_THRESHOLD_DAYS) continue;

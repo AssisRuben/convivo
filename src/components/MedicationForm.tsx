@@ -20,6 +20,8 @@ export type MedicationFormValues = {
   totalUnits: number;
   unitsPerDose: number;
   horarios: string[];
+  /** Dias da semana (0 = domingo); vazio = todo dia. */
+  daysOfWeek: number[];
   /** null = uso contínuo. */
   treatmentDays: number | null;
 };
@@ -75,6 +77,7 @@ export function MedicationForm({
     totalUnits?: number | null;
     unitsPerDose?: number;
     horarios?: string[];
+    daysOfWeek?: number[];
     treatmentDays?: number | null;
     startDate?: string | null;
   };
@@ -99,6 +102,10 @@ export function MedicationForm({
     String(initial.unitsPerDose ?? 1),
   );
   const [horarios, setHorarios] = useState<string[]>(initial.horarios ?? []);
+  // Todo dia (padrão) ou só em alguns dias da semana (ex.: Ozempic toda
+  // quinta) — o estoque e a adesão contam só os dias marcados.
+  const [todoDia, setTodoDia] = useState(!initial.daysOfWeek?.length);
+  const [daysOfWeek, setDaysOfWeek] = useState<number[]>(initial.daysOfWeek ?? []);
   // Uso contínuo = sem data pra acabar (Home mostra a soma do mês);
   // tratamento = N dias a partir do início (Home mostra "Dia 5 de 7").
   const [usoContinuo, setUsoContinuo] = useState(initial.treatmentDays == null);
@@ -116,6 +123,12 @@ export function MedicationForm({
 
   function removeHorario(value: string) {
     setHorarios((prev) => prev.filter((h) => h !== value));
+  }
+
+  function toggleDay(day: number) {
+    setDaysOfWeek((prev) =>
+      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort(),
+    );
   }
 
   async function handleSave() {
@@ -142,6 +155,13 @@ export function MedicationForm({
       );
       return;
     }
+    if (!todoDia && daysOfWeek.length === 0) {
+      showAlert(
+        "Faltam os dias",
+        "Marque em quais dias da semana você toma (ex.: Qui)",
+      );
+      return;
+    }
     const treatmentDaysNum = Number(treatmentDays);
     if (
       !usoContinuo &&
@@ -161,6 +181,7 @@ export function MedicationForm({
         totalUnits: totalUnitsNum,
         unitsPerDose: unitsPerDoseNum,
         horarios,
+        daysOfWeek: todoDia ? [] : daysOfWeek,
         treatmentDays: usoContinuo ? null : treatmentDaysNum,
       });
     } catch (error) {
@@ -247,6 +268,67 @@ export function MedicationForm({
               </Text>
             )}
           </View>
+        </View>
+
+        <View className="gap-2">
+          <Text className="text-sm font-medium text-navy">
+            Em quais dias?
+          </Text>
+          <View className="flex-row gap-2">
+            {[
+              { value: true, label: "Todo dia" },
+              { value: false, label: "Em dias específicos" },
+            ].map((opcao) => {
+              const ativo = todoDia === opcao.value;
+              return (
+                <Pressable
+                  key={opcao.label}
+                  onPress={() => setTodoDia(opcao.value)}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: ativo }}
+                  className={`flex-1 items-center rounded-full border py-2.5 ${
+                    ativo ? "border-navy bg-navy" : "border-navy/15 bg-card"
+                  }`}
+                >
+                  <Text
+                    className={`text-sm font-medium ${ativo ? "text-white" : "text-navy"}`}
+                  >
+                    {opcao.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          {!todoDia && (
+            <View className="gap-1">
+              <View className="flex-row justify-between">
+                {WEEKDAYS.map((label, day) => {
+                  const ativo = daysOfWeek.includes(day);
+                  return (
+                    <Pressable
+                      key={day}
+                      onPress={() => toggleDay(day)}
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: ativo }}
+                      className={`h-11 w-11 items-center justify-center rounded-full ${
+                        ativo ? "bg-mint" : "border border-navy/15 bg-card"
+                      }`}
+                    >
+                      <Text
+                        className={`text-xs font-semibold ${ativo ? "text-white" : "text-navy/70"}`}
+                      >
+                        {label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <Text className="text-xs text-navy/50">
+                Ex.: injeção uma vez por semana. O lembrete e a conta de quando
+                acaba valem só para os dias marcados.
+              </Text>
+            </View>
+          )}
         </View>
 
         <View className="gap-2">

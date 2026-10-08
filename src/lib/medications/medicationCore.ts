@@ -1,6 +1,14 @@
 import { prisma } from "@/lib/prisma";
 import { todayDate } from "@/lib/timeline/format";
 import { unitsPerPackageFromName } from "@/lib/medications/packageCount";
+import {
+  countScheduledDays,
+  firstUncoveredDay,
+  normalizeDaysOfWeek,
+  trackingDaysOfWeek,
+  validDaysOfWeek,
+} from "@/lib/medications/doseSchedule";
+import { recordScheduleChange, sameDays } from "@/lib/care/scheduleVersion";
 
 export { unitsPerPackageFromName };
 
@@ -20,6 +28,8 @@ export type MedicationTrackingInput = {
   packQuantity?: number | null;
   unitsPerDose: number;
   horarios: string[]; // ["08:00", "20:00", ...]
+  /** Dias da semana (0 = domingo); vazio/ausente = todo dia. */
+  daysOfWeek?: number[] | null;
   /** Dias de tratamento; null/ausente = uso contínuo. */
   treatmentDays?: number | null;
 };
@@ -38,6 +48,8 @@ export type MedicationTrackingView = {
   packQuantity: number;
   unitsPerDose: number;
   horarios: string[];
+  /** Dias da semana (0 = domingo); vazio = todo dia. */
+  daysOfWeek: number[];
   /** null = uso contínuo. */
   treatmentDays: number | null;
   /** Doses já tomadas desde a compra — soma as conclusões de todos os
@@ -60,6 +72,9 @@ export function validateInput(input: MedicationTrackingInput): void {
   }
   for (const horario of input.horarios) {
     if (!TIME_FORMAT.test(horario)) throw new Error(`Horário inválido: ${horario}`);
+  }
+  if (input.daysOfWeek != null && !validDaysOfWeek(input.daysOfWeek)) {
+    throw new Error("Dias da semana inválidos");
   }
   if (
     input.packQuantity != null &&
@@ -116,15 +131,19 @@ export function stockBase(tracking: {
   return tracking.stockCountedAt ?? medicationStart(tracking);
 }
 
-/** Quanto deve restar hoje, pela posologia, desde a última contagem. */
+/** Quanto deve restar hoje, pela posologia, desde a última contagem.
+ * Conta só os dias programados de antes de hoje (a dose de hoje ainda não
+ * saiu do estoque). */
 export function unitsRemaining(
   totalUnits: number,
   unitsPerDose: number,
   dosesPerDay: number,
   countedAt: Date,
-  today: Date
+  today: Date,
+  daysOfWeek: number[] = []
 ): number {
-  const elapsed = Math.max(daysBetween(startOfDayUtc(countedAt), today), 0);
+  const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+  const elapsed = countScheduledDays(startOfDayUtc(countedAt), yesterday, daysOfWeek);
   return Math.max(totalUnits - elapsed * unitsPerDose * Math.max(dosesPerDay, 1), 0);
 }
 
@@ -155,12 +174,13 @@ export function monthlyDoseSummary(
   purchaseDate: Date,
   dosesPerDay: number,
   completionDates: Date[],
-  today: Date
+  today: Date,
+  daysOfWeek: number[] = []
 ): { taken: number; expected: number; monthStart: Date } {
   const monthStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
   const purchaseDay = startOfDayUtc(purchaseDate);
   const from = purchaseDay > monthStart ? purchaseDay : monthStart;
-  const days = Math.max(daysBetween(from, today) + 1, 0);
+  const days = countScheduledDays(from, today, daysOfWeek);
   const taken = completionDates.filter((d) => d >= from && d <= today).length;
   return { taken, expected: days * Math.max(dosesPerDay, 1), monthStart };
 }
@@ -196,13 +216,15 @@ function estimateRunOutDate(
   purchaseDate: Date,
   totalUnits: number,
   unitsPerDose: number,
-  dosesPerDay: number
+  dosesPerDay: number,
+  daysOfWeek: number[] = []
 ): Date {
+  // Remédio em dias da semana: o estoque cobre N dias PROGRAMADOS, e acaba
+  // no primeiro dia programado que não cobre (Ozempic de 4 doses toda
+  // quinta dura 4 semanas, não 4 dias).
   const dailyConsumption = unitsPerDose * dosesPerDay;
   const daysSupply = dailyConsumption > 0 ? Math.floor(totalUnits / dailyConsumption) : 0;
-  const runOut = new Date(purchaseDate);
-  runOut.setDate(runOut.getDate() + daysSupply);
-  return runOut;
+  return firstUncoveredDay(startOfDayUtc(purchaseDate), daysSupply, daysOfWeek);
 }
 
 function daysBetween(from: Date, to: Date): number {
@@ -216,6 +238,7 @@ export async function createMedicationTracking(
 ): Promise<void> {
   validateInput(input);
   const startDate = input.startDate ? new Date(input.startDate) : todayDate();
+  const daysOfWeek = normalizeDaysOfWeek(input.daysOfWeek ?? []);
 
   await prisma.$transaction(async (tx) => {
     const tracking = await tx.medicationTracking.create({
@@ -241,7 +264,7 @@ export async function createMedicationTracking(
           title: input.productName.trim(),
           category: "MEDICACAO",
           timeOfDay: horario,
-          daysOfWeek: [],
+          daysOfWeek,
           medicationTrackingId: tracking.id,
         },
       });
@@ -270,6 +293,7 @@ export async function listMedicationTrackingsForUser(
       .filter((t): t is string => Boolean(t))
       .sort();
     const dosesPerDay = Math.max(horarios.length, 1);
+    const daysOfWeek = trackingDaysOfWeek(tracking.checklistItems);
     const dosesTaken = tracking.checklistItems.reduce(
       (sum, item) => sum + item.completions.length,
       0
@@ -278,7 +302,8 @@ export async function listMedicationTrackingsForUser(
       stockBase(tracking),
       tracking.totalUnits,
       tracking.unitsPerDose,
-      dosesPerDay
+      dosesPerDay,
+      daysOfWeek
     );
 
     return {
@@ -293,11 +318,13 @@ export async function listMedicationTrackingsForUser(
         tracking.unitsPerDose,
         dosesPerDay,
         stockBase(tracking),
-        today
+        today,
+        daysOfWeek
       ),
       packQuantity: tracking.packQuantity,
       unitsPerDose: tracking.unitsPerDose,
       horarios,
+      daysOfWeek,
       treatmentDays: tracking.treatmentDays,
       dosesTaken,
       estimatedRunOutDate: runOutDate.toISOString().slice(0, 10),
@@ -317,6 +344,8 @@ export type MedicationTrackingUpdate = {
   startDate?: string | null;
   /** Ausente (app antigo) = mantém. */
   packQuantity?: number | null;
+  /** Ausente (app antigo) = mantém os dias atuais; vazio = todo dia. */
+  daysOfWeek?: number[] | null;
 };
 
 /**
@@ -369,12 +398,15 @@ export async function updateMedicationTracking(
     horarios,
     treatmentDays: update.treatmentDays,
     packQuantity: update.packQuantity ?? null,
+    daysOfWeek: update.daysOfWeek ?? null,
   });
+  const currentDays = trackingDaysOfWeek(tracking.checklistItems);
+  const daysOfWeek = update.daysOfWeek != null ? normalizeDaysOfWeek(update.daysOfWeek) : currentDays;
   // A quantidade no formulário de edição é "quantos você tem agora": mudou
   // = contagem nova, de hoje. Não mudou = mantém a contagem anterior.
   const recount = update.totalUnits !== tracking.totalUnits;
 
-  const { desativar, criar } = diffHorarios(tracking.checklistItems, horarios);
+  const { manter, desativar, criar } = diffHorarios(tracking.checklistItems, horarios);
 
   await prisma.$transaction(async (tx) => {
     await tx.medicationTracking.update({
@@ -399,6 +431,13 @@ export async function updateMedicationTracking(
         data: { active: false },
       });
     }
+    // Dias da semana mudaram: vale pra todos os horários que ficam, com o
+    // histórico da agenda (meta de Rotina ligada a esse horário).
+    for (const item of tracking.checklistItems) {
+      if (!manter.includes(item.id) || sameDays(item.daysOfWeek, daysOfWeek)) continue;
+      await tx.careChecklistItem.update({ where: { id: item.id }, data: { daysOfWeek } });
+      await recordScheduleChange(tx, item, daysOfWeek);
+    }
     for (const horario of criar) {
       await tx.careChecklistItem.create({
         data: {
@@ -406,7 +445,7 @@ export async function updateMedicationTracking(
           title: tracking.productName,
           category: "MEDICACAO",
           timeOfDay: horario,
-          daysOfWeek: [],
+          daysOfWeek,
           medicationTrackingId: id,
         },
       });
@@ -434,7 +473,8 @@ export async function addMedicationStock(userId: string, id: string, units: numb
     tracking.unitsPerDose,
     Math.max(tracking.checklistItems.length, 1),
     stockBase(tracking),
-    today
+    today,
+    trackingDaysOfWeek(tracking.checklistItems)
   );
   await prisma.$transaction([
     prisma.medicationTracking.update({

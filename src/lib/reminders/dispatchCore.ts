@@ -11,6 +11,7 @@ import {
   medicationStart,
   stockBase,
 } from "@/lib/medications/medicationCore";
+import { trackingDaysOfWeek } from "@/lib/medications/doseSchedule";
 import { dueTipIndexes } from "@/lib/goals/goalCore";
 import { pickTipForIndex } from "@/lib/goals/goalTips";
 import { isNextChapterAvailable as isNextWisdomChapterAvailable } from "@/lib/wisdom/wisdomCore";
@@ -111,7 +112,8 @@ export async function dispatchMedicationRepurchaseAlerts(now: Date = new Date())
       stockBase(tracking),
       tracking.totalUnits,
       tracking.unitsPerDose,
-      dosesPerDay
+      dosesPerDay,
+      trackingDaysOfWeek(tracking.checklistItems)
     );
     if (daysBetween(today, runOutDate) !== 1) continue;
     // tratamento com prazo que termina junto com o remédio: nada a recomprar

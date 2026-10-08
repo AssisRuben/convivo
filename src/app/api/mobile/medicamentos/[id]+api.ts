@@ -71,6 +71,7 @@ export async function PATCH(request: Request, { id }: Record<string, string>) {
       treatmentDays: body.treatmentDays == null ? null : Number(body.treatmentDays),
       startDate: typeof body.startDate === "string" ? body.startDate : null,
       packQuantity: body.packQuantity == null ? null : Number(body.packQuantity),
+      daysOfWeek: Array.isArray(body.daysOfWeek) ? body.daysOfWeek.map(Number) : null,
     });
     const items = await listMedicationTrackingsForUser(userId);
     return Response.json({ items });

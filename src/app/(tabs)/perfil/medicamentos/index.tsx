@@ -13,6 +13,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { apiFetch } from "@/lib/api";
 import { showAlert } from "@/lib/alert";
+import { describeDaysOfWeek } from "@/lib/medications/doseSchedule";
 import { invalidateCached } from "@/lib/tabDataCache";
 import { HOME_CACHE_KEY, ROTINA_CACHE_KEY } from "@/lib/tabPrefetch";
 
@@ -29,6 +30,8 @@ type ApiMedicationTracking = {
   packQuantity?: number;
   unitsPerDose: number;
   horarios: string[];
+  /** Ausente em servidor antigo = todo dia. */
+  daysOfWeek?: number[];
   /** null = uso contínuo (ausente em servidor antigo). */
   treatmentDays?: number | null;
   dosesTaken: number;
@@ -208,6 +211,7 @@ export default function MedicamentosScreen() {
                     {item.productName}
                   </Text>
                   <Text className="mt-0.5 text-xs text-navy/50">
+                    {item.daysOfWeek?.length ? `${describeDaysOfWeek(item.daysOfWeek)}, ` : ""}
                     {item.horarios.join(" · ")} — {item.unitsPerDose} por vez
                   </Text>
                   <Text className="mt-0.5 text-xs text-navy/50">
