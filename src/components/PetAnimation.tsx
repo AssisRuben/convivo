@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Animated, Easing, Text, View } from "react-native";
-import { getBearTier, type PetGoalType } from "@/constants/petStages";
+import { getBearTier, type BearTier, type PetGoalType } from "@/constants/petStages";
 
-const BASE_SIZE = 110;
+const DEFAULT_SIZE = 110;
 
 const SPARKLES: Record<"hearts" | "stars", string[]> = {
   hearts: ["💕", "💗", "💓"],
@@ -26,10 +26,17 @@ const SPARKLES: Record<"hearts" | "stars", string[]> = {
 export function PetAnimation({
   goalType,
   milestoneValue,
+  tier: tierProp,
+  size = DEFAULT_SIZE,
 }: {
-  goalType: PetGoalType;
-  milestoneValue: number;
+  goalType?: PetGoalType;
+  milestoneValue?: number;
+  /** Fase já resolvida (bichinho do Home, que cresce com a sequência de
+   * dias) — no feed vem goalType + milestoneValue. */
+  tier?: BearTier;
+  size?: number;
 }) {
+  const BASE_SIZE = size;
   const [bounce] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
@@ -53,7 +60,7 @@ export function PetAnimation({
     return () => loop.stop();
   }, [bounce]);
 
-  const tier = getBearTier(goalType, milestoneValue);
+  const tier = tierProp ?? getBearTier(goalType ?? "ROTINA", milestoneValue ?? 30);
   const animatedStyle = {
     transform: [{ translateY: bounce }, { scale: tier.scale }],
   };
@@ -85,8 +92,8 @@ export function PetAnimation({
             key={i}
             style={{
               position: "absolute",
-              fontSize: 18,
-              top: [2, 26, 50][i],
+              fontSize: BASE_SIZE * 0.16,
+              top: [0.02, 0.24, 0.45].map((f) => f * BASE_SIZE)[i],
               left: i % 2 === 0 ? 4 : undefined,
               right: i % 2 === 1 ? 4 : undefined,
             }}
@@ -111,7 +118,7 @@ export function PetAnimation({
         {tier.crown && (
           <Text
             className="absolute w-full text-center"
-            style={{ fontSize: BASE_SIZE * 0.4, top: -20 }}
+            style={{ fontSize: BASE_SIZE * 0.4, top: -BASE_SIZE * 0.18 }}
           >
             👑
           </Text>

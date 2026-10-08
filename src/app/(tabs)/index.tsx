@@ -10,6 +10,7 @@ import { HOME_CACHE_KEY, ROTINA_CACHE_KEY, fetchHomeDashboard } from "@/lib/tabP
 import { getCached, loadCached, setCached } from "@/lib/tabDataCache";
 import { UserAvatar } from "@/components/UserAvatar";
 import { GoodMorningCard } from "@/components/GoodMorningCard";
+import { HomePetCard } from "@/components/HomePetCard";
 
 function readCachedDashboard() {
   return getCached<ApiHomeDashboard>(HOME_CACHE_KEY);
@@ -419,6 +420,12 @@ export default function HomeScreen() {
           ))}
         </View>
       )}
+
+      <HomePetCard
+        streakDays={dashboard.routineStreak ?? 0}
+        doneToday={dashboard.rotina?.doneToday ?? 0}
+        totalToday={dashboard.rotina?.totalToday ?? 0}
+      />
 
       <Pressable
         onPress={() => router.push("/perfil/fidelidade")}
