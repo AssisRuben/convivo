@@ -1,4 +1,5 @@
 import {
+  dispatchCaregiverMissedDoseAlerts,
   dispatchDueFaithReminders,
   dispatchDueGoalTips,
   dispatchDueRoutineReminders,
@@ -16,13 +17,14 @@ export async function POST(request: Request) {
     return Response.json({ error: "Não autorizado" }, { status: 401 });
   }
 
-  const [routineReminders, medicationAlerts, goalTips, wisdomReminders, faithReminders] = await Promise.all([
+  const [routineReminders, medicationAlerts, goalTips, wisdomReminders, faithReminders, caregiverAlerts] = await Promise.all([
     dispatchDueRoutineReminders(),
     dispatchMedicationRepurchaseAlerts(),
     dispatchDueGoalTips(),
     dispatchDueWisdomReminders(),
     dispatchDueFaithReminders(),
+    dispatchCaregiverMissedDoseAlerts(),
   ]);
 
-  return Response.json({ routineReminders, medicationAlerts, goalTips, wisdomReminders, faithReminders });
+  return Response.json({ routineReminders, medicationAlerts, goalTips, wisdomReminders, faithReminders, caregiverAlerts });
 }

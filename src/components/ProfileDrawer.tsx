@@ -172,6 +172,12 @@ export function ProfileDrawer() {
             />
             <MenuLink href="/perfil/metas" icon="flag-outline" label="Minhas metas" onNavigate={navigate} />
             <MenuLink
+              href="/perfil/familia"
+              icon="people-outline"
+              label="Família e cuidadores"
+              onNavigate={navigate}
+            />
+            <MenuLink
               href="/perfil/minhas-postagens"
               icon="ribbon-outline"
               label="Minhas postagens"

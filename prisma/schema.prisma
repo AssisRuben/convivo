@@ -229,17 +229,38 @@ enum CareLinkStatus {
   REVOKED
 }
 
+// Modo cuidador (lib/care/caregiverCore.ts): o titular (quem é
+// acompanhado) gera o convite — o consentimento parte dele — e o cuidador
+// aceita digitando o código. Ativo: o cuidador vê doses do dia, sequência e
+// medições recentes, e recebe alerta de dose não marcada. Qualquer um dos
+// dois desfaz (REVOKED). Convite sem expiresAt (antigo) não vale mais.
 model CareLink {
   id          String         @id @default(cuid())
   titularId   String
   caregiverId String?
   inviteCode  String         @unique
   status      CareLinkStatus @default(PENDING)
+  expiresAt   DateTime?
   createdAt   DateTime       @default(now())
   acceptedAt  DateTime?
 
-  titular   User  @relation("TitularLinks", fields: [titularId], references: [id])
-  caregiver User? @relation("CaregiverLinks", fields: [caregiverId], references: [id])
+  titular   User                     @relation("TitularLinks", fields: [titularId], references: [id])
+  caregiver User?                    @relation("CaregiverLinks", fields: [caregiverId], references: [id])
+  alerts    CaregiverAlertDispatch[]
+}
+
+// Alerta "dose não marcada" já enviado ao cuidador — um por vínculo, dose
+// e dia.
+model CaregiverAlertDispatch {
+  id     String   @id @default(cuid())
+  linkId String
+  itemId String
+  date   DateTime @db.Date
+  sentAt DateTime @default(now())
+
+  link CareLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
+
+  @@unique([linkId, itemId, date])
 }
 
 // Espelho "write-through" do catálogo real da farmácia (banco externo, ver
@@ -725,3 +746,4 @@ model ReportShare {
 
   @@index([userId])
 }
+

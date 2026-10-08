@@ -12,6 +12,7 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { GoodMorningCard } from "@/components/GoodMorningCard";
 import { HomePetCard } from "@/components/HomePetCard";
 import { WeeklyChallengesCard } from "@/components/WeeklyChallengesCard";
+import { CaregivingCard } from "@/components/CaregivingCard";
 
 function readCachedDashboard() {
   return getCached<ApiHomeDashboard>(HOME_CACHE_KEY);
@@ -420,6 +421,10 @@ export default function HomeScreen() {
             </View>
           ))}
         </View>
+      )}
+
+      {dashboard.caregiving && dashboard.caregiving.length > 0 && (
+        <CaregivingCard people={dashboard.caregiving} />
       )}
 
       <HomePetCard

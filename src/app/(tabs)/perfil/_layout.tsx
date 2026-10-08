@@ -35,6 +35,7 @@ export default function PerfilLayout() {
       <Stack.Screen name="medicamentos/[id]/recomprar" options={backButtonOptions} />
       <Stack.Screen name="medicamentos/[id]/editar" options={backButtonOptions} />
       <Stack.Screen name="metas/index" />
+      <Stack.Screen name="familia" />
       <Stack.Screen name="metas/nova" options={backButtonOptions} />
       <Stack.Screen name="metas/[id]" options={backButtonOptions} />
       {/* Gotas de Fé e Pílulas sem seta no header: a saída é o Continuar do

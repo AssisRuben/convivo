@@ -156,6 +156,28 @@ export type ProfileInput = Partial<Omit<ApiProfile, "id" | "email" | "cpfVerifie
 
 export type CpfVerificationResult = "verified" | "mismatch" | "locked" | null;
 
+export type ApiCaregivingSummary = {
+  linkId: string;
+  name: string;
+  dosesTaken: number;
+  dosesTotal: number;
+  overdue: number;
+};
+
+export type ApiCaredPerson = {
+  linkId: string;
+  name: string;
+  doses: ApiHomeDose[];
+  streakDays: number;
+  latest: { type: "PRESSAO" | "GLICEMIA" | "PESO" | "GORDURA"; value: string; measuredAt: string }[];
+};
+
+export type ApiCareOverview = {
+  caregivers: { linkId: string; name: string; since: string }[];
+  pendingInvite: { linkId: string; code: string; expiresAt: string } | null;
+  people: ApiCaredPerson[];
+};
+
 export type ApiWeeklyChallenge = {
   id: string;
   title: string;
@@ -264,6 +286,8 @@ export type ApiHomeDashboard = {
   dailyWisdom?: ApiHomeDailyReading | null;
   dailyFaith?: ApiHomeDailyReading | null;
   weeklyChallenges?: ApiWeeklyChallenge[];
+  /** Modo cuidador: quem eu acompanho (ausente em servidor antigo). */
+  caregiving?: ApiCaregivingSummary[];
   wisdom: ApiHomeTrailSummary;
   faith: ApiHomeTrailSummary;
   rotina: ApiHomeRotinaSummary;

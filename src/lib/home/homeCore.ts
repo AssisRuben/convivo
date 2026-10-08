@@ -137,7 +137,7 @@ function parseTimeOfDay(value: string): number {
  * mês. Tratamento que já passou do último dia não aparece.
  * Ordem: por horário; sem horário fixo vai pro fim.
  */
-async function getTodayDoses(userId: string, now: Date): Promise<HomeDose[]> {
+export async function getTodayDoses(userId: string, now: Date): Promise<HomeDose[]> {
   const { minutes: nowMinutes, weekday } = localClock(now);
   const today = todayDate();
   const monthStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));

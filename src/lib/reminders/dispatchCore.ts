@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { todayDate } from "@/lib/timeline/format";
 import { zonedParts } from "@/lib/timeZone";
+import { shouldAlertMissedDose } from "@/lib/care/caregiverRules";
 import { sendPushToUser } from "@/lib/push/expoPush";
 import {
   estimateRunOutDate,
@@ -256,5 +257,76 @@ export async function dispatchDueFaithReminders(now: Date = new Date()): Promise
     sent += 1;
   }
 
+  return sent;
+}
+
+/**
+ * Modo cuidador: dose de remédio do titular não marcada até
+ * MISSED_DOSE_ALERT_MINUTES depois do horário → push pro cuidador, uma vez
+ * por vínculo, dose e dia (CaregiverAlertDispatch). Horário no relógio de
+ * Brasília (o cron não vem de um celular — ver lib/timeZone.ts).
+ */
+export async function dispatchCaregiverMissedDoseAlerts(now: Date = new Date()): Promise<number> {
+  const today = todayDate();
+  const { minutes: nowMinutes, weekday } = localClock(now);
+
+  const links = await prisma.careLink.findMany({
+    where: { status: "ACTIVE", caregiverId: { not: null } },
+    include: {
+      titular: { select: { name: true } },
+      alerts: { where: { date: today }, select: { itemId: true } },
+    },
+  });
+  if (links.length === 0) return 0;
+
+  const items = await prisma.careChecklistItem.findMany({
+    where: {
+      userId: { in: [...new Set(links.map((l) => l.titularId))] },
+      active: true,
+      category: "MEDICACAO",
+      timeOfDay: { not: null },
+    },
+    include: {
+      completions: { where: { date: today }, select: { id: true } },
+      medicationTracking: { select: { purchaseDate: true, startDate: true, treatmentDays: true } },
+    },
+  });
+
+  let sent = 0;
+  for (const link of links) {
+    const alerted = new Set(link.alerts.map((a) => a.itemId));
+    for (const item of items) {
+      if (item.userId !== link.titularId || !item.timeOfDay) continue;
+      const tracking = item.medicationTracking;
+      const ended = tracking ? treatmentProgress(medicationStart(tracking), tracking.treatmentDays, today)?.ended : false;
+      const scheduledToday = !ended && (item.daysOfWeek.length === 0 || item.daysOfWeek.includes(weekday));
+      if (
+        !shouldAlertMissedDose({
+          itemMinutes: parseTimeOfDay(item.timeOfDay),
+          nowMinutes,
+          scheduledToday,
+          completed: item.completions.length > 0,
+          alreadyAlerted: alerted.has(item.id),
+        })
+      ) {
+        continue;
+      }
+
+      try {
+        // registra antes de enviar: se o cron rodar duas vezes ao mesmo
+        // tempo, a chave única barra o segundo envio
+        await prisma.caregiverAlertDispatch.create({ data: { linkId: link.id, itemId: item.id, date: today } });
+      } catch {
+        continue;
+      }
+      const firstName = link.titular.name.split(" ")[0];
+      await sendPushToUser(link.caregiverId!, {
+        title: "Dose não marcada ⚠️",
+        body: `${firstName} ainda não marcou ${item.title} das ${item.timeOfDay}.`,
+        data: { screen: "familia" },
+      });
+      sent += 1;
+    }
+  }
   return sent;
 }
