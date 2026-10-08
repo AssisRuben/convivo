@@ -17,6 +17,7 @@ import { getFaithBooksSummaryForUser } from "@/lib/faith/faithCore";
 import type { HealthMeasurementType } from "@/lib/generated/prisma/client";
 import { getCarePointsSummary, type CarePointsSummary } from "@/lib/points/pointsCore";
 import { getOverallRoutineStreak } from "@/lib/care/checklistCore";
+import { getWeeklyChallenges, type WeeklyChallenge } from "@/lib/points/challengesCore";
 
 /** Leitura do dia sugerida no "Bom dia": próximo capítulo liberado hoje. */
 export type HomeDailyReading = {
@@ -110,6 +111,7 @@ export type HomeDashboardView = {
   routineStreak: number;
   dailyWisdom: HomeDailyReading | null;
   dailyFaith: HomeDailyReading | null;
+  weeklyChallenges: WeeklyChallenge[];
   wisdom: HomeTrailSummary;
   faith: HomeTrailSummary;
   rotina: HomeRotinaSummary;
@@ -306,7 +308,7 @@ async function getSaudeSummary(userId: string, now: Date): Promise<HomeSaudeSumm
 }
 
 export async function getHomeDashboardForUser(userId: string, now: Date = new Date()): Promise<HomeDashboardView> {
-  const [todayDoses, repurchaseReady, loyalty, promotions, wisdomTopics, faithBooks, rotina, saude, activeMedicationsCount, carePoints, routineStreak] = await Promise.all([
+  const [todayDoses, repurchaseReady, loyalty, promotions, wisdomTopics, faithBooks, rotina, saude, activeMedicationsCount, carePoints, routineStreak, weeklyChallenges] = await Promise.all([
     getTodayDoses(userId, now),
     getRepurchaseReady(userId),
     getLoyaltyProgress(userId),
@@ -318,6 +320,7 @@ export async function getHomeDashboardForUser(userId: string, now: Date = new Da
     prisma.medicationTracking.count({ where: { userId, active: true } }),
     getCarePointsSummary(userId),
     getOverallRoutineStreak(userId),
+    getWeeklyChallenges(userId),
   ]);
 
   return {
@@ -337,6 +340,7 @@ export async function getHomeDashboardForUser(userId: string, now: Date = new Da
     routineStreak,
     dailyWisdom: pickDailyReading(wisdomTopics),
     dailyFaith: pickDailyReading(faithBooks),
+    weeklyChallenges,
     wisdom: summarizeTrail(wisdomTopics),
     faith: summarizeTrail(faithBooks),
     rotina,

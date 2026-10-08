@@ -11,6 +11,7 @@ const WAYS: { icon: keyof typeof Ionicons.glyphMap; label: string; points: strin
   { icon: "checkmark-done-outline", label: "Marcar um cuidado da Rotina", points: "+1" },
   { icon: "pulse-outline", label: "Registrar uma medição (1x por dia)", points: "+5" },
   { icon: "book-outline", label: "Ler a pílula ou a gota do dia", points: "+3" },
+  { icon: "trophy-outline", label: "Completar um desafio da semana", points: "+30" },
 ];
 
 /**

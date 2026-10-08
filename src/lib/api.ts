@@ -149,6 +149,15 @@ export type ProfileInput = Partial<Omit<ApiProfile, "id" | "email" | "cpfVerifie
 
 export type CpfVerificationResult = "verified" | "mismatch" | "locked" | null;
 
+export type ApiWeeklyChallenge = {
+  id: string;
+  title: string;
+  progress: number;
+  target: number;
+  points: number;
+  completed: boolean;
+};
+
 export type ApiHomeDailyReading = {
   slug: string;
   title: string;
@@ -247,6 +256,7 @@ export type ApiHomeDashboard = {
   routineStreak?: number;
   dailyWisdom?: ApiHomeDailyReading | null;
   dailyFaith?: ApiHomeDailyReading | null;
+  weeklyChallenges?: ApiWeeklyChallenge[];
   wisdom: ApiHomeTrailSummary;
   faith: ApiHomeTrailSummary;
   rotina: ApiHomeRotinaSummary;

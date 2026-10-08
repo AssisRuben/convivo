@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { todayDate } from "@/lib/timeline/format";
-import { zonedParts } from "@/lib/timeZone";
+import { startOfLocalDay } from "@/lib/timeZone";
 
 /**
  * Pontos de cuidado: hábito de saúde vira ponto, e a cada
@@ -55,13 +55,6 @@ export function conversionsAvailable(balance: number, monthRewardCents: number):
 /** Quanto ainda dá pra ganhar hoje na Rotina, dado o já ganho. Pura. */
 export function routinePointsAllowed(wanted: number, alreadyToday: number): number {
   return Math.max(Math.min(wanted, DAILY_ROUTINE_POINTS_CAP - alreadyToday), 0);
-}
-
-/** Instante da meia-noite de hoje no relógio do celular (lib/timeZone). */
-function startOfLocalDay(now: Date = new Date()): Date {
-  const { hour, minute } = zonedParts(now);
-  const elapsedMs = ((hour * 60 + minute) * 60 + now.getUTCSeconds()) * 1000 + now.getUTCMilliseconds();
-  return new Date(now.getTime() - elapsedMs);
 }
 
 async function balanceOf(userId: string): Promise<number> {

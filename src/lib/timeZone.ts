@@ -65,3 +65,22 @@ export function zonedParts(date: Date, timeZone: string = currentTimeZone()) {
     weekday: WEEKDAYS.indexOf(get("weekday")),
   };
 }
+
+/** Instante da meia-noite de hoje no relógio do celular da requisição. */
+export function startOfLocalDay(now: Date = new Date()): Date {
+  const { hour, minute } = zonedParts(now);
+  const elapsedMs = ((hour * 60 + minute) * 60 + now.getUTCSeconds()) * 1000 + now.getUTCMilliseconds();
+  return new Date(now.getTime() - elapsedMs);
+}
+
+/**
+ * Semana atual (segunda a domingo) no relógio do celular: instante da
+ * segunda 00:00 e a data dela ("2026-10-05"), pra chave de prêmio semanal.
+ */
+export function localWeekStart(now: Date = new Date()): { start: Date; key: string } {
+  const { weekday } = zonedParts(now);
+  const daysSinceMonday = (weekday + 6) % 7;
+  const start = new Date(startOfLocalDay(now).getTime() - daysSinceMonday * 24 * 60 * 60 * 1000);
+  const { year, month, day } = zonedParts(new Date(start.getTime() + 12 * 60 * 60 * 1000));
+  return { start, key: `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}` };
+}

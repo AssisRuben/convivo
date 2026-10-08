@@ -11,6 +11,7 @@ import { getCached, loadCached, setCached } from "@/lib/tabDataCache";
 import { UserAvatar } from "@/components/UserAvatar";
 import { GoodMorningCard } from "@/components/GoodMorningCard";
 import { HomePetCard } from "@/components/HomePetCard";
+import { WeeklyChallengesCard } from "@/components/WeeklyChallengesCard";
 
 function readCachedDashboard() {
   return getCached<ApiHomeDashboard>(HOME_CACHE_KEY);
@@ -426,6 +427,10 @@ export default function HomeScreen() {
         doneToday={dashboard.rotina?.doneToday ?? 0}
         totalToday={dashboard.rotina?.totalToday ?? 0}
       />
+
+      {dashboard.weeklyChallenges && dashboard.weeklyChallenges.length > 0 && (
+        <WeeklyChallengesCard challenges={dashboard.weeklyChallenges} />
+      )}
 
       <Pressable
         onPress={() => router.push("/perfil/fidelidade")}

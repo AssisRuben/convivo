@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { getRequestContextStorage, isValidTimeZone } from "@/lib/timeZone";
+import { getRequestContextStorage, isValidTimeZone, localWeekStart } from "@/lib/timeZone";
 import { todayDate } from "@/lib/timeline/format";
 import { localClock } from "@/lib/reminders/dispatchCore";
 
@@ -46,5 +46,23 @@ describe("dia e hora pelo fuso do celular", () => {
     expect(isValidTimeZone("America/Sao_Paulo")).toBe(true);
     expect(isValidTimeZone("Nada/Existe")).toBe(false);
     expect(isValidTimeZone("'; drop table")).toBe(false);
+  });
+});
+
+describe("semana local (segunda a domingo)", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("terça 22:30 em Brasília: semana começou na segunda 00:00 de Brasília", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(Date.UTC(2026, 9, 7, 1, 30))); // qua 01:30 UTC = ter 22:30 BRT
+    const week = localWeekStart();
+    expect(week.key).toBe("2026-10-05");
+    expect(week.start.toISOString()).toBe("2026-10-05T03:00:00.000Z");
+  });
+
+  it("domingo à noite ainda é a mesma semana", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(Date.UTC(2026, 9, 12, 2, 0))); // seg 02:00 UTC = dom 23:00 BRT
+    expect(localWeekStart().key).toBe("2026-10-05");
   });
 });
