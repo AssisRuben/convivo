@@ -4,7 +4,6 @@ import { Animated, ActivityIndicator, Platform, Pressable, ScrollView, Text, Vie
 import { Ionicons } from "@expo/vector-icons";
 import { apiFetch, type ApiHomeDashboard, type ApiHomeDose } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { useProfileDrawer } from "@/lib/profileDrawer";
 import { showAlert } from "@/lib/alert";
 import { HOME_CACHE_KEY, ROTINA_CACHE_KEY, fetchHomeDashboard } from "@/lib/tabPrefetch";
 import { getCached, loadCached, setCached } from "@/lib/tabDataCache";
@@ -158,7 +157,6 @@ function QuickAction({
 export default function HomeScreen() {
   const router = useRouter();
   const { user } = useAuth();
-  const { open: openProfileDrawer } = useProfileDrawer();
   const [dashboard, setDashboard] = useState<ApiHomeDashboard | null>(() => readCachedDashboard() ?? null);
   const [loading, setLoading] = useState(() => readCachedDashboard() === undefined);
   const loadedOnce = useRef(false);
@@ -300,14 +298,9 @@ export default function HomeScreen() {
             <Text className="text-lg font-bold text-navy">{firstName(user?.name)}.</Text>
           </View>
         </View>
-        <View className="flex-row items-center gap-4">
-          <Pressable onPress={() => router.push("/perfil/novidades")}>
-            <Ionicons name="notifications-outline" size={24} color="#0b1e3d" />
-          </Pressable>
-          <Pressable onPress={openProfileDrawer}>
-            <Ionicons name="person-outline" size={24} color="#0b1e3d" />
-          </Pressable>
-        </View>
+        <Pressable onPress={() => router.push("/perfil/novidades")}>
+          <Ionicons name="notifications-outline" size={24} color="#0b1e3d" />
+        </Pressable>
       </View>
 
       <GoodMorningCard dashboard={dashboard} dosesTaken={tomadas} dosesTotal={doses.length} />
