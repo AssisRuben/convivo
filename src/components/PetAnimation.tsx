@@ -113,8 +113,21 @@ export function PetAnimation({
         </Text>
       )}
 
-      <Animated.View style={[{ width: BASE_SIZE, height: BASE_SIZE }, animatedStyle]}>
-        <Text style={{ fontSize: BASE_SIZE, lineHeight: BASE_SIZE }}>🐻</Text>
+      {/* Caixa mais larga que a fonte: no Android o emoji desenha além do
+          fontSize e uma caixa do tamanho exato cortava o lado direito. */}
+      <Animated.View
+        style={[{ width: BASE_SIZE * 1.4, height: BASE_SIZE, alignItems: "center" }, animatedStyle]}
+      >
+        <Text
+          style={{
+            fontSize: BASE_SIZE * 0.9,
+            lineHeight: BASE_SIZE,
+            textAlign: "center",
+            includeFontPadding: false,
+          }}
+        >
+          🐻
+        </Text>
         {tier.crown && (
           <Text
             className="absolute w-full text-center"
