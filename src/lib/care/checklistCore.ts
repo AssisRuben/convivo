@@ -8,6 +8,7 @@ import { awardCarePoints, CARE_POINTS, pointsKey, revokeCarePoints } from "@/lib
 import { medicationStart, treatmentProgress } from "@/lib/medications/medicationCore";
 import type { CareCategory } from "@/lib/generated/prisma/client";
 import { recordScheduleChange, sameDays } from "@/lib/care/scheduleVersion";
+import { describeDaysOfWeek, isScheduledOn } from "@/lib/medications/doseSchedule";
 
 /**
  * Lógica de rotina/checklist compartilhada entre as server actions da web
@@ -192,6 +193,11 @@ export async function deactivateChecklistItemForUser(userId: string, id: string)
 export async function completeChecklistItemForUser(userId: string, itemId: string): Promise<void> {
   const item = await requireOwnedItem(userId, itemId);
   const date = todayDate();
+  // Cuidado de outro dia da semana não vale hoje — sem isso, app antigo
+  // (que lista tudo) deixava marcar e ganhar pontos/sequência fora do dia.
+  if (!isScheduledOn(item.daysOfWeek, date)) {
+    throw new Error(`Esse cuidado não é pra hoje (${describeDaysOfWeek(item.daysOfWeek)}).`);
+  }
 
   await prisma.careChecklistCompletion.upsert({
     where: { itemId_date: { itemId, date } },

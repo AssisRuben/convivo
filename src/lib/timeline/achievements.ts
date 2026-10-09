@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import type { GoalType, TimelineEventType } from "@/lib/generated/prisma/client";
+import { isScheduledOn } from "@/lib/medications/doseSchedule";
 
 function daysBefore(date: Date, days: number): Date {
   const result = new Date(date);
@@ -258,10 +259,14 @@ export async function checkCareCompletionAchievement(
   const day = startOfDay(date);
   const nextDay = daysBefore(day, -1);
 
-  const activeItems = await prisma.careChecklistItem.findMany({
-    where: { userId, active: true },
-    select: { id: true },
-  });
+  // Só os cuidados programados pra esse dia da semana — o de quinta não
+  // pode impedir o "dia completo" da terça.
+  const activeItems = (
+    await prisma.careChecklistItem.findMany({
+      where: { userId, active: true },
+      select: { id: true, daysOfWeek: true },
+    })
+  ).filter((item) => isScheduledOn(item.daysOfWeek, day));
   if (activeItems.length === 0) return;
 
   const completions = await prisma.careChecklistCompletion.count({

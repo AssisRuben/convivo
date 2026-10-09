@@ -28,6 +28,29 @@ import { CelebrationModal } from "@/components/CelebrationModal";
 import { RotinaCompleteToast } from "@/components/RotinaCompleteToast";
 import { getCached, invalidateCached, loadCached, setCached } from "@/lib/tabDataCache";
 
+const WEEKDAY_NAMES = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
+
+function isForToday(item: ApiChecklistItem, weekday: number): boolean {
+  return item.daysOfWeek.length === 0 || item.daysOfWeek.includes(weekday);
+}
+
+/** " · amanhã" ou " · próxima: quinta" — com um dia só, o nome já está
+ * na linha ("Dom"), então só avisa quando é amanhã. */
+function otherDayHint(daysOfWeek: number[], weekday: number): string {
+  const next = nextDayLabel(daysOfWeek, weekday);
+  if (next === "amanhã") return " · amanhã";
+  return daysOfWeek.length > 1 && next ? ` · próxima: ${next}` : "";
+}
+
+/** "amanhã" ou o nome do próximo dia programado ("quinta"). */
+function nextDayLabel(daysOfWeek: number[], weekday: number): string {
+  for (let ahead = 1; ahead <= 7; ahead++) {
+    const day = (weekday + ahead) % 7;
+    if (daysOfWeek.includes(day)) return ahead === 1 ? "amanhã" : WEEKDAY_NAMES[day];
+  }
+  return "";
+}
+
 function readCachedRotina() {
   return getCached<{ items: ApiChecklistItem[]; streakDays: number }>(ROTINA_CACHE_KEY);
 }
@@ -80,6 +103,7 @@ export default function RotinaScreen() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [celebration, setCelebration] = useState<number | null>(null);
   const [completeToast, setCompleteToast] = useState<string | null>(null);
+  const [showOtherDays, setShowOtherDays] = useState(false);
   const loadedOnce = useRef(false);
   const hadCacheOnMount = useRef(readCachedRotina() !== undefined);
   // "completedToday" é por data — sem isso, um app que fica dias sem ser
@@ -306,21 +330,36 @@ export default function RotinaScreen() {
         .join(" ")
     : "";
 
-  const pendingItems = items.filter((item) => !item.completedToday);
-  const doneItems = items.filter((item) => item.completedToday);
+  // Só o que é de hoje entra nas listas de fazer/feito; o resto fica em
+  // "Outros dias", sem check (dá pra editar e apagar). Marcado hoje fica
+  // na lista de hoje mesmo fora do dia (dá pra desmarcar).
+  const weekday = new Date().getDay();
+  const todayItems = items.filter((item) => item.completedToday || isForToday(item, weekday));
+  const otherDayItems = items.filter((item) => !item.completedToday && !isForToday(item, weekday));
+  const pendingItems = todayItems.filter((item) => !item.completedToday);
+  const doneItems = todayItems.filter((item) => item.completedToday);
 
-  function renderItemRow(item: ApiChecklistItem) {
+  function renderItemRow(item: ApiChecklistItem, otherDay = false) {
     const meta = CARE_CATEGORY_META[item.category];
     return (
-      <View key={item.id} className="flex-row items-center gap-3 rounded-2xl bg-card p-3 shadow-sm">
-        <Pressable
-          onPress={() => toggleComplete(item)}
-          className={`h-7 w-7 items-center justify-center rounded-full border-2 ${
-            item.completedToday ? "border-mint bg-mint" : "border-navy/20"
-          }`}
-        >
-          {item.completedToday && <Ionicons name="checkmark" size={16} color="#fff" />}
-        </Pressable>
+      <View
+        key={item.id}
+        className={`flex-row items-center gap-3 rounded-2xl p-3 ${otherDay ? "bg-card/60" : "bg-card shadow-sm"}`}
+      >
+        {otherDay ? (
+          <View className="h-7 w-7 items-center justify-center">
+            <Ionicons name="calendar-outline" size={18} color="#0b1e3d60" />
+          </View>
+        ) : (
+          <Pressable
+            onPress={() => toggleComplete(item)}
+            className={`h-7 w-7 items-center justify-center rounded-full border-2 ${
+              item.completedToday ? "border-mint bg-mint" : "border-navy/20"
+            }`}
+          >
+            {item.completedToday && <Ionicons name="checkmark" size={16} color="#fff" />}
+          </Pressable>
+        )}
 
         <Pressable className="flex-1" onPress={() => openDetail(item)}>
           <Text
@@ -334,6 +373,7 @@ export default function RotinaScreen() {
             {item.daysOfWeek.length === 0
               ? "Todo dia"
               : item.daysOfWeek.map((d) => WEEKDAY_LABELS[d]).join(", ")}
+            {otherDay && otherDayHint(item.daysOfWeek, weekday)}
           </Text>
           {(item.medicationTrackingId || item.activeGoals.length > 0) && (
             <View className="mt-1 flex-row flex-wrap gap-1">
@@ -497,10 +537,12 @@ export default function RotinaScreen() {
           <Text className="mb-2 text-sm font-bold text-navy">Bora fazer o certo? 💪</Text>
           {pendingItems.length === 0 ? (
             <View className="items-center rounded-2xl bg-card p-5">
-              <Text className="text-sm font-medium text-navy/60">Tudo em dia por aqui! 🎉</Text>
+              <Text className="text-sm font-medium text-navy/60">
+                {todayItems.length === 0 ? "Nenhum cuidado programado pra hoje." : "Tudo em dia por aqui! 🎉"}
+              </Text>
             </View>
           ) : (
-            <View className="gap-2">{pendingItems.map(renderItemRow)}</View>
+            <View className="gap-2">{pendingItems.map((item) => renderItemRow(item))}</View>
           )}
         </View>
       )}
@@ -508,7 +550,24 @@ export default function RotinaScreen() {
       {doneItems.length > 0 && (
         <View className="mb-4">
           <Text className="mb-2 text-sm font-bold text-navy">Aí tu deu aula! 🎉</Text>
-          <View className="gap-2">{doneItems.map(renderItemRow)}</View>
+          <View className="gap-2">{doneItems.map((item) => renderItemRow(item))}</View>
+        </View>
+      )}
+
+      {otherDayItems.length > 0 && (
+        <View className="mb-4">
+          <Pressable
+            onPress={() => setShowOtherDays((v) => !v)}
+            className="mb-2 flex-row items-center justify-between py-1"
+          >
+            <Text className="text-sm font-bold text-navy/60">
+              Outros dias da semana ({otherDayItems.length})
+            </Text>
+            <Ionicons name={showOtherDays ? "chevron-up" : "chevron-down"} size={18} color="#0b1e3d80" />
+          </Pressable>
+          {showOtherDays && (
+            <View className="gap-2">{otherDayItems.map((item) => renderItemRow(item, true))}</View>
+          )}
         </View>
       )}
       </ScrollView>
