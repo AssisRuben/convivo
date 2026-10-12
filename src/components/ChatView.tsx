@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { ActivityIndicator, FlatList, Platform, Pressable, Text, TextInput, View } from "react-native";
+import { FlatList, Platform, Pressable, Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
@@ -10,6 +10,12 @@ const MAX_LENGTH = 2000;
 const CREAM = "#fafaf7"; // cream do tailwind.config.js
 // Cabeçalho padrão do Stack (o do app não muda a altura).
 const HEADER_HEIGHT = Platform.OS === "ios" ? 44 : 56;
+
+/** Mensagem na tela: as do servidor e as que acabaram de ser enviadas e
+ * ainda estão salvando (ou falharam). */
+type DisplayMessage = ApiChatMessage & { status?: "sending" | "failed" };
+
+const PENDING_MATCH_MS = 2 * 60 * 1000;
 
 function sameDay(a: Date, b: Date): boolean {
   return a.toDateString() === b.toDateString();
@@ -46,26 +52,57 @@ export function ChatView({
 }) {
   const insets = useSafeAreaInsets();
   const [text, setText] = useState("");
-  const [sending, setSending] = useState(false);
-  const listRef = useRef<FlatList<ApiChatMessage>>(null);
+  const [pending, setPending] = useState<DisplayMessage[]>([]);
+  const listRef = useRef<FlatList<DisplayMessage>>(null);
+  const tempSeq = useRef(0);
 
-  async function send() {
-    const value = text.trim();
-    if (!value || sending) return;
-    setSending(true);
+  // Envio otimista: a bolha aparece na hora (com relógio) e o campo já
+  // limpa; o servidor salva em segundo plano. Deu certo, a lista do
+  // servidor traz a mensagem e a provisória some; deu errado, fica
+  // vermelha pra tocar e tentar de novo.
+  async function deliver(item: DisplayMessage) {
+    setPending((prev) => prev.map((p) => (p.id === item.id ? { ...p, status: "sending" } : p)));
     try {
-      await onSend(value);
-      setText("");
+      await onSend(item.text);
+      setPending((prev) => prev.filter((p) => p.id !== item.id));
     } catch (error) {
-      showAlert("Não foi possível enviar", error instanceof Error ? error.message : undefined);
-    } finally {
-      setSending(false);
+      setPending((prev) => prev.map((p) => (p.id === item.id ? { ...p, status: "failed" } : p)));
+      showAlert("Não foi possível enviar", error instanceof Error ? error.message : "Toque na mensagem pra tentar de novo.");
     }
   }
 
+  function send() {
+    const value = text.trim();
+    if (!value) return;
+    tempSeq.current += 1;
+    const item: DisplayMessage = {
+      id: `tmp-${Date.now()}-${tempSeq.current}`,
+      text: value,
+      createdAt: new Date().toISOString(),
+      mine: true,
+      status: "sending",
+    };
+    setPending((prev) => [...prev, item]);
+    setText("");
+    deliver(item);
+  }
+
+  // A busca periódica pode trazer a mensagem antes da resposta do envio:
+  // a provisória com o mesmo texto já salvo some, sem aparecer duplicada.
+  const visiblePending = pending.filter(
+    (p) =>
+      p.status === "failed" ||
+      !messages.some(
+        (m) =>
+          m.mine &&
+          m.text === p.text &&
+          Math.abs(new Date(m.createdAt).getTime() - new Date(p.createdAt).getTime()) < PENDING_MATCH_MS
+      )
+  );
+  const all: DisplayMessage[] = [...messages, ...visiblePending];
   // Lista invertida: a mensagem mais nova fica embaixo e a rolagem já
   // começa no fim, sem precisar rolar depois de carregar.
-  const reversed = [...messages].reverse();
+  const reversed = [...all].reverse();
 
   return (
     <KeyboardAvoidingView
@@ -74,7 +111,7 @@ export function ChatView({
       // componente de fora do NativeWind: className não chega nele
       style={{ flex: 1, backgroundColor: CREAM }}
     >
-      {messages.length === 0 ? (
+      {all.length === 0 ? (
         <View className="flex-1 items-center justify-center gap-2 px-8">
           <View className="h-16 w-16 items-center justify-center rounded-full bg-mint/15">
             <Ionicons name="chatbubbles" size={30} color="#2ec4b6" />
@@ -103,16 +140,27 @@ export function ChatView({
                     {dayLabel(date)}
                   </Text>
                 )}
-                <View
+                <Pressable
+                  disabled={item.status !== "failed"}
+                  onPress={() => deliver(item)}
                   className={`max-w-[80%] rounded-2xl px-3 py-2 ${
-                    item.mine ? "self-end rounded-br-md bg-navy" : "self-start rounded-bl-md bg-card shadow-sm"
-                  }`}
+                    item.mine ? "self-end rounded-br-md" : "self-start rounded-bl-md bg-card shadow-sm"
+                  } ${item.mine ? (item.status === "failed" ? "bg-coral" : "bg-navy") : ""}`}
                 >
                   <Text className={`text-[15px] ${item.mine ? "text-white" : "text-navy"}`}>{item.text}</Text>
-                  <Text className={`mt-0.5 self-end text-[10px] ${item.mine ? "text-white/60" : "text-navy/40"}`}>
-                    {timeLabel(date)}
-                  </Text>
-                </View>
+                  <View className="mt-0.5 flex-row items-center gap-1 self-end">
+                    <Text className={`text-[10px] ${item.mine ? "text-white/70" : "text-navy/40"}`}>
+                      {item.status === "failed" ? "Não enviada · toque pra tentar de novo" : timeLabel(date)}
+                    </Text>
+                    {item.mine && item.status !== "failed" && (
+                      <Ionicons
+                        name={item.status === "sending" ? "time-outline" : "checkmark"}
+                        size={11}
+                        color="#ffffffb0"
+                      />
+                    )}
+                  </View>
+                </Pressable>
               </View>
             );
           }}
@@ -130,11 +178,11 @@ export function ChatView({
         />
         <Pressable
           onPress={send}
-          disabled={sending || !text.trim()}
+          disabled={!text.trim()}
           accessibilityLabel="Enviar"
           className="h-11 w-11 items-center justify-center rounded-full bg-mint disabled:opacity-40"
         >
-          {sending ? <ActivityIndicator color="#fff" /> : <Ionicons name="send" size={18} color="#fff" />}
+          <Ionicons name="send" size={18} color="#fff" />
         </Pressable>
       </View>
     </KeyboardAvoidingView>
