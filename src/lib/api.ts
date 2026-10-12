@@ -178,6 +178,24 @@ export type ApiCareOverview = {
   people: ApiCaredPerson[];
 };
 
+/** Espelha ChatMessageView/ChatThreadSummary (lib/chat/chatCore.ts). */
+export type ApiChatMessage = { id: string; text: string; createdAt: string; mine: boolean };
+
+export type ApiChatThreadSummary = {
+  id: string;
+  customerName: string;
+  lastMessageAt: string;
+  lastMessagePreview: string;
+  unread: number;
+};
+
+/** GET /api/mobile/chat: o cliente vê a conversa dele; o gestor, a lista. */
+export type ApiChatOverview =
+  | { role: "cliente"; messages: ApiChatMessage[] }
+  | { role: "gestor"; threads: ApiChatThreadSummary[] };
+
+export type ApiChatThread = { customerName: string; messages: ApiChatMessage[] };
+
 export type ApiWeeklyChallenge = {
   id: string;
   title: string;

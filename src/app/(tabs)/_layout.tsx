@@ -6,12 +6,14 @@ import { brandHeaderOptions } from "@/components/AppHeader";
 import { useProfileDrawer } from "@/lib/profileDrawer";
 import { prefetchAllTabs } from "@/lib/tabPrefetch";
 import { TabIcon } from "@/components/TabIcon";
+import { useChatUnread } from "@/lib/chatUnread";
 
 // Uma cor de destaque por aba, em vez da mesma cor pra todas — cada ícone
 // ganha sua "bolha" nessa cor quando ativo (ver TabIcon.tsx).
 const TAB_COLORS = {
   home: "#e63946",
   produtos: "#f59e0b",
+  conversa: "#f59e0b",
   saude: "#3b82f6",
   rotina: "#2ec4b6",
   perfil: "#8b5cf6",
@@ -21,6 +23,7 @@ export default function TabsLayout() {
   const { token } = useAuth();
   const { open: openProfileDrawer } = useProfileDrawer();
   const insets = useSafeAreaInsets();
+  const chatUnread = useChatUnread(Boolean(token));
 
   // Dispara a busca das 4 abas em paralelo assim que o usuário loga, em
   // vez de cada uma só buscar quando ganha foco pela primeira vez — troca
@@ -67,9 +70,34 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="conversa"
+        options={{
+          title: "Conversa",
+          headerShown: false,
+          tabBarActiveTintColor: TAB_COLORS.conversa,
+          tabBarBadge: chatUnread > 0 ? (chatUnread > 99 ? "99+" : chatUnread) : undefined,
+          tabBarBadgeStyle: { backgroundColor: "#e63946", fontSize: 11 },
+          // O campo de mensagem sobe com o teclado; a barra de abas some
+          // pra não ficar entre os dois.
+          tabBarHideOnKeyboard: true,
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon
+              name="chatbubbles-outline"
+              filledName="chatbubbles"
+              focused={focused}
+              color={color}
+              activeColor={TAB_COLORS.conversa}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="catalogo"
         options={{
           title: "Produtos",
+          // Fora da barra (trocada pela Conversa), mas o código continua:
+          // a busca do Home e os links de produto ainda abrem por aqui.
+          href: null,
           tabBarActiveTintColor: TAB_COLORS.produtos,
           tabBarIcon: ({ color, focused }) => (
             <TabIcon

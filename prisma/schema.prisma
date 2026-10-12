@@ -27,6 +27,11 @@ model User {
   isVendedor Boolean @default(false)
   vendedorId String?
 
+  // Gestor: atende o chat da farmácia (aba Conversa) — vê a lista de
+  // conversas de todos os clientes e responde em nome da farmácia. Mesmo
+  // esquema do isVendedor: só atribuído via SQL direto.
+  isGestor Boolean @default(false)
+
   // Telefone e nascimento — exigidos pelo checkout (efetuar-venda-v1 da
   // Trier/SGF precisa dos dois no `cliente`).
   phone     String?
@@ -91,6 +96,8 @@ model User {
   carePoints           CarePointsEntry[]
   reportShares         ReportShare[]
   faithProgress        FaithProgress[]
+  chatThread           ChatThread?
+  chatMessages         ChatMessage[]
 }
 
 enum WalletEntrySource {
@@ -747,3 +754,39 @@ model ReportShare {
   @@index([userId])
 }
 
+
+// Chat cliente <-> farmácia (aba Conversa, lib/chat/chatCore.ts): uma
+// conversa por cliente; quem responde é qualquer User com isGestor, em
+// nome da farmácia. Os contadores de não lidas ficam aqui pra lista do
+// gestor e o selo da aba não precisarem contar mensagens.
+model ChatThread {
+  id                 String   @id @default(cuid())
+  customerId         String   @unique
+  lastMessageAt      DateTime @default(now())
+  lastMessagePreview String   @default("")
+  // Não lidas por quem: o cliente (mensagens da farmácia) e a farmácia
+  // (mensagens do cliente). Zera quando o lado abre a conversa.
+  customerUnread     Int      @default(0)
+  staffUnread        Int      @default(0)
+  createdAt          DateTime @default(now())
+
+  customer User          @relation(fields: [customerId], references: [id])
+  messages ChatMessage[]
+
+  @@index([lastMessageAt])
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  threadId  String
+  senderId  String
+  // true = enviada pela farmácia (gestor); false = pelo cliente.
+  fromStaff Boolean
+  text      String
+  createdAt DateTime @default(now())
+
+  thread ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  sender User       @relation(fields: [senderId], references: [id])
+
+  @@index([threadId, createdAt])
+}
