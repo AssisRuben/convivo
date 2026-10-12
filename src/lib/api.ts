@@ -219,6 +219,8 @@ export type ApiCarePointsSummary = {
   monthRewardCents: number;
   monthCapCents: number;
   todayPoints: number;
+  /** Ausente em servidor antigo (= podia converter). */
+  canRedeem?: boolean;
 };
 
 export type ApiLoyaltyProgress = {

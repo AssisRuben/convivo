@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { verifyCpfPhoneMatch } from "@/lib/pharmacyDb";
+import { convertCarePoints } from "@/lib/points/pointsCore";
+import { syncStoreStamps } from "@/lib/loyalty/loyaltyCore";
 import type { User } from "@/lib/generated/prisma/client";
 
 const CPF_LOCKOUT_ATTEMPTS = 5;
@@ -193,6 +195,11 @@ export async function updateProfileForUser(
 
   try {
     const user = await prisma.user.update({ where: { id: userId }, data });
+    if (cpfVerification === "verified") {
+      // Pontos guardados viram crédito e as compras do balcão viram selos.
+      void convertCarePoints(userId);
+      void syncStoreStamps(userId).catch((error) => console.error("[perfil] selos da loja:", error));
+    }
     return { profile: toView(user), cpfVerification };
   } catch (error) {
     if (

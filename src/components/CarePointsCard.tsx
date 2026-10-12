@@ -9,8 +9,8 @@ function formatPrice(cents: number): string {
 const WAYS: { icon: keyof typeof Ionicons.glyphMap; label: string; points: string }[] = [
   { icon: "medkit-outline", label: "Tomar a dose do remédio", points: "+2" },
   { icon: "checkmark-done-outline", label: "Marcar um cuidado da Rotina", points: "+1" },
-  { icon: "pulse-outline", label: "Registrar uma medição (1x por dia)", points: "+5" },
-  { icon: "book-outline", label: "Ler a pílula ou a gota do dia", points: "+3" },
+  { icon: "pulse-outline", label: "Registrar uma medição (até 3 dias por semana)", points: "+5" },
+  { icon: "book-outline", label: "Ler um capítulo de Pílulas ou Gotas (1 por dia)", points: "+3" },
   { icon: "trophy-outline", label: "Completar um desafio da semana", points: "+30" },
 ];
 
@@ -41,6 +41,16 @@ export function CarePointsCard({ summary, compact = false }: { summary: ApiCareP
       <View className="h-2.5 overflow-hidden rounded-full bg-navy/5">
         <View className="h-full rounded-full bg-mint" style={{ width: `${Math.round(progress * 100)}%` }} />
       </View>
+
+      {summary.canRedeem === false && (
+        <View className="flex-row items-start gap-2 rounded-xl bg-amber-50 p-3">
+          <Ionicons name="id-card-outline" size={16} color="#92400e" />
+          <Text className="flex-1 text-xs text-amber-800">
+            Confirme seu CPF em Menu › Meus dados para seus pontos virarem crédito. Até lá, eles ficam
+            guardados.
+          </Text>
+        </View>
+      )}
 
       <Text className="text-xs text-navy/60">
         {capReached

@@ -9,6 +9,7 @@ import { medicationStart, treatmentProgress } from "@/lib/medications/medication
 import type { CareCategory } from "@/lib/generated/prisma/client";
 import { recordScheduleChange, sameDays } from "@/lib/care/scheduleVersion";
 import { describeDaysOfWeek, isScheduledOn } from "@/lib/medications/doseSchedule";
+import { startOfLocalDay } from "@/lib/timeZone";
 
 /**
  * Lógica de rotina/checklist compartilhada entre as server actions da web
@@ -213,11 +214,15 @@ export async function completeChecklistItemForUser(userId: string, itemId: strin
   void (async () => {
     // Pontos de cuidado: dose de remédio vale mais que os outros cuidados.
     const isDose = item.category === "MEDICACAO";
+    // Cuidado criado hoje só vale ponto a partir de amanhã — criar e marcar
+    // cuidados na hora não vira crédito (o dia ainda conta pros desafios).
+    const createdToday = item.createdAt.getTime() >= startOfLocalDay().getTime();
     await awardCarePoints(
       userId,
       isDose ? "DOSE" : "ROTINA",
       pointsKey.check(itemId, date),
-      isDose ? CARE_POINTS.DOSE : CARE_POINTS.ROTINA
+      isDose ? CARE_POINTS.DOSE : CARE_POINTS.ROTINA,
+      { eligible: !createdToday }
     );
     await checkCareCompletionAchievement(userId, date);
     await checkRoutineStreakMilestones(userId, date);
