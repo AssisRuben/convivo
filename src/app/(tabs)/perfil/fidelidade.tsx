@@ -302,7 +302,8 @@ export default function FidelidadeScreen() {
 
       <View className="mt-6 rounded-2xl bg-card p-5 shadow-sm">
         <Text className="text-center text-xs leading-5 text-navy/55">
-          Cada pedido aprovado de {formatPrice(progress.minOrderCents)} ou mais conta como 1 selo.
+          Cada compra de {formatPrice(progress.minOrderCents)} ou mais conta como 1 selo — pelo app ou
+          no balcão da farmácia (com o CPF confirmado no app).
           O crédito ganho cai no seu saldo — o mesmo usado nas indicações — pra usar nas próximas
           compras.
         </Text>

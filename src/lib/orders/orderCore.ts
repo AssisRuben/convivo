@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { efetuarVendaTrier, getPharmacyEndereco, isTrierConfigured } from "@/lib/orders/trier";
 import { createPreferenceForOrder, isMercadoPagoConfigured } from "@/lib/orders/mercadopago";
-import { checkLoyaltyStampReward } from "@/lib/loyalty/loyaltyCore";
+import { checkLoyaltyStampReward, recordAppOrderStamp } from "@/lib/loyalty/loyaltyCore";
 import { getWalletBalanceCents } from "@/lib/wallet";
 import {
   decrementCatalogStock,
@@ -438,6 +438,7 @@ export async function approveOrder(orderId: string): Promise<void> {
   await syncOrderToTrier(orderForDownstream);
   await creditReferralCommission(orderForDownstream);
   await creditVendedorCommission(orderForDownstream);
+  await recordAppOrderStamp(orderForDownstream);
   await checkLoyaltyStampReward(order.userId);
 }
 

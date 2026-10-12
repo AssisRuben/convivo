@@ -32,6 +32,10 @@ model User {
   // esquema do isVendedor: só atribuído via SQL direto.
   isGestor Boolean @default(false)
 
+  // Última vez que as compras da loja (Trier) viraram selos do cartão
+  // fidelidade — ver syncStoreStamps em lib/loyalty/loyaltyCore.ts.
+  loyaltySyncedAt DateTime?
+
   // Telefone e nascimento — exigidos pelo checkout (efetuar-venda-v1 da
   // Trier/SGF precisa dos dois no `cliente`).
   phone     String?
@@ -97,6 +101,7 @@ model User {
   reportShares         ReportShare[]
   faithProgress        FaithProgress[]
   chatThread           ChatThread?
+  loyaltyStamps        LoyaltyStamp[]
   chatMessages         ChatMessage[]
 }
 
@@ -789,4 +794,27 @@ model ChatMessage {
   sender User       @relation(fields: [senderId], references: [id])
 
   @@index([threadId, createdAt])
+}
+
+enum LoyaltyStampSource {
+  APP // pedido aprovado no app
+  LOJA // venda no balcão (sistema Trier), casada pelo CPF verificado
+}
+
+// Um selo do cartão fidelidade por compra de R$ 50+ — no app ou na loja.
+// refKey único ("order:<id>" / "venda:<id da venda na Trier>") impede a
+// mesma compra de valer dois selos (pedido do app enviado à Trier também
+// é ignorado do lado da loja pela nota; ver loyaltyCore.ts).
+model LoyaltyStamp {
+  id          String             @id @default(cuid())
+  userId      String
+  source      LoyaltyStampSource
+  refKey      String             @unique
+  amountCents Int
+  purchasedAt DateTime           @db.Date
+  createdAt   DateTime           @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
 }

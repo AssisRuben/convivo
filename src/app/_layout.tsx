@@ -65,6 +65,7 @@ function useNotificationTapNavigation() {
         else if (screen === "pilulas-sabedoria") router.push("/perfil/pilulas-sabedoria");
         else if (screen === "gotas-de-fe") router.push("/perfil/gotas-de-fe");
         else if (screen === "familia") router.push("/perfil/familia");
+        else if (screen === "fidelidade") router.push("/perfil/fidelidade");
         else if (screen === "chat") {
           const threadId = response.notification.request.content.data?.threadId;
           if (typeof threadId === "string") router.push({ pathname: "/conversa/[threadId]", params: { threadId } });

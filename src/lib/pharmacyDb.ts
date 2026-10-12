@@ -149,6 +149,56 @@ export async function getPurchaseHistoryForUser(
   }));
 }
 
+export type StoreSale = {
+  vendaId: string;
+  numeroNota: number | null;
+  /** "YYYY-MM-DD" */
+  dataEmissao: string;
+  totalCents: number;
+};
+
+/**
+ * Vendas do cliente na farmácia (qualquer canal) a partir de `since`
+ * ("YYYY-MM-DD"), uma linha por venda com o total líquido — pro cartão
+ * fidelidade. Fica de fora venda cancelada (tipo_cancelamento D/E) e a que
+ * foi devolvida (outra venda aponta pra ela em numero_nota_origem).
+ */
+export async function getStoreSalesForUser(
+  cpf: string | null,
+  phone: string | null,
+  since: string
+): Promise<StoreSale[]> {
+  const pool = getPool();
+  if (!pool) return [];
+
+  const codigoCliente = await findCodigoCliente(pool, cpf, phone);
+  if (codigoCliente == null) return [];
+
+  const res = await pool.query<{ id: string; numero_nota: number | null; data_emissao: Date; total: string }>(
+    `SELECT v.id, v.numero_nota, v.data_emissao, SUM(vi.valor_total_liquido) AS total
+     FROM vendas v
+     JOIN venda_itens vi ON vi.venda_id = v.id
+     WHERE v.codigo_cliente = $1
+       AND v.data_emissao >= $2
+       AND v.tipo_cancelamento IS NULL
+       AND NOT EXISTS (
+         SELECT 1 FROM vendas d
+         WHERE d.numero_nota_origem IS NOT NULL AND d.numero_nota_origem = v.numero_nota
+       )
+     GROUP BY v.id, v.numero_nota, v.data_emissao
+     ORDER BY v.data_emissao
+     LIMIT 500`,
+    [codigoCliente, since]
+  );
+
+  return res.rows.map((row) => ({
+    vendaId: String(row.id),
+    numeroNota: row.numero_nota,
+    dataEmissao: row.data_emissao.toISOString().slice(0, 10),
+    totalCents: Math.round(Number(row.total) * 100),
+  }));
+}
+
 export type PharmacyCustomerAddress = {
   cep: string | null;
   logradouro: string | null;
