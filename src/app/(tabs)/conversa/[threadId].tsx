@@ -16,14 +16,16 @@ export default function ConversaClienteScreen() {
   const load = useCallback(async () => {
     try {
       const res = await apiFetch(`/api/mobile/chat/${threadId}`);
-      const json = await res.json();
-      if (!res.ok) {
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json) {
         setError(json?.error ?? "Não foi possível abrir a conversa");
         return;
       }
+      setError(null);
       setData(json);
     } catch {
       // sem rede: tenta de novo no próximo ciclo
+      setError((current) => current ?? "Sem conexão. Tentando de novo…");
     }
   }, [threadId]);
 
@@ -35,7 +37,7 @@ export default function ConversaClienteScreen() {
     }, [load])
   );
 
-  if (error) {
+  if (error && !data) {
     return (
       <View className="flex-1 items-center justify-center bg-cream p-6">
         <Text className="text-center text-navy/60">{error}</Text>

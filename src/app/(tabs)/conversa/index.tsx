@@ -55,17 +55,23 @@ function ThreadRow({ thread, onPress }: { thread: ApiChatThreadSummary; onPress:
 export default function ConversaScreen() {
   const router = useRouter();
   const [data, setData] = useState<ApiChatOverview | null>(null);
+  const [failed, setFailed] = useState(false);
 
   const load = useCallback(async () => {
     try {
       const res = await apiFetch("/api/mobile/chat");
-      if (!res.ok) return;
+      if (!res.ok) {
+        setFailed(true);
+        return;
+      }
       const json: ApiChatOverview = await res.json();
+      setFailed(false);
       setData(json);
       // Cliente abriu = leu tudo; gestor: soma do que ainda falta abrir.
       setChatUnread(json.role === "gestor" ? json.threads.reduce((s, t) => s + t.unread, 0) : 0);
     } catch {
       // sem rede: tenta de novo no próximo ciclo
+      setFailed(true);
     }
   }, []);
 
@@ -76,6 +82,18 @@ export default function ConversaScreen() {
       return () => clearInterval(timer);
     }, [load])
   );
+
+  if (!data && failed) {
+    return (
+      <View className="flex-1 items-center justify-center gap-3 bg-cream p-6">
+        <Ionicons name="cloud-offline-outline" size={32} color="#0b1e3d60" />
+        <Text className="text-center text-navy/60">Não foi possível carregar as conversas.</Text>
+        <Pressable onPress={load} className="rounded-full bg-navy px-5 py-2.5">
+          <Text className="text-sm font-semibold text-white">Tentar de novo</Text>
+        </Pressable>
+      </View>
+    );
+  }
 
   if (!data) {
     return (
