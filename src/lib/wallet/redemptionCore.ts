@@ -2,6 +2,7 @@ import { randomInt } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { getWalletBalanceCents } from "@/lib/wallet";
 import { sendPushToUser } from "@/lib/push/expoPush";
+import { postStaffNotice } from "@/lib/chat/chatCore";
 import { startOfLocalDay } from "@/lib/timeZone";
 import {
   CREDIT_VALIDITY_MONTHS,
@@ -193,6 +194,14 @@ export async function redeemAtCounter(
     return { balanceCents: balanceCents - input.amountCents };
   });
 
+  // Recibo na conversa do cliente: fica com ele e o gestor vê na lista.
+  void postStaffNotice(
+    row.userId,
+    staffId,
+    `✅ Crédito usado no balcão: ${formatCents(input.amountCents)} numa compra de ${formatCents(input.purchaseCents)}` +
+      `${saleNumber ? ` (venda ${saleNumber})` : ""}. Saldo agora: ${formatCents(result.balanceCents)}.`
+  ).catch((error) => console.error("[carteira] recibo no chat:", error));
+
   void sendPushToUser(row.userId, {
     title: `💳 Você usou ${formatCents(input.amountCents)} de créditos`,
     body: `Saldo: ${formatCents(result.balanceCents)}. Obrigado por comprar na Farmácia Conviva!`,
@@ -254,6 +263,11 @@ export async function reverseRedemption(gestorId: string, redemptionId: string):
     }),
     ...(redemption.walletEntryId ? [prisma.walletEntry.delete({ where: { id: redemption.walletEntryId } })] : []),
   ]);
+  void postStaffNotice(
+    redemption.userId,
+    gestorId,
+    `↩️ Estorno: ${formatCents(redemption.amountCents)} voltaram pro seu saldo de créditos.`
+  ).catch((error) => console.error("[carteira] estorno no chat:", error));
   void sendPushToUser(redemption.userId, {
     title: "💳 Crédito devolvido",
     body: `${formatCents(redemption.amountCents)} voltaram pro seu saldo.`,

@@ -168,6 +168,24 @@ export async function sendStaffMessage(userId: string, threadId: string, rawText
   }).catch((error) => console.error("[chat] push pro cliente:", error));
 }
 
+/**
+ * Aviso automático da farmácia na conversa do cliente (ex.: recibo de
+ * crédito usado no balcão) — fica no histórico dele e aparece na lista
+ * do gestor. Sem push aqui: quem chama já avisa do jeito dele.
+ */
+export async function postStaffNotice(customerId: string, staffId: string, rawText: string): Promise<void> {
+  const text = normalizeMessage(rawText);
+  const now = new Date();
+  const thread = await prisma.chatThread.upsert({
+    where: { customerId },
+    create: { customerId, lastMessageAt: now, lastMessagePreview: previewOf(text), customerUnread: 1 },
+    update: { lastMessageAt: now, lastMessagePreview: previewOf(text), customerUnread: { increment: 1 } },
+  });
+  await prisma.chatMessage.create({
+    data: { threadId: thread.id, senderId: staffId, fromStaff: true, text, createdAt: now },
+  });
+}
+
 /** Selo da aba: não lidas do cliente, ou de todas as conversas pro gestor. */
 export async function getChatUnread(userId: string): Promise<number> {
   if (await isGestor(userId)) {
