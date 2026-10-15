@@ -7,7 +7,9 @@ export default function ConversaLayout() {
   return (
     <Stack screenOptions={brandHeaderOptions}>
       <Stack.Screen name="index" />
-      <Stack.Screen name="[threadId]" options={{ headerBackVisible: true, headerLeft: BackHeaderButton }} />
+      {/* Só a seta própria: com headerBackVisible a nativa aparecia junto,
+          duas setas no cabeçalho (a nativa colada no nome do cliente). */}
+      <Stack.Screen name="[threadId]" options={{ headerBackVisible: false, headerLeft: BackHeaderButton }} />
     </Stack>
   );
 }
