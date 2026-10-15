@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { generateCode } from "@/lib/codes";
 import { checkReferralMilestones } from "@/lib/timeline/achievements";
 import type { User } from "@/lib/generated/prisma/client";
+import { normalizeReferralCode } from "@/lib/referral/referralCore";
 
 export type CreateUserAccountInput = {
   name: string;
@@ -25,7 +26,7 @@ export async function createUserAccount(
 
   const passwordHash = await bcrypt.hash(input.password, 10);
   const referrer = input.referralCode
-    ? await prisma.user.findUnique({ where: { referralCode: input.referralCode } })
+    ? await prisma.user.findUnique({ where: { referralCode: normalizeReferralCode(input.referralCode) } })
     : null;
 
   // O mesmo campo de código serve pros dois casos — quem é o dono do
@@ -78,34 +79,29 @@ export type AttributeCodeResult =
  * Vínculo de código depois do cadastro — mesma detecção automática
  * amigo/vendedor de createUserAccount, mas pra quem já tem conta (ex:
  * cliente cadastrado sem código que depois é atendido por um vendedor na
- * farmácia). Cada tipo de vínculo só pode ser setado uma vez por usuário
- * (trava no primeiro, sem sobrescrever).
+ * farmácia). Um código vinculado por cliente: pra trocar, remove o atual
+ * antes (ver unlinkReferralCode em lib/referral/referralCore.ts).
  */
-export async function attributeCode(userId: string, code: string): Promise<AttributeCodeResult> {
+export async function attributeCode(userId: string, rawCode: string): Promise<AttributeCodeResult> {
+  const code = normalizeReferralCode(rawCode);
   const owner = await prisma.user.findUnique({ where: { referralCode: code } });
-  if (!owner || owner.id === userId) {
-    return { ok: false, error: "Código inválido" };
+  if (!owner || owner.id === userId || owner.deletedAt) {
+    return { ok: false, error: "Código não encontrado. Confira as letras e números." };
+  }
+
+  const linked = await prisma.user.findUniqueOrThrow({
+    where: { id: userId },
+    select: { referredById: true, vendedorId: true },
+  });
+  if (linked.referredById || linked.vendedorId) {
+    return { ok: false, error: "Você já tem um código vinculado. Remova o atual para vincular outro." };
   }
 
   if (owner.isVendedor) {
-    const current = await prisma.user.findUniqueOrThrow({
-      where: { id: userId },
-      select: { vendedorId: true },
-    });
-    if (current.vendedorId) {
-      return { ok: false, error: "Você já tem um vendedor vinculado" };
-    }
     await prisma.user.update({ where: { id: userId }, data: { vendedorId: owner.id } });
     return { ok: true, kind: "vendedor" };
   }
 
-  const current = await prisma.user.findUniqueOrThrow({
-    where: { id: userId },
-    select: { referredById: true },
-  });
-  if (current.referredById) {
-    return { ok: false, error: "Você já foi indicado por alguém" };
-  }
   await prisma.user.update({ where: { id: userId }, data: { referredById: owner.id } });
   await checkReferralMilestones(owner.id);
   return { ok: true, kind: "amigo" };

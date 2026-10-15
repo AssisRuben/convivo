@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { getApiUserId } from "@/lib/apiAuth";
 import { attributeCode } from "@/lib/userAccount";
+import { getReferralOverview, unlinkReferralCode } from "@/lib/referral/referralCore";
 
 const schema = z.object({ code: z.string().trim().min(1, "Informe um código") });
 

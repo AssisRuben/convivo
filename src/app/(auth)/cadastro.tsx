@@ -12,6 +12,8 @@ import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/lib/auth";
 import { showAlert } from "@/lib/alert";
+import { useCodeOwner } from "@/lib/useCodeOwner";
+import { CodeOwnerHint } from "@/components/CodeOwnerHint";
 
 export default function CadastroScreen() {
   const { register } = useAuth();
@@ -21,6 +23,8 @@ export default function CadastroScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [referralCode, setReferralCode] = useState("");
   const [loading, setLoading] = useState(false);
+  // "Código de Maria S." embaixo do campo, antes de criar a conta
+  const codeOwner = useCodeOwner(referralCode);
 
   async function handleSubmit() {
     setLoading(true);
@@ -83,8 +87,10 @@ export default function CadastroScreen() {
           onChangeText={setReferralCode}
           placeholder="Código de indicação (opcional)"
           autoCapitalize="characters"
+          autoCorrect={false}
           className="rounded-xl border border-navy/10 bg-card p-3.5"
         />
+        <CodeOwnerHint state={codeOwner} />
 
         <Pressable
           disabled={loading}
