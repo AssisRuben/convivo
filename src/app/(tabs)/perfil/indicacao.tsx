@@ -71,7 +71,9 @@ export default function IndicacaoScreen() {
         return;
       }
       setCodeInput("");
-      setData(json);
+      // servidor antigo devolve só { ok, kind }: busca a tela de novo
+      if (json.referralCode) setData(json);
+      else load();
       showAlert(
         "Código vinculado!",
         json.linked ? `Agora você usa o código de ${json.linked.name}` : undefined

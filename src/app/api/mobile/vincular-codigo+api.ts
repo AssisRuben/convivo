@@ -31,5 +31,16 @@ export async function POST(request: Request) {
     return Response.json({ error: result.error }, { status: 409 });
   }
 
-  return Response.json({ ok: true, kind: result.kind });
+  // A tela de indicação adota a resposta inteira (código vinculado, amigos)
+  return Response.json({ ok: true, kind: result.kind, ...(await getReferralOverview(userId)) });
+}
+
+/** Remove o código vinculado — depois dá pra vincular outro. */
+export async function DELETE(request: Request) {
+  const userId = await getApiUserId(request);
+  if (!userId) {
+    return Response.json({ error: "Não autenticado" }, { status: 401 });
+  }
+  await unlinkReferralCode(userId);
+  return Response.json(await getReferralOverview(userId));
 }
