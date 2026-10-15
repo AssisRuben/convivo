@@ -57,11 +57,11 @@ describe("comissões calculadas sobre a margem", () => {
 
 describe("clampWalletDiscount", () => {
   it("usa o valor pedido quando cabe no subtotal e no saldo", () => {
-    expect(clampWalletDiscount(500, 2000, 1000)).toBe(500);
+    expect(clampWalletDiscount(500, 6000, 1000)).toBe(500);
   });
 
   it("nunca deixa o desconto passar do subtotal, mesmo com saldo maior", () => {
-    expect(clampWalletDiscount(5000, 2000, 10000)).toBe(2000);
+    expect(clampWalletDiscount(9000, 6000, 10000)).toBe(6000);
   });
 
   it("nunca deixa o desconto passar do saldo disponível, mesmo pedindo mais", () => {
@@ -70,6 +70,10 @@ describe("clampWalletDiscount", () => {
 
   it("nunca fica negativo, mesmo com valor pedido negativo", () => {
     expect(clampWalletDiscount(-100, 2000, 1000)).toBe(0);
+  });
+
+  it("compra abaixo de R$ 50 não usa crédito (mesma regra do balcão)", () => {
+    expect(clampWalletDiscount(500, 4999, 1000)).toBe(0);
   });
 
   it("saldo zerado sempre resulta em desconto zero", () => {

@@ -3,6 +3,7 @@ import { efetuarVendaTrier, getPharmacyEndereco, isTrierConfigured } from "@/lib
 import { createPreferenceForOrder, isMercadoPagoConfigured } from "@/lib/orders/mercadopago";
 import { checkLoyaltyStampReward, recordAppOrderStamp } from "@/lib/loyalty/loyaltyCore";
 import { getWalletBalanceCents } from "@/lib/wallet";
+import { WALLET_MIN_PURCHASE_CENTS } from "@/lib/wallet/walletRules";
 import {
   decrementCatalogStock,
   getCatalogProductByCodigo,
@@ -33,6 +34,8 @@ export function clampWalletDiscount(
   subtotalCents: number,
   balanceCents: number
 ): number {
+  // Mesma regra do balcão: crédito só em compra a partir de R$ 50.
+  if (subtotalCents < WALLET_MIN_PURCHASE_CENTS) return 0;
   return Math.max(0, Math.min(requestedCents, subtotalCents, balanceCents));
 }
 

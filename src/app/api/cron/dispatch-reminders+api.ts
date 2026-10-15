@@ -7,6 +7,7 @@ import {
   dispatchMedicationRepurchaseAlerts,
 } from "@/lib/reminders/dispatchCore";
 import { dispatchLoyaltyStoreSync } from "@/lib/loyalty/loyaltyCore";
+import { dispatchWalletExpirations } from "@/lib/wallet/redemptionCore";
 
 // Sem scheduler configurado nesta sessão (não há hospedagem/deploy no
 // escopo) — chamar manualmente por enquanto. Um cron de verdade (Vercel
@@ -18,7 +19,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "Não autorizado" }, { status: 401 });
   }
 
-  const [routineReminders, medicationAlerts, goalTips, wisdomReminders, faithReminders, caregiverAlerts, loyaltyStoreStamps] = await Promise.all([
+  const [routineReminders, medicationAlerts, goalTips, wisdomReminders, faithReminders, caregiverAlerts, loyaltyStoreStamps, walletExpirations] = await Promise.all([
     dispatchDueRoutineReminders(),
     dispatchMedicationRepurchaseAlerts(),
     dispatchDueGoalTips(),
@@ -26,7 +27,8 @@ export async function POST(request: Request) {
     dispatchDueFaithReminders(),
     dispatchCaregiverMissedDoseAlerts(),
     dispatchLoyaltyStoreSync(),
+    dispatchWalletExpirations(),
   ]);
 
-  return Response.json({ routineReminders, medicationAlerts, goalTips, wisdomReminders, faithReminders, caregiverAlerts, loyaltyStoreStamps });
+  return Response.json({ routineReminders, medicationAlerts, goalTips, wisdomReminders, faithReminders, caregiverAlerts, loyaltyStoreStamps, walletExpirations });
 }

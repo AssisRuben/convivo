@@ -32,6 +32,11 @@ model User {
   // esquema do isVendedor: só atribuído via SQL direto.
   isGestor Boolean @default(false)
 
+  // Atendente do balcão: resgata os créditos dos clientes (tela Resgatar
+  // créditos, lib/wallet/redemptionCore.ts). Só via SQL, como isGestor —
+  // gestor também resgata e é quem confere o relatório e estorna.
+  isAtendente Boolean @default(false)
+
   // Última vez que as compras da loja (Trier) viraram selos do cartão
   // fidelidade — ver syncStoreStamps em lib/loyalty/loyaltyCore.ts.
   loyaltySyncedAt DateTime?
@@ -102,6 +107,9 @@ model User {
   faithProgress        FaithProgress[]
   chatThread           ChatThread?
   loyaltyStamps        LoyaltyStamp[]
+  walletRedeemCodes    WalletRedeemCode[]
+  redemptionsAsClient  WalletRedemption[]   @relation("RedemptionCustomer")
+  redemptionsAsStaff   WalletRedemption[]   @relation("RedemptionStaff")
   chatMessages         ChatMessage[]
 }
 
@@ -116,6 +124,8 @@ enum WalletEntrySource {
   WALLET_REDEMPTION
   // Pontos de cuidado convertidos em crédito (ver CarePointsEntry).
   CARE_POINTS
+  // Crédito que passou de 12 meses sem uso (ver lib/wallet/walletRules.ts).
+  WALLET_EXPIRATION
 }
 
 // Extrato de crédito do usuário (hoje só bônus de indicação; comissão por
@@ -128,6 +138,9 @@ model WalletEntry {
   source      WalletEntrySource
   description String
   createdAt   DateTime          @default(now())
+  // Chave de idempotência de lançamentos automáticos (ex.: vencimento do
+  // dia "exp:<user>:<YYYY-MM-DD>"). Null nos lançamentos antigos.
+  refKey      String?           @unique
 
   user User @relation(fields: [userId], references: [id])
 }
@@ -817,4 +830,40 @@ model LoyaltyStamp {
   user User @relation(fields: [userId], references: [id])
 
   @@index([userId])
+}
+
+// Código de 6 dígitos que o cliente mostra no balcão pra usar os créditos
+// — vale 10 minutos e uma vez só (lib/wallet/redemptionCore.ts).
+model WalletRedeemCode {
+  id        String    @id @default(cuid())
+  userId    String
+  code      String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+// Resgate de crédito no balcão: quem (cliente), quem confirmou
+// (atendente), quanto, de qual compra. O débito é o WalletEntry ligado;
+// estorno apaga o débito e marca reversedAt (o registro fica).
+model WalletRedemption {
+  id            String    @id @default(cuid())
+  userId        String
+  staffId       String
+  amountCents   Int
+  purchaseCents Int
+  saleNumber    String?
+  walletEntryId String?   @unique
+  createdAt     DateTime  @default(now())
+  reversedAt    DateTime?
+  reversedById  String?
+
+  user  User @relation("RedemptionCustomer", fields: [userId], references: [id])
+  staff User @relation("RedemptionStaff", fields: [staffId], references: [id])
+
+  @@index([createdAt])
 }

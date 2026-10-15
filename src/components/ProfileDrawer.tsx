@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { apiFetch } from "@/lib/api";
 import { useRouter, type Href } from "expo-router";
 import { Animated, Dimensions, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -42,6 +43,22 @@ export function ProfileDrawer() {
   const { user, logout } = useAuth();
   const { isOpen, close } = useProfileDrawer();
   const [translateX] = useState(() => new Animated.Value(-DRAWER_WIDTH));
+  // Atendente/gestor veem "Resgatar créditos" (consulta ao abrir o menu).
+  const [isStaff, setIsStaff] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen || !user) return;
+    let cancelled = false;
+    apiFetch("/api/mobile/balcao")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((access) => {
+        if (!cancelled) setIsStaff(Boolean(access?.atendente));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, user]);
 
   useEffect(() => {
     Animated.timing(translateX, {
@@ -195,6 +212,20 @@ export function ProfileDrawer() {
               label="Indique e ganhe"
               onNavigate={navigate}
             />
+            <MenuLink
+              href="/perfil/carteira"
+              icon="wallet-outline"
+              label="Meus créditos"
+              onNavigate={navigate}
+            />
+            {isStaff && (
+              <MenuLink
+                href="/perfil/balcao"
+                icon="storefront-outline"
+                label="Resgatar créditos (balcão)"
+                onNavigate={navigate}
+              />
+            )}
           </View>
 
           <Pressable

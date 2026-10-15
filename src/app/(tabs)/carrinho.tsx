@@ -14,6 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
 import { apiFetch } from "@/lib/api";
+import { WALLET_MIN_PURCHASE_CENTS } from "@/lib/wallet/walletRules";
 import { showAlert } from "@/lib/alert";
 import { useCheckoutForm } from "@/hooks/useCheckoutForm";
 import { FulfillmentAddressForm } from "@/components/checkout/FulfillmentAddressForm";
@@ -67,7 +68,9 @@ export default function CarrinhoScreen() {
     }, [load])
   );
 
-  const maxDiscountCents = Math.min(saldoCents, total);
+  // Crédito só em compra a partir de R$ 50 (mesma regra do servidor e do balcão).
+  const meetsMinimum = total >= WALLET_MIN_PURCHASE_CENTS;
+  const maxDiscountCents = meetsMinimum ? Math.min(saldoCents, total) : 0;
   // Clamp é só pra um preview honesto na tela — o servidor recalcula e
   // trava o valor de qualquer forma (nunca confia no que o cliente manda).
   const clampedDiscountCents = Math.min(
@@ -184,6 +187,13 @@ export default function CarrinhoScreen() {
                   <Text className="text-navy/70">Subtotal</Text>
                   <Text className="text-navy/70">{formatPrice(total)}</Text>
                 </View>
+
+                {saldoCents > 0 && !meetsMinimum && (
+                  <Text className="mt-3 text-xs text-navy/50">
+                    Você tem {formatPrice(saldoCents)} de crédito — dá pra usar em compras a partir de{" "}
+                    {formatPrice(WALLET_MIN_PURCHASE_CENTS)}.
+                  </Text>
+                )}
 
                 {maxDiscountCents > 0 && (
                   <View className="mt-3">

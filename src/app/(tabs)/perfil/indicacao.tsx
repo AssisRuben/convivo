@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { ActivityIndicator, Modal, Pressable, ScrollView, Share, Text, TextInput, View } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { Ionicons } from "@expo/vector-icons";
@@ -36,6 +36,7 @@ function firstName(name: string): string {
 }
 
 export default function IndicacaoScreen() {
+  const router = useRouter();
   const [data, setData] = useState<Overview | null>(null);
   const [codeInput, setCodeInput] = useState("");
   const [linking, setLinking] = useState(false);
@@ -191,11 +192,15 @@ export default function IndicacaoScreen() {
             </Text>
             <Text className="text-[11px] font-semibold text-mint">Ver lista ›</Text>
           </Pressable>
-          <View className="flex-1 items-center gap-1 rounded-2xl bg-card p-5 shadow-sm">
+          <Pressable
+            onPress={() => router.push("/perfil/carteira")}
+            className="flex-1 items-center gap-1 rounded-2xl bg-card p-5 shadow-sm"
+          >
             <Ionicons name="sparkles-outline" size={22} color="#2ec4b6" />
             <Text className="text-2xl font-bold text-navy">{formatPrice(data.saldoCents)}</Text>
             <Text className="text-center text-xs text-navy/60">seu saldo de créditos</Text>
-          </View>
+            <Text className="text-[11px] font-semibold text-mint">Usar ›</Text>
+          </Pressable>
         </View>
 
         <Text className="mt-6 text-center text-xs text-navy/50">
