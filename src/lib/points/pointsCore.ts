@@ -42,6 +42,13 @@ export type CarePointsSummary = {
   /** Pontos só viram crédito com o CPF confirmado (uma pessoa real =
    * uma conta; sem isso, várias contas multiplicavam o teto do mês). */
   canRedeem: boolean;
+  /** Quanto dos limites já foi usado — o app calcula na hora os pontos de
+   * uma ação com as mesmas regras daqui (ver lib/carePointsLocal.ts). */
+  routinePointsToday: number;
+  caredToday: boolean;
+  measuredToday: boolean;
+  measurementDaysThisWeek: number;
+  readingPaidToday: boolean;
 };
 
 function monthKey(today: Date): string {
@@ -171,17 +178,32 @@ export async function awardCarePoints(
   refKey: string,
   points: number,
   { eligible = true }: { eligible?: boolean } = {}
-): Promise<void> {
+): Promise<number> {
   try {
     const amount = eligible ? await allowedPoints(userId, reason, points) : 0;
     await prisma.carePointsEntry.create({ data: { userId, points: amount, reason, refKey } });
     if (amount > 0) await convertIfPossible(userId);
+    return amount;
   } catch (error) {
     // P2002 (refKey repetida) = já ganhou por isso; o resto vai pro log
     if ((error as { code?: string })?.code !== "P2002") {
       console.error("[pontos] não foi possível registrar:", error);
     }
+    return 0;
   }
+}
+
+/** Pontos que cada cuidado ganhou hoje (null = ainda não marcado hoje). */
+export async function checkPointsToday(userId: string, itemIds: string[]): Promise<Map<string, number>> {
+  if (itemIds.length === 0) return new Map();
+  const today = todayDate();
+  const keys = itemIds.map((id) => pointsKey.check(id, today));
+  const entries = await prisma.carePointsEntry.findMany({
+    where: { userId, refKey: { in: keys } },
+    select: { refKey: true, points: true },
+  });
+  const byKey = new Map(entries.map((e) => [e.refKey, e.points]));
+  return new Map(itemIds.map((id) => [id, byKey.get(pointsKey.check(id, today))]).filter(([, p]) => p !== undefined) as [string, number][]);
 }
 
 /** Desfaz um ganho (ex.: desmarcou a dose no mesmo dia). Nunca lança. */
@@ -195,7 +217,8 @@ export async function revokeCarePoints(userId: string, refKey: string): Promise<
 
 export async function getCarePointsSummary(userId: string): Promise<CarePointsSummary> {
   const today = todayDate();
-  const [balance, monthRewardCents, todayAgg, user] = await Promise.all([
+  const dayStart = startOfLocalDay();
+  const [balance, monthRewardCents, todayAgg, user, todayEntries, weekMeasures] = await Promise.all([
     balanceOf(userId),
     monthRewardCentsOf(userId, today),
     prisma.carePointsEntry.aggregate({
@@ -203,7 +226,15 @@ export async function getCarePointsSummary(userId: string): Promise<CarePointsSu
       _sum: { points: true },
     }),
     prisma.user.findUnique({ where: { id: userId }, select: { cpfVerifiedAt: true } }),
+    prisma.carePointsEntry.findMany({
+      where: { userId, createdAt: { gte: dayStart }, reason: { in: ["DOSE", "ROTINA", "MEDICAO", "LEITURA"] } },
+      select: { reason: true, points: true },
+    }),
+    prisma.carePointsEntry.count({
+      where: { userId, reason: "MEDICAO", points: { gt: 0 }, createdAt: { gte: localWeekStart().start } },
+    }),
   ]);
+  const care = todayEntries.filter((e) => e.reason === "DOSE" || e.reason === "ROTINA");
   return {
     balance: Math.max(balance, 0),
     pointsPerReward: POINTS_PER_REWARD,
@@ -212,6 +243,11 @@ export async function getCarePointsSummary(userId: string): Promise<CarePointsSu
     monthCapCents: MONTHLY_CAP_CENTS,
     todayPoints: todayAgg._sum.points ?? 0,
     canRedeem: Boolean(user?.cpfVerifiedAt),
+    routinePointsToday: care.reduce((sum, e) => sum + e.points, 0),
+    caredToday: care.length > 0,
+    measuredToday: todayEntries.some((e) => e.reason === "MEDICAO"),
+    measurementDaysThisWeek: weekMeasures,
+    readingPaidToday: todayEntries.some((e) => e.reason === "LEITURA" && e.points > 0),
   };
 }
 

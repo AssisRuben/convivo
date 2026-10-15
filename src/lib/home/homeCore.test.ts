@@ -21,8 +21,8 @@ vi.mock("@/lib/loyalty/loyaltyCore", () => ({
 }));
 vi.mock("@/lib/catalog/catalogDb", () => ({ getActivePromotions: async () => [] }));
 // card "Bom dia" (pontos e sequência) — fora do escopo destes testes
-vi.mock("@/lib/points/pointsCore", () => ({ getCarePointsSummary: async () => null }));
-vi.mock("@/lib/care/checklistCore", () => ({ getOverallRoutineStreak: async () => 0 }));
+vi.mock("@/lib/points/pointsCore", () => ({ getCarePointsSummary: async () => null, checkPointsToday: async () => new Map() }));
+vi.mock("@/lib/care/checklistCore", () => ({ getOverallRoutineStreak: async () => 0, earnsPointsToday: () => true }));
 vi.mock("@/lib/points/challengesCore", () => ({ getWeeklyChallenges: async () => [] }));
 // "hoje" fixo: 05/10/2026 (todayDate usa a data UTC)
 vi.mock("@/lib/timeline/format", () => ({

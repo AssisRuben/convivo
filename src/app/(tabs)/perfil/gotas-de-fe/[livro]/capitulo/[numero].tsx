@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { apiFetch, type ApiFaithProgress } from "@/lib/api";
+import { patchHomeCache } from "@/lib/carePointsLocal";
 import { useReadingBook, useReadingChapter } from "@/lib/readingClient";
 import { showAlert } from "@/lib/alert";
 import { CelebrationModal } from "@/components/CelebrationModal";
@@ -117,6 +118,8 @@ export default function GotaLeituraScreen() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error ?? "Não foi possível salvar");
+      // pontos e desafio de leitura já aparecem no Home ao voltar
+      patchHomeCache({ kind: "leitura" });
       setProgress(data);
       setResult(data);
     } catch (error) {

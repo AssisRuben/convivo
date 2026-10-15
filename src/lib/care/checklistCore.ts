@@ -4,7 +4,7 @@ import {
   checkRoutineStreakMilestones,
 } from "@/lib/timeline/achievements";
 import { todayDate } from "@/lib/timeline/format";
-import { awardCarePoints, CARE_POINTS, pointsKey, revokeCarePoints } from "@/lib/points/pointsCore";
+import { awardCarePoints, CARE_POINTS, checkPointsToday, pointsKey, revokeCarePoints } from "@/lib/points/pointsCore";
 import { medicationStart, treatmentProgress } from "@/lib/medications/medicationCore";
 import type { CareCategory } from "@/lib/generated/prisma/client";
 import { recordScheduleChange, sameDays } from "@/lib/care/scheduleVersion";
@@ -36,6 +36,10 @@ export type ChecklistItemView = {
   // Medicamentos) ou o hábito medido por uma meta em andamento.
   medicationTrackingId: string | null;
   activeGoals: { id: string; title: string }[];
+  /** Vale ponto hoje (criado antes de hoje) e quanto já ganhou hoje
+   * (null = não marcado) — pro app mostrar os pontos na hora. */
+  earnsPoints: boolean;
+  pointsEarned: number | null;
 };
 
 export function validateRoutineInput(input: RoutineItemInput): string {
@@ -112,6 +116,11 @@ export async function listChecklistItemsForUser(userId: string): Promise<Checkli
     },
   });
 
+  const pointsById = await checkPointsToday(
+    userId,
+    items.filter((i) => i.completions.length > 0).map((i) => i.id)
+  );
+
   return items
     // Horário de remédio com tratamento já encerrado (ex.: antibiótico de
     // 7 dias) sai da Rotina sozinho — mesma regra da Home e dos lembretes.
@@ -128,6 +137,8 @@ export async function listChecklistItemsForUser(userId: string): Promise<Checkli
     completedToday: item.completions.length > 0,
     medicationTrackingId: item.medicationTrackingId,
     activeGoals: item.goals,
+    earnsPoints: earnsPointsToday(item.createdAt),
+    pointsEarned: pointsById.get(item.id) ?? null,
   }));
 }
 
@@ -191,6 +202,11 @@ export async function deactivateChecklistItemForUser(userId: string, id: string)
   await prisma.careChecklistItem.update({ where: { id }, data: { active: false } });
 }
 
+/** Cuidado criado hoje só começa a valer ponto amanhã. */
+export function earnsPointsToday(createdAt: Date): boolean {
+  return createdAt.getTime() < startOfLocalDay().getTime();
+}
+
 export async function completeChecklistItemForUser(userId: string, itemId: string): Promise<void> {
   const item = await requireOwnedItem(userId, itemId);
   const date = todayDate();
@@ -211,19 +227,21 @@ export async function completeChecklistItemForUser(userId: string, itemId: strin
   // por dia pra trás — e seguravam o "marcar dose" por segundos. Ninguém
   // precisa delas na resposta; o servidor é um processo contínuo, então
   // elas terminam normalmente em segundo plano.
+  // Pontos de cuidado antes de responder (o app já mostrou na hora; a
+  // próxima busca precisa encontrar o valor gravado). Dose de remédio vale
+  // mais que os outros cuidados. Cuidado criado hoje só vale ponto a partir
+  // de amanhã — criar e marcar na hora não vira crédito (o dia ainda conta
+  // pros desafios).
+  const isDose = item.category === "MEDICACAO";
+  await awardCarePoints(
+    userId,
+    isDose ? "DOSE" : "ROTINA",
+    pointsKey.check(itemId, date),
+    isDose ? CARE_POINTS.DOSE : CARE_POINTS.ROTINA,
+    { eligible: earnsPointsToday(item.createdAt) }
+  );
+
   void (async () => {
-    // Pontos de cuidado: dose de remédio vale mais que os outros cuidados.
-    const isDose = item.category === "MEDICACAO";
-    // Cuidado criado hoje só vale ponto a partir de amanhã — criar e marcar
-    // cuidados na hora não vira crédito (o dia ainda conta pros desafios).
-    const createdToday = item.createdAt.getTime() >= startOfLocalDay().getTime();
-    await awardCarePoints(
-      userId,
-      isDose ? "DOSE" : "ROTINA",
-      pointsKey.check(itemId, date),
-      isDose ? CARE_POINTS.DOSE : CARE_POINTS.ROTINA,
-      { eligible: !createdToday }
-    );
     await checkCareCompletionAchievement(userId, date);
     await checkRoutineStreakMilestones(userId, date);
   })().catch((error) => console.error("[rotina] conquistas após marcar:", error));

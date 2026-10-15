@@ -164,6 +164,6 @@ export async function completeChapterForUser(
     update: { chaptersRead: chapterNumber, streakDays, lastReadDate: today },
   });
 
-  void awardCarePoints(userId, "LEITURA", pointsKey.leitura("wisdom", topicSlug, chapterNumber), CARE_POINTS.LEITURA);
+  await awardCarePoints(userId, "LEITURA", pointsKey.leitura("wisdom", topicSlug, chapterNumber), CARE_POINTS.LEITURA);
   return toView(topicSlug, topic.chapters.length, updated);
 }

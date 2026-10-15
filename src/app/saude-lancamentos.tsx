@@ -16,6 +16,7 @@ import { showAlert } from "@/lib/alert";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { SAUDE_CACHE_KEY, fetchSaude } from "@/lib/tabPrefetch";
 import { getCached, loadCached, setCached } from "@/lib/tabDataCache";
+import { patchHomeCache } from "@/lib/carePointsLocal";
 
 function readCachedSaude() {
   return getCached<{ measurements: ApiHealthMeasurement[] }>(SAUDE_CACHE_KEY);
@@ -201,6 +202,8 @@ export default function SaudeLancamentosScreen() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error ?? "Não foi possível salvar");
+      // pontos e desafio de medição já aparecem no Home ao voltar
+      patchHomeCache({ kind: "medicao" });
       setMeasurements(data.measurements ?? []);
       setPesoKg("");
       setSistolica("");

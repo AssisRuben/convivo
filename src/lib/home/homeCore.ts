@@ -16,8 +16,8 @@ import { getActivePromotions } from "@/lib/catalog/catalogDb";
 import { getWisdomTopicsSummaryForUser } from "@/lib/wisdom/wisdomCore";
 import { getFaithBooksSummaryForUser } from "@/lib/faith/faithCore";
 import type { HealthMeasurementType } from "@/lib/generated/prisma/client";
-import { getCarePointsSummary, type CarePointsSummary } from "@/lib/points/pointsCore";
-import { getOverallRoutineStreak } from "@/lib/care/checklistCore";
+import { checkPointsToday, getCarePointsSummary, type CarePointsSummary } from "@/lib/points/pointsCore";
+import { earnsPointsToday, getOverallRoutineStreak } from "@/lib/care/checklistCore";
 import { getWeeklyChallenges, type WeeklyChallenge } from "@/lib/points/challengesCore";
 
 /** Leitura do dia sugerida no "Bom dia": próximo capítulo liberado hoje. */
@@ -64,6 +64,10 @@ export type HomeDose = {
   taken: boolean;
   overdue: boolean;
   period: HomeDosePeriod | null;
+  /** Vale ponto hoje (criado antes de hoje) e quanto ganhou hoje (null =
+   * não marcada) — o app mostra os pontos na hora ao marcar/desmarcar. */
+  earnsPoints: boolean;
+  pointsEarned: number | null;
 };
 
 export type HomeRepurchaseItem = {
@@ -208,9 +212,17 @@ export async function getTodayDoses(userId: string, now: Date): Promise<HomeDose
       taken,
       overdue: !taken && minutes != null && minutes < nowMinutes,
       period,
+      earnsPoints: earnsPointsToday(item.createdAt),
+      pointsEarned: null,
       minutes,
     });
   }
+
+  const pointsById = await checkPointsToday(
+    userId,
+    doses.filter((d) => d.taken).map((d) => d.checklistItemId)
+  );
+  for (const dose of doses) dose.pointsEarned = pointsById.get(dose.checklistItemId) ?? null;
 
   return doses
     .sort(

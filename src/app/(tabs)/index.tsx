@@ -6,7 +6,8 @@ import { apiFetch, type ApiHomeDashboard, type ApiHomeDose } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { showAlert } from "@/lib/alert";
 import { HOME_CACHE_KEY, ROTINA_CACHE_KEY, fetchHomeDashboard } from "@/lib/tabPrefetch";
-import { getCached, loadCached, setCached } from "@/lib/tabDataCache";
+import { getCached, loadCached, setCached, takeStale } from "@/lib/tabDataCache";
+import { applyCareAction } from "@/lib/carePointsLocal";
 import { UserAvatar } from "@/components/UserAvatar";
 import { GoodMorningCard } from "@/components/GoodMorningCard";
 import { HomePetCard } from "@/components/HomePetCard";
@@ -183,9 +184,19 @@ export default function HomeScreen() {
       if (loadedOnce.current) {
         // A Rotina invalida o cache da Home quando marca/edita algo —
         // aqui refaz a busca pra lista de doses refletir o status novo.
-        if (readCachedDashboard() === undefined) {
+        const cached = readCachedDashboard();
+        if (cached === undefined) {
           fetchHomeDashboard()
             .then(setDashboard)
+            .catch(() => {});
+        } else if (takeStale(HOME_CACHE_KEY)) {
+          // Outra tela já atualizou o guardado na hora (pontos, desafios):
+          // mostra isso agora e confere com o servidor em segundo plano.
+          setDashboard(cached);
+          fetchHomeDashboard()
+            .then((fresh) => {
+              if (inFlight.current === 0) setDashboard(fresh);
+            })
             .catch(() => {});
         }
         return;
@@ -224,7 +235,26 @@ export default function HomeScreen() {
     const id = dose.checklistItemId;
     const next = !dose.taken;
     latestToggleIntent.current.set(id, next);
-    setDoseTaken(id, next);
+    // Pontos, desafios e "X de Y feitos" mudam junto com o check, na hora
+    // — mesmas regras do servidor (lib/carePointsLocal.ts).
+    const before = dashboard;
+    setDashboard((prev) => {
+      if (!prev) return prev;
+      const { dashboard: applied, routineDelta } = applyCareAction(
+        prev,
+        next
+          ? { kind: "check", isDose: true, eligible: dose.earnsPoints ?? true, scheduledToday: true }
+          : { kind: "uncheck", earned: dose.pointsEarned ?? 0, scheduledToday: true }
+      );
+      return {
+        ...applied,
+        todayDoses: dosesOf(applied).map((d) =>
+          d.checklistItemId === id
+            ? { ...d, taken: next, overdue: next ? false : d.overdue, pointsEarned: next ? routineDelta : null }
+            : d
+        ),
+      };
+    });
     inFlight.current += 1;
 
     let saved = false;
@@ -245,6 +275,13 @@ export default function HomeScreen() {
     if (!saved) {
       if (latestToggleIntent.current.get(id) === next) {
         setDoseTaken(id, !next);
+        if (before) {
+          setDashboard((prev) =>
+            prev
+              ? { ...prev, carePoints: before.carePoints, weeklyChallenges: before.weeklyChallenges, rotina: before.rotina }
+              : prev
+          );
+        }
         showAlert("Não foi possível salvar", "Sua conexão pode estar instável — tente de novo.");
       }
       return;

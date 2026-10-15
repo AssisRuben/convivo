@@ -27,6 +27,7 @@ import { HOME_CACHE_KEY, ROTINA_CACHE_KEY, fetchRotina } from "@/lib/tabPrefetch
 import { CelebrationModal } from "@/components/CelebrationModal";
 import { RotinaCompleteToast } from "@/components/RotinaCompleteToast";
 import { getCached, invalidateCached, loadCached, setCached } from "@/lib/tabDataCache";
+import { patchHomeCache } from "@/lib/carePointsLocal";
 
 const WEEKDAY_NAMES = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
 
@@ -177,12 +178,21 @@ export default function RotinaScreen() {
     // do dia, vale comemorar (só quando está marcando, não desmarcando).
     const isFirstOfDay = nextCompleted && items.every((i) => i.id === item.id || !i.completedToday);
     latestToggleIntent.current.set(item.id, nextCompleted);
-    // A Home lista as doses do dia com o mesmo status — ela refaz a busca
-    // na próxima vez que ganhar foco.
-    invalidateCached(HOME_CACHE_KEY);
+    // Home: pontos, desafios e "X de Y feitos" já mudam na hora (mesmas
+    // regras do servidor); ele confere com o banco ao voltar a aparecer.
+    const scheduledToday = isForToday(item, new Date().getDay());
+    const { routineDelta } = patchHomeCache(
+      nextCompleted
+        ? { kind: "check", isDose: item.category === "MEDICACAO", eligible: item.earnsPoints ?? true, scheduledToday }
+        : { kind: "uncheck", earned: item.pointsEarned ?? 0, scheduledToday }
+    );
 
     setItems((prev) =>
-      prev.map((i) => (i.id === item.id ? { ...i, completedToday: nextCompleted } : i))
+      prev.map((i) =>
+        i.id === item.id
+          ? { ...i, completedToday: nextCompleted, pointsEarned: nextCompleted ? routineDelta : null }
+          : i
+      )
     );
 
     try {
@@ -208,6 +218,8 @@ export default function RotinaScreen() {
           prev.map((i) => (i.id === item.id ? { ...i, completedToday: !nextCompleted } : i))
         );
         showAlert("Não foi possível salvar", "Sua conexão pode estar instável — tente de novo.");
+        // desfaz a previsão do Home: busca de novo do servidor
+        invalidateCached(HOME_CACHE_KEY);
       }
     }
   }

@@ -221,6 +221,12 @@ export type ApiCarePointsSummary = {
   todayPoints: number;
   /** Ausente em servidor antigo (= podia converter). */
   canRedeem?: boolean;
+  /** Limites já usados (ver lib/carePointsLocal.ts) — ausentes em servidor antigo. */
+  routinePointsToday?: number;
+  caredToday?: boolean;
+  measuredToday?: boolean;
+  measurementDaysThisWeek?: number;
+  readingPaidToday?: boolean;
 };
 
 export type ApiLoyaltyProgress = {
@@ -260,6 +266,9 @@ export type ApiHomeDose = {
   taken: boolean;
   overdue: boolean;
   period: ApiHomeDosePeriod | null;
+  /** Vale ponto hoje / quanto ganhou hoje — ausentes em servidor antigo. */
+  earnsPoints?: boolean;
+  pointsEarned?: number | null;
 };
 
 export type ApiRoutineNextOccurrence = {
@@ -369,6 +378,9 @@ export type ApiChecklistItem = {
   completedToday: boolean;
   medicationTrackingId: string | null;
   activeGoals: { id: string; title: string }[];
+  /** Vale ponto hoje / quanto ganhou hoje — ausentes em servidor antigo. */
+  earnsPoints?: boolean;
+  pointsEarned?: number | null;
 };
 
 export type RoutineItemInput = {

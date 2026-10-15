@@ -29,6 +29,19 @@ export function invalidateCached(key: string): void {
   cache.delete(key);
 }
 
+// Dado guardado que já foi atualizado na hora (otimista) mas ainda precisa
+// conferir com o servidor: a tela mostra o guardado e busca em segundo plano.
+const stale = new Set<string>();
+
+export function markStale(key: string): void {
+  stale.add(key);
+}
+
+/** true uma vez por marcação (quem consulta assume a nova busca). */
+export function takeStale(key: string): boolean {
+  return stale.delete(key);
+}
+
 export function loadCached<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
   if (cache.has(key)) return Promise.resolve(cache.get(key) as T);
 

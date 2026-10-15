@@ -43,7 +43,7 @@ export async function addMeasurementsForUser(
     data: entries.map((values) => ({ userId, ...values })),
   });
   // Pontos de cuidado: uma vez por dia, quantas medições forem
-  void awardCarePoints(userId, "MEDICAO", pointsKey.medicao(), CARE_POINTS.MEDICAO);
+  await awardCarePoints(userId, "MEDICAO", pointsKey.medicao(), CARE_POINTS.MEDICAO);
   await checkAchievementsForTypes(
     userId,
     entries.map((e) => e.type)
