@@ -7,6 +7,9 @@ export type PushPayload = {
   title: string;
   body: string;
   data?: Record<string, string>;
+  /** Mesma chave = substitui a notificação anterior em vez de empilhar
+   * (padrão WhatsApp: uma por conversa). Android: tag; iOS: collapseId. */
+  replaceKey?: string;
 };
 
 /**
@@ -28,6 +31,7 @@ export async function sendPushToUser(userId: string, payload: PushPayload): Prom
       title: payload.title,
       body: payload.body,
       data: payload.data,
+      ...(payload.replaceKey ? { tag: payload.replaceKey, collapseId: payload.replaceKey } : {}),
     });
   }
   if (messages.length === 0) return;

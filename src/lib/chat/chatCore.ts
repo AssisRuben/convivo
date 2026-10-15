@@ -42,6 +42,11 @@ export function previewOf(text: string): string {
   return flat.length > PREVIEW_LENGTH ? `${flat.slice(0, PREVIEW_LENGTH - 1)}…` : flat;
 }
 
+/** "💬 Maria" ou, com várias não lidas, "💬 Maria (3 mensagens)". */
+export function chatPushTitle(name: string, unread: number): string {
+  return unread > 1 ? `💬 ${name} (${unread} mensagens)` : `💬 ${name}`;
+}
+
 export async function isGestor(userId: string): Promise<boolean> {
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { isGestor: true } });
   return Boolean(user?.isGestor);
@@ -99,9 +104,11 @@ export async function sendCustomerMessage(userId: string, rawText: string): Prom
     });
     for (const gestor of gestores) {
       await sendPushToUser(gestor.id, {
-        title: `💬 ${thread.customer.name}`,
+        title: chatPushTitle(thread.customer.name, thread.staffUnread),
         body: previewOf(text),
         data: { screen: "chat", threadId: thread.id },
+        // uma notificação por conversa, trocada pela última mensagem
+        replaceKey: `chat-${thread.id}`,
       });
     }
   })().catch((error) => console.error("[chat] push pros gestores:", error));
@@ -154,9 +161,10 @@ export async function sendStaffMessage(userId: string, threadId: string, rawText
     data: { threadId, senderId: userId, fromStaff: true, text, createdAt: now },
   });
   void sendPushToUser(thread.customerId, {
-    title: `💬 ${STAFF_DISPLAY_NAME}`,
+    title: chatPushTitle(STAFF_DISPLAY_NAME, thread.customerUnread),
     body: previewOf(text),
     data: { screen: "chat" },
+    replaceKey: "chat-farmacia",
   }).catch((error) => console.error("[chat] push pro cliente:", error));
 }
 

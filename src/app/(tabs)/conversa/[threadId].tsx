@@ -4,6 +4,7 @@ import { ActivityIndicator, Text, View } from "react-native";
 import { apiFetch, type ApiChatThread } from "@/lib/api";
 import { ChatView } from "@/components/ChatView";
 import { refreshChatUnread } from "@/lib/chatUnread";
+import { dismissChatNotifications } from "@/lib/chatNotifications";
 
 const POLL_MS = 5000;
 
@@ -23,6 +24,8 @@ export default function ConversaClienteScreen() {
       }
       setError(null);
       setData(json);
+      // conversa aberta: a notificação dela sai da barra
+      dismissChatNotifications(threadId);
     } catch {
       // sem rede: tenta de novo no próximo ciclo
       setError((current) => current ?? "Sem conexão. Tentando de novo…");

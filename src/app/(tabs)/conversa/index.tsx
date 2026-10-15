@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { apiFetch, type ApiChatOverview, type ApiChatThreadSummary } from "@/lib/api";
 import { ChatView } from "@/components/ChatView";
 import { setChatUnread } from "@/lib/chatUnread";
+import { dismissChatNotifications } from "@/lib/chatNotifications";
 
 const POLL_MS = 5000;
 
@@ -69,6 +70,8 @@ export default function ConversaScreen() {
       setData(json);
       // Cliente abriu = leu tudo; gestor: soma do que ainda falta abrir.
       setChatUnread(json.role === "gestor" ? json.threads.reduce((s, t) => s + t.unread, 0) : 0);
+      // cliente com a conversa aberta: a notificação dela sai da barra
+      if (json.role === "cliente") dismissChatNotifications();
     } catch {
       // sem rede: tenta de novo no próximo ciclo
       setFailed(true);

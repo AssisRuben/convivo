@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/prisma", () => ({ prisma: {} }));
 vi.mock("@/lib/push/expoPush", () => ({ sendPushToUser: vi.fn() }));
 
-import { MAX_MESSAGE_LENGTH, normalizeMessage, previewOf } from "@/lib/chat/chatCore";
+import { MAX_MESSAGE_LENGTH, chatPushTitle, normalizeMessage, previewOf } from "@/lib/chat/chatCore";
 
 describe("mensagem do chat", () => {
   it("tira espaço das pontas", () => {
@@ -31,5 +31,14 @@ describe("prévia na lista do gestor", () => {
     const preview = previewOf("x".repeat(300));
     expect(preview).toHaveLength(120);
     expect(preview.endsWith("…")).toBe(true);
+  });
+});
+
+describe("título da notificação (uma por conversa)", () => {
+  it("uma mensagem: só o nome", () => {
+    expect(chatPushTitle("Maria", 1)).toBe("💬 Maria");
+  });
+  it("várias não lidas: conta, como no WhatsApp", () => {
+    expect(chatPushTitle("Maria", 3)).toBe("💬 Maria (3 mensagens)");
   });
 });
