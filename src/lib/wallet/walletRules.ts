@@ -105,3 +105,19 @@ export function validateRedemption(input: {
   if (amountCents > purchaseCents) return "O crédito não pode passar do valor da compra.";
   return null;
 }
+
+/** Conteúdo do QR que o cliente mostra no balcão. */
+export const REDEEM_QR_PREFIX = "convivo-credito:";
+
+export function redeemQrValue(code: string): string {
+  return `${REDEEM_QR_PREFIX}${code}`;
+}
+
+/** Lê o QR escaneado: só aceita o do Convivo (ou 6 dígitos puros). */
+export function parseRedeemQr(data: string): string | null {
+  const text = data.trim();
+  const match = text.startsWith(REDEEM_QR_PREFIX)
+    ? text.slice(REDEEM_QR_PREFIX.length).match(/^\d{6}$/)
+    : text.match(/^\d{6}$/);
+  return match ? match[0] : null;
+}

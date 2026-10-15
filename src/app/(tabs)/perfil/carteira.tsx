@@ -4,6 +4,8 @@ import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-nati
 import { Ionicons } from "@expo/vector-icons";
 import { apiFetch } from "@/lib/api";
 import { showAlert } from "@/lib/alert";
+import QRCode from "react-native-qrcode-svg";
+import { redeemQrValue } from "@/lib/wallet/walletRules";
 
 type Overview = {
   balanceCents: number;
@@ -120,8 +122,12 @@ export default function CarteiraScreen() {
 
       {codeState.phase === "showing" && left > 0 ? (
         <View className="items-center gap-2 rounded-3xl bg-card p-6 shadow-sm">
-          <Text className="text-sm font-semibold text-navy">Mostre este código ao atendente</Text>
-          <Text className="text-5xl font-extrabold tracking-[8px] text-navy">
+          <Text className="text-sm font-semibold text-navy">Mostre este QR ao atendente</Text>
+          <View className="rounded-2xl bg-white p-3">
+            <QRCode value={redeemQrValue(codeState.code)} size={210} color="#0b1e3d" backgroundColor="#ffffff" />
+          </View>
+          <Text className="text-xs text-navy/50">Se a leitura não funcionar, ele digita o código:</Text>
+          <Text className="text-3xl font-extrabold tracking-[6px] text-navy">
             {codeState.code.slice(0, 3)} {codeState.code.slice(3)}
           </Text>
           <View className="flex-row items-center gap-1.5">
@@ -166,7 +172,7 @@ export default function CarteiraScreen() {
       <View className="gap-1.5 rounded-2xl bg-mint/10 p-4">
         <Text className="text-xs font-semibold uppercase tracking-wide text-mint">Como usar na farmácia</Text>
         <Text className="text-xs text-navy/70">1. No caixa, toque em “Usar no balcão”.</Text>
-        <Text className="text-xs text-navy/70">2. Mostre o código ao atendente — ele confirma quanto vai usar.</Text>
+        <Text className="text-xs text-navy/70">2. Mostre o QR ao atendente — ele lê com o celular e confirma quanto vai usar.</Text>
         <Text className="text-xs text-navy/70">
           3. O desconto entra na hora. Compra mínima de {formatPrice(data.minPurchaseCents)}; dá pra usar parte do
           saldo e guardar o resto.

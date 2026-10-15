@@ -6,6 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { apiFetch } from "@/lib/api";
 import { showAlert } from "@/lib/alert";
 import { parseMoneyToCents, validateRedemption } from "@/lib/wallet/walletRules";
+import { QrScannerModal } from "@/components/QrScannerModal";
 
 type Lookup = { customerName: string; balanceCents: number; minPurchaseCents: number };
 type Redemption = {
@@ -50,6 +51,7 @@ export default function BalcaoScreen() {
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<{ customerName: string; amountCents: number; balanceCents: number } | null>(null);
   const [today, setToday] = useState<Today | null>(null);
+  const [scanning, setScanning] = useState(false);
 
   const loadToday = useCallback(async () => {
     const res = await apiFetch("/api/mobile/balcao/resgates");
@@ -71,10 +73,10 @@ export default function BalcaoScreen() {
     setDone(null);
   }
 
-  async function consult() {
+  async function consult(value: string = code) {
     setBusy(true);
     try {
-      const res = await apiFetch("/api/mobile/balcao/consultar", { method: "POST", body: JSON.stringify({ code }) });
+      const res = await apiFetch("/api/mobile/balcao/consultar", { method: "POST", body: JSON.stringify({ code: value }) });
       const json = await res.json();
       if (!res.ok) throw new Error(json?.error);
       setLookup(json);
@@ -174,8 +176,17 @@ export default function BalcaoScreen() {
       ) : !lookup ? (
         <View className="gap-3 rounded-2xl bg-card p-4 shadow-sm">
           <Text className="text-sm text-navy/70">
-            Peça pro cliente abrir Menu › Meus créditos › Usar no balcão e digite o código que aparece.
+            Peça pro cliente abrir Menu › Meus créditos › Usar no balcão e leia o QR que aparece.
           </Text>
+          <Pressable
+            disabled={busy}
+            onPress={() => setScanning(true)}
+            className="flex-row items-center justify-center gap-2 rounded-full bg-mint py-4 disabled:opacity-40"
+          >
+            <Ionicons name="qr-code-outline" size={22} color="#fff" />
+            <Text className="text-base font-semibold text-white">Ler QR do cliente</Text>
+          </Pressable>
+          <Text className="text-center text-xs text-navy/50">ou digite os 6 números</Text>
           <TextInput
             value={code}
             onChangeText={(v) => setCode(v.replace(/\D/g, "").slice(0, 6))}
@@ -186,7 +197,7 @@ export default function BalcaoScreen() {
           />
           <Pressable
             disabled={busy || code.length !== 6}
-            onPress={consult}
+            onPress={() => consult()}
             className="items-center rounded-full bg-navy py-3.5 disabled:opacity-40"
           >
             {busy ? <ActivityIndicator color="#fff" /> : <Text className="font-semibold text-white">Consultar</Text>}
@@ -293,6 +304,15 @@ export default function BalcaoScreen() {
           )}
         </View>
       )}
+      <QrScannerModal
+        visible={scanning}
+        onClose={() => setScanning(false)}
+        onCode={(value) => {
+          setScanning(false);
+          setCode(value);
+          consult(value);
+        }}
+      />
     </KeyboardAwareScrollView>
   );
 }

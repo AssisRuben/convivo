@@ -66,3 +66,16 @@ describe("resgate no balcão", () => {
     expect(validateRedemption({ purchaseCents: 6000, amountCents: 6000, balanceCents: 9000 })).toBeNull();
   });
 });
+
+describe("QR do resgate", () => {
+  it("ida e volta", async () => {
+    const { parseRedeemQr, redeemQrValue } = await import("@/lib/wallet/walletRules");
+    expect(parseRedeemQr(redeemQrValue("482913"))).toBe("482913");
+    expect(parseRedeemQr("482913")).toBe("482913");
+  });
+  it("QR de outra coisa é recusado", async () => {
+    const { parseRedeemQr } = await import("@/lib/wallet/walletRules");
+    expect(parseRedeemQr("https://exemplo.com/482913")).toBeNull();
+    expect(parseRedeemQr("convivo-credito:12345")).toBeNull();
+  });
+});

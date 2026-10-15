@@ -57,7 +57,15 @@
           "color": "#c9a24b"
         }
       ],
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "O Convivo usa a câmera para ler o QR code de créditos dos clientes no balcão.",
+          "recordAudioAndroid": false,
+          "barcodeScannerEnabled": true
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
