@@ -77,7 +77,7 @@
     "lint": "expo lint",
     "test": "vitest run",
     "backfill:images": "tsx --env-file=.env.local scripts/backfill-product-images.ts",
-    "build:server": "expo export -p web --api-only --max-workers 1",
+    "build:server": "NODE_OPTIONS=--max-old-space-size=1536 expo export -p web --api-only --max-workers 1",
     "start:server": "node server.js",
     "eas-build-post-install": "bash eas-build-post-install.sh"
   },
