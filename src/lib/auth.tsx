@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { deleteItemAsync, getItemAsync, setItemAsync } from "@/lib/storage";
 import { apiFetch } from "@/lib/api";
+import { clearAllCached } from "@/lib/tabDataCache";
 import { TOKEN_KEY, USER_KEY } from "@/lib/storageKeys";
 import { registerPushToken } from "@/lib/push/registerPushToken";
 import { registerForceLogoutHandler } from "@/lib/authEvents";
@@ -45,6 +46,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   async function persist(newToken: string, newUser: AuthUser) {
+    // Dados guardados das telas são da conta anterior: começa do zero.
+    clearAllCached();
     await Promise.all([
       setItemAsync(TOKEN_KEY, newToken),
       setItemAsync(USER_KEY, JSON.stringify(newUser)),
@@ -75,6 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function logout() {
+    clearAllCached();
     await Promise.all([
       deleteItemAsync(TOKEN_KEY),
       deleteItemAsync(USER_KEY),

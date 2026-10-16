@@ -29,6 +29,7 @@ export function invalidateCached(key: string): void {
   cache.delete(key);
 }
 
+
 // Dado guardado que já foi atualizado na hora (otimista) mas ainda precisa
 // conferir com o servidor: a tela mostra o guardado e busca em segundo plano.
 const stale = new Set<string>();
@@ -58,4 +59,11 @@ export function loadCached<T>(key: string, fetcher: () => Promise<T>): Promise<T
     });
   inflight.set(key, promise);
   return promise;
+}
+
+/** Troca de conta (login/logout): nada da conta anterior pode aparecer. */
+export function clearAllCached(): void {
+  cache.clear();
+  inflight.clear();
+  stale.clear();
 }

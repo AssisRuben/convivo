@@ -4,6 +4,7 @@ import { generateCode } from "@/lib/codes";
 import { checkReferralMilestones } from "@/lib/timeline/achievements";
 import type { User } from "@/lib/generated/prisma/client";
 import { normalizeReferralCode } from "@/lib/referral/referralCore";
+import { forgetActiveUser } from "@/lib/apiAuth";
 
 export type CreateUserAccountInput = {
   name: string;
@@ -167,6 +168,8 @@ export async function deleteUserAccount(
       allergies: [],
     },
   });
+  // o login guardado por 1 min (apiAuth) deixa de valer na hora
+  forgetActiveUser(userId);
 
   return { ok: true };
 }

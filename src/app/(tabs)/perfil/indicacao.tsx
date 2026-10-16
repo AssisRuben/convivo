@@ -4,6 +4,7 @@ import { ActivityIndicator, Modal, Pressable, ScrollView, Share, Text, TextInput
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { Ionicons } from "@expo/vector-icons";
 import { apiFetch } from "@/lib/api";
+import { useCachedState } from "@/lib/useCachedState";
 import { showAlert } from "@/lib/alert";
 import { useCodeOwner } from "@/lib/useCodeOwner";
 import { CodeOwnerHint } from "@/components/CodeOwnerHint";
@@ -37,7 +38,7 @@ function firstName(name: string): string {
 
 export default function IndicacaoScreen() {
   const router = useRouter();
-  const [data, setData] = useState<Overview | null>(null);
+  const [data, setData] = useCachedState<Overview>("tela:indicacao");
   const [codeInput, setCodeInput] = useState("");
   const [linking, setLinking] = useState(false);
   const [showFriends, setShowFriends] = useState(false);
@@ -47,7 +48,7 @@ export default function IndicacaoScreen() {
   const load = useCallback(async () => {
     const res = await apiFetch("/api/mobile/indicacao");
     if (res.ok) setData(await res.json());
-  }, []);
+  }, [setData]);
 
   useFocusEffect(
     useCallback(() => {

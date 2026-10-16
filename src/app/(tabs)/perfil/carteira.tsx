@@ -3,6 +3,7 @@ import { useFocusEffect } from "expo-router";
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { apiFetch } from "@/lib/api";
+import { useCachedState } from "@/lib/useCachedState";
 import { showAlert } from "@/lib/alert";
 import QRCode from "react-native-qrcode-svg";
 import { redeemQrValue } from "@/lib/wallet/walletRules";
@@ -41,7 +42,7 @@ function secondsLeft(iso: string, now: number): number {
  * app dele. A tela acompanha o código e mostra o resgate assim que sai.
  */
 export default function CarteiraScreen() {
-  const [data, setData] = useState<Overview | null>(null);
+  const [data, setData] = useCachedState<Overview>("tela:carteira");
   const [codeState, setCodeState] = useState<CodeState>({ phase: "none" });
   const [generating, setGenerating] = useState(false);
   const [now, setNow] = useState(() => Date.now());
@@ -50,7 +51,7 @@ export default function CarteiraScreen() {
   const load = useCallback(async () => {
     const res = await apiFetch("/api/mobile/carteira");
     if (res.ok) setData(await res.json());
-  }, []);
+  }, [setData]);
 
   useFocusEffect(
     useCallback(() => {

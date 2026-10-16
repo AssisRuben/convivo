@@ -4,6 +4,7 @@ import { ActivityIndicator, Modal, Pressable, ScrollView, Share, Text, TextInput
 import { Ionicons } from "@expo/vector-icons";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { apiFetch, type ApiCaredPerson, type ApiCareOverview } from "@/lib/api";
+import { useCachedState } from "@/lib/useCachedState";
 import { showAlert } from "@/lib/alert";
 
 function formatDate(iso: string): string {
@@ -77,7 +78,7 @@ function PersonCard({ person, onStop }: { person: ApiCaredPerson; onStop: () => 
  * aceitar um convite e acompanhar as doses de quem eu cuido.
  */
 export default function FamiliaScreen() {
-  const [data, setData] = useState<ApiCareOverview | null>(null);
+  const [data, setData] = useCachedState<ApiCareOverview>("tela:familia");
   const [busy, setBusy] = useState(false);
   const [codeOpen, setCodeOpen] = useState(false);
   const [code, setCode] = useState("");
@@ -85,7 +86,7 @@ export default function FamiliaScreen() {
   const load = useCallback(async () => {
     const res = await apiFetch("/api/mobile/cuidador");
     if (res.ok) setData(await res.json());
-  }, []);
+  }, [setData]);
 
   useFocusEffect(
     useCallback(() => {

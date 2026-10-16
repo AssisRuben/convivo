@@ -12,6 +12,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { apiFetch } from "@/lib/api";
+import { useCachedState } from "@/lib/useCachedState";
 import { showAlert } from "@/lib/alert";
 import { describeDaysOfWeek } from "@/lib/medications/doseSchedule";
 import { invalidateCached } from "@/lib/tabDataCache";
@@ -55,7 +56,9 @@ export default function MedicamentosScreen() {
   const router = useRouter();
   // Vindo do "Comprei mais" da Home: abre direto o campo de quantidade.
   const { comprei } = useLocalSearchParams<{ comprei?: string }>();
-  const [items, setItems] = useState<ApiMedicationTracking[]>([]);
+  // Voltar pra lista mostra a última na hora; a busca atualiza por trás.
+  const [cachedItems, setItems] = useCachedState<ApiMedicationTracking[]>("tela:medicamentos");
+  const items = cachedItems ?? [];
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [stockFor, setStockFor] = useState<ApiMedicationTracking | null>(null);
@@ -73,7 +76,7 @@ export default function MedicamentosScreen() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [setItems]);
 
   useFocusEffect(
     useCallback(() => {
@@ -160,7 +163,7 @@ export default function MedicamentosScreen() {
     );
   }
 
-  if (loading) {
+  if (loading && cachedItems == null) {
     return (
       <View className="flex-1 items-center justify-center bg-cream">
         <ActivityIndicator color="#0b1e3d" />

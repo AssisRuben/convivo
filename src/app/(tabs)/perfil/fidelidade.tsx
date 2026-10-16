@@ -4,6 +4,7 @@ import { ActivityIndicator, Animated, ScrollView, Text, View } from "react-nativ
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { apiFetch, type ApiLoyaltyProgress } from "@/lib/api";
+import { useCachedState } from "@/lib/useCachedState";
 import { CarePointsCard } from "@/components/CarePointsCard";
 
 function formatPrice(cents: number): string {
@@ -157,21 +158,14 @@ function StampSlot({ index, filled, isNext }: { index: number; filled: boolean; 
 }
 
 export default function FidelidadeScreen() {
-  const [progress, setProgress] = useState<ApiLoyaltyProgress | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Voltar pra tela mostra o último cartão na hora; a busca atualiza por trás.
+  const [progress, setProgress] = useCachedState<ApiLoyaltyProgress>("tela:fidelidade");
   const loadedOnce = useRef(false);
 
   const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await apiFetch("/api/mobile/fidelidade");
-      if (res.ok) {
-        setProgress(await res.json());
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    const res = await apiFetch("/api/mobile/fidelidade");
+    if (res.ok) setProgress(await res.json());
+  }, [setProgress]);
 
   useFocusEffect(
     useCallback(() => {
@@ -181,7 +175,7 @@ export default function FidelidadeScreen() {
     }, [load])
   );
 
-  if (loading || !progress) {
+  if (!progress) {
     return (
       <View className="flex-1 items-center justify-center bg-cream">
         <ActivityIndicator color="#0b1e3d" />

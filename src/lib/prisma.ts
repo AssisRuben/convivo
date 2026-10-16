@@ -15,6 +15,10 @@ const globalForPrisma = globalThis as unknown as {
 const adapter = new PrismaPg({
   connectionString: process.env.DATABASE_URL,
   connectionTimeoutMillis: 10_000,
+  // O Home dispara ~30 consultas em paralelo; com o padrão (10) elas
+  // esperavam em fila, cada uma pagando ~0,2 s até o banco. O pooler da
+  // Supabase (modo transação) aguenta bem mais conexões de cliente.
+  max: 20,
   idleTimeoutMillis: 300_000,
   keepAlive: true,
 });
