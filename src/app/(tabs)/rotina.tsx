@@ -29,6 +29,12 @@ import { RotinaCompleteToast } from "@/components/RotinaCompleteToast";
 import { getCached, invalidateCached, loadCached, setCached } from "@/lib/tabDataCache";
 import { patchHomeCache } from "@/lib/carePointsLocal";
 import { useDayChange } from "@/lib/useDayChange";
+import {
+  RotinaProgressCard,
+  formatDuration,
+  minutesUntilTime,
+  type NextCare,
+} from "@/components/RotinaProgressCard";
 
 const WEEKDAY_NAMES = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
 
@@ -172,6 +178,13 @@ export default function RotinaScreen() {
     if (!loading) setCached(ROTINA_CACHE_KEY, { items, streakDays });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items, streakDays]);
+
+  // Relógio pras contagens "próximo em 1h20" / "faltam 5h pra garantir hoje".
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 30_000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Marca/desmarca na hora, sem esperar o servidor — o banco fica longe
   // (Supabase remota) e travar o clique até a resposta voltar tornava a
@@ -361,6 +374,20 @@ export default function RotinaScreen() {
   const pendingItems = todayItems.filter((item) => !item.completedToday);
   const doneItems = todayItems.filter((item) => item.completedToday);
 
+  // Próximo cuidado: o atrasado mais antigo, senão o mais próximo de vencer.
+  const timedPending = pendingItems
+    .map((item) => ({ item, minutesUntil: item.timeOfDay ? minutesUntilTime(item.timeOfDay, now) : null }))
+    .filter((x): x is { item: ApiChecklistItem; minutesUntil: number } => x.minutesUntil !== null)
+    .sort((a, b) => a.minutesUntil - b.minutesUntil);
+  const nextCare: NextCare | null = timedPending[0]
+    ? {
+        title: timedPending[0].item.title,
+        timeOfDay: timedPending[0].item.timeOfDay ?? "",
+        minutesUntil: timedPending[0].minutesUntil,
+      }
+    : null;
+  const minutesUntilById = new Map(timedPending.map((x) => [x.item.id, x.minutesUntil]));
+
   function renderItemRow(item: ApiChecklistItem, otherDay = false) {
     const meta = CARE_CATEGORY_META[item.category];
     return (
@@ -397,6 +424,17 @@ export default function RotinaScreen() {
               : item.daysOfWeek.map((d) => WEEKDAY_LABELS[d]).join(", ")}
             {otherDay && otherDayHint(item.daysOfWeek, weekday)}
           </Text>
+          {!otherDay && !item.completedToday && minutesUntilById.has(item.id) && (
+            <Text
+              className={`mt-0.5 text-xs font-semibold ${
+                (minutesUntilById.get(item.id) ?? 0) < 0 ? "text-coral" : "text-mint"
+              }`}
+            >
+              {(minutesUntilById.get(item.id) ?? 0) < 0
+                ? `⏰ Atrasado há ${formatDuration(-(minutesUntilById.get(item.id) ?? 0))}`
+                : `⏰ Em ${formatDuration(minutesUntilById.get(item.id) ?? 0)}`}
+            </Text>
+          )}
           {(item.medicationTrackingId || item.activeGoals.length > 0) && (
             <View className="mt-1 flex-row flex-wrap gap-1">
               {item.medicationTrackingId && (
@@ -453,18 +491,15 @@ export default function RotinaScreen() {
         </Pressable>
       </View>
 
-      {streakDays > 0 && (
-        <View className="mb-4 flex-row items-center gap-3 rounded-2xl bg-navy p-4">
-          <View className="h-12 w-12 items-center justify-center rounded-full bg-white/10">
-            <Ionicons name="flame" size={22} color="#f59e0b" />
-          </View>
-          <View className="flex-1">
-            <Text className="text-sm font-semibold text-white">
-              {streakDays} dia{streakDays > 1 ? "s seguidos" : " seguido"} cuidando de você
-            </Text>
-            <Text className="mt-0.5 text-xs text-white/60">Marque pelo menos um cuidado hoje pra manter</Text>
-          </View>
-        </View>
+      {items.length > 0 && (
+        <RotinaProgressCard
+          done={doneItems.length}
+          total={todayItems.length}
+          streakDays={streakDays}
+          next={nextCare}
+          untimedPending={pendingItems.length - timedPending.length}
+          now={now}
+        />
       )}
 
       {form && (
