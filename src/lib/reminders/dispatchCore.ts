@@ -214,8 +214,10 @@ export async function dispatchDueWisdomReminders(now: Date = new Date()): Promis
       data: { screen: "pilulas-sabedoria" },
     });
     notifiedUserIds.add(row.userId);
-    await prisma.wisdomProgress.update({
-      where: { userId_topicSlug: { userId: row.userId, topicSlug: row.topicSlug } },
+    // Marca TODOS os tópicos do usuário: o cron passa 2-3 vezes na janela
+    // das 08:00, e marcar só este deixava os outros avisarem de novo.
+    await prisma.wisdomProgress.updateMany({
+      where: { userId: row.userId },
       data: { lastNotifiedDate: today },
     });
     sent += 1;
@@ -252,8 +254,10 @@ export async function dispatchDueFaithReminders(now: Date = new Date()): Promise
       data: { screen: "gotas-de-fe" },
     });
     notifiedUserIds.add(row.userId);
-    await prisma.faithProgress.update({
-      where: { userId_bookSlug: { userId: row.userId, bookSlug: row.bookSlug } },
+    // Marca TODOS os livros do usuário: o cron passa 2-3 vezes na janela
+    // das 08:00, e marcar só este deixava o outro livro avisar de novo.
+    await prisma.faithProgress.updateMany({
+      where: { userId: row.userId },
       data: { lastNotifiedDate: today },
     });
     sent += 1;
