@@ -28,6 +28,7 @@ import { CelebrationModal } from "@/components/CelebrationModal";
 import { RotinaCompleteToast } from "@/components/RotinaCompleteToast";
 import { getCached, invalidateCached, loadCached, setCached } from "@/lib/tabDataCache";
 import { patchHomeCache } from "@/lib/carePointsLocal";
+import { useDayChange } from "@/lib/useDayChange";
 
 const WEEKDAY_NAMES = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
 
@@ -123,6 +124,15 @@ export default function RotinaScreen() {
       setLoading(false);
     }
   }, []);
+
+  useDayChange(
+    useCallback(() => {
+      invalidateCached(ROTINA_CACHE_KEY);
+      lastCheckedDay.current = new Date().toDateString();
+      loadedOnce.current = true;
+      load();
+    }, [load])
+  );
 
   useFocusEffect(
     useCallback(() => {

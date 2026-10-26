@@ -11,18 +11,35 @@
  * própria tela, se o usuário for rápido) compartilham a mesma promise
  * em vez de disparar duas requisições.
  */
-const cache = new Map<string, unknown>();
+// Cada entrada guarda o dia (do aparelho) em que foi gravada: dado de
+// ontem conta como ausente. "Concluído hoje" da Rotina e a próxima dose do
+// Home são por dia, e o app costuma ficar dias só minimizado.
+const cache = new Map<string, { data: unknown; day: string }>();
 const inflight = new Map<string, Promise<unknown>>();
 
+function today(): string {
+  return new Date().toDateString();
+}
+
+function fresh(key: string): { data: unknown } | undefined {
+  const entry = cache.get(key);
+  if (!entry) return undefined;
+  if (entry.day !== today()) {
+    cache.delete(key);
+    return undefined;
+  }
+  return entry;
+}
+
 export function getCached<T>(key: string): T | undefined {
-  return cache.get(key) as T | undefined;
+  return fresh(key)?.data as T | undefined;
 }
 
 /** Espelha o estado atual de uma tela no cache — chamado num useEffect
  * que observa o state, não em cada handler de mutação, pra não precisar
  * lembrar de sincronizar em todo lugar que muda o dado. */
 export function setCached<T>(key: string, data: T): void {
-  cache.set(key, data);
+  cache.set(key, { data, day: today() });
 }
 
 export function invalidateCached(key: string): void {
@@ -44,14 +61,15 @@ export function takeStale(key: string): boolean {
 }
 
 export function loadCached<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
-  if (cache.has(key)) return Promise.resolve(cache.get(key) as T);
+  const entry = fresh(key);
+  if (entry) return Promise.resolve(entry.data as T);
 
   const existing = inflight.get(key) as Promise<T> | undefined;
   if (existing) return existing;
 
   const promise = fetcher()
     .then((data) => {
-      cache.set(key, data);
+      cache.set(key, { data, day: today() });
       return data;
     })
     .finally(() => {

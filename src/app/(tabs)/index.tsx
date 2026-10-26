@@ -6,8 +6,9 @@ import { apiFetch, type ApiHomeDashboard, type ApiHomeDose } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { showAlert } from "@/lib/alert";
 import { HOME_CACHE_KEY, ROTINA_CACHE_KEY, fetchHomeDashboard } from "@/lib/tabPrefetch";
-import { getCached, loadCached, setCached, takeStale } from "@/lib/tabDataCache";
+import { getCached, invalidateCached, loadCached, setCached, takeStale } from "@/lib/tabDataCache";
 import { applyCareAction } from "@/lib/carePointsLocal";
+import { useDayChange } from "@/lib/useDayChange";
 import { UserAvatar } from "@/components/UserAvatar";
 import { GoodMorningCard } from "@/components/GoodMorningCard";
 import { HomePetCard } from "@/components/HomePetCard";
@@ -178,6 +179,15 @@ export default function HomeScreen() {
       setLoading(false);
     }
   }, []);
+
+  useDayChange(
+    useCallback(() => {
+      invalidateCached(HOME_CACHE_KEY);
+      fetchHomeDashboard()
+        .then(setDashboard)
+        .catch(() => {});
+    }, [])
+  );
 
   useFocusEffect(
     useCallback(() => {
