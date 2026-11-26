@@ -20,8 +20,9 @@ import type {
   User,
 } from "@/lib/generated/prisma/client";
 
-export const REFERRAL_COMMISSION_RATE = 0.02;
-export const VENDEDOR_COMMISSION_RATE = 0.05;
+// Taxas compartilhadas com a comissão das compras da loja física
+import { REFERRAL_COMMISSION_RATE, VENDEDOR_COMMISSION_RATE } from "@/lib/referral/storeCommission";
+export { REFERRAL_COMMISSION_RATE, VENDEDOR_COMMISSION_RATE };
 
 /**
  * Trava o desconto de saldo contra o que realmente existe — usada tanto na
@@ -349,7 +350,9 @@ export function calculateOrderMarginCents(items: MarginItem[]): number {
 /**
  * Comissão recorrente de 2% da margem bruta pro amigo que indicou — toda
  * compra do indicado, não só a primeira. Independente da comissão de
- * vendedor abaixo: os dois vínculos podem existir juntos no mesmo cliente.
+ * vendedor abaixo. Hoje cada cliente tem um vínculo por vez (amigo OU
+ * vendedor, ver attributeCode em lib/userAccount.ts), mas conta antiga
+ * pode ter os dois — aí cada um recebe a sua parte.
  */
 async function creditReferralCommission(order: OrderWithRelations): Promise<void> {
   if (!order.user.referredById) return;
@@ -370,8 +373,9 @@ async function creditReferralCommission(order: OrderWithRelations): Promise<void
 /**
  * Comissão recorrente de 5% da margem bruta pro vendedor vinculado ao
  * cliente — taxa maior que a de amigo (papel mais ativo, atendimento
- * presencial). Coexiste com creditReferralCommission: um cliente pode ter
- * amigo indicador E vendedor ao mesmo tempo, cada um ganha a sua parte.
+ * presencial). Independente de creditReferralCommission: só conta antiga
+ * tem amigo E vendedor ao mesmo tempo (cliente novo tem um vínculo por
+ * vez); nesse caso cada um ganha a sua parte.
  */
 async function creditVendedorCommission(order: OrderWithRelations): Promise<void> {
   if (!order.user.vendedorId) return;

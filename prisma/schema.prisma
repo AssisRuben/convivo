@@ -18,14 +18,19 @@ model User {
   createdAt    DateTime @default(now())
 
   // Vendedor: papel especial (só atribuído via SQL direto — sem
-  // autoatendimento) e o vínculo cliente→vendedor, independente da
-  // indicação entre amigos acima. Um cliente pode ter os dois ao mesmo
-  // tempo — o amigo e o vendedor ganham comissão juntos, cada um a sua
-  // taxa (ver creditReferralCommission/creditVendedorCommission em
-  // lib/orders/orderCore.ts). Uma vez setado, vendedorId não muda mais
-  // (trava no primeiro vínculo, ver attributeCode em lib/userAccount.ts).
+  // autoatendimento) e o vínculo cliente→vendedor, separado da indicação
+  // entre amigos acima. Hoje cada cliente tem um vínculo por vez (amigo OU
+  // vendedor, ver attributeCode em lib/userAccount.ts); conta antiga pode
+  // ter os dois, e aí cada um ganha a sua comissão.
   isVendedor Boolean @default(false)
   vendedorId String?
+
+  // Quando o código atual (amigo ou vendedor) foi vinculado — compra da
+  // loja só gera comissão a partir daqui (ver lib/referral/storeCommission.ts),
+  // nunca do cadastro. Os vínculos anteriores a este campo foram preenchidos
+  // pela migração 20261126191000_backfill_code_linked_at; sem data, a loja
+  // não gera comissão.
+  codeLinkedAt DateTime?
 
   // Gestor: atende o chat da farmácia (aba Conversa) — vê a lista de
   // conversas de todos os clientes e responde em nome da farmácia. Mesmo

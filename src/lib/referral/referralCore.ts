@@ -90,5 +90,8 @@ export async function getReferralOverview(userId: string): Promise<ReferralOverv
 /** Remove o código vinculado (os dois, se conta antiga tiver amigo e
  * vendedor) — depois a pessoa pode vincular outro. */
 export async function unlinkReferralCode(userId: string): Promise<void> {
-  await prisma.user.update({ where: { id: userId }, data: { referredById: null, vendedorId: null } });
+  await prisma.user.update({
+    where: { id: userId },
+    data: { referredById: null, vendedorId: null, codeLinkedAt: null },
+  });
 }

@@ -155,13 +155,18 @@ export type StoreSale = {
   /** "YYYY-MM-DD" */
   dataEmissao: string;
   totalCents: number;
+  /** Margem bruta (líquido - custo, por item, só os de margem positiva) —
+   * base da comissão de amigo/vendedor, mesma regra de
+   * calculateOrderMarginCents nos pedidos do app. */
+  marginCents: number;
 };
 
 /**
  * Vendas do cliente na farmácia (qualquer canal) a partir de `since`
  * ("YYYY-MM-DD"), uma linha por venda com o total líquido — pro cartão
- * fidelidade. Fica de fora venda cancelada (tipo_cancelamento D/E) e a que
- * foi devolvida (outra venda aponta pra ela em numero_nota_origem).
+ * fidelidade e pra comissão de quem indicou. Fica de fora venda cancelada
+ * (tipo_cancelamento D/E) e a que foi devolvida (outra venda aponta pra
+ * ela em numero_nota_origem).
  */
 export async function getStoreSalesForUser(
   cpf: string | null,
@@ -174,8 +179,16 @@ export async function getStoreSalesForUser(
   const codigoCliente = await findCodigoCliente(pool, cpf, phone);
   if (codigoCliente == null) return [];
 
-  const res = await pool.query<{ id: string; numero_nota: number | null; data_emissao: Date; total: string }>(
-    `SELECT v.id, v.numero_nota, v.data_emissao, SUM(vi.valor_total_liquido) AS total
+  // Custo nulo = margem desconhecida, conta 0 (nunca estimada)
+  const res = await pool.query<{
+    id: string;
+    numero_nota: number | null;
+    data_emissao: Date;
+    total: string;
+    margem: string;
+  }>(
+    `SELECT v.id, v.numero_nota, v.data_emissao, SUM(vi.valor_total_liquido) AS total,
+            SUM(GREATEST(vi.valor_total_liquido - COALESCE(vi.valor_total_custo, vi.valor_total_liquido), 0)) AS margem
      FROM vendas v
      JOIN venda_itens vi ON vi.venda_id = v.id
      WHERE v.codigo_cliente = $1
@@ -196,6 +209,7 @@ export async function getStoreSalesForUser(
     numeroNota: row.numero_nota,
     dataEmissao: row.data_emissao.toISOString().slice(0, 10),
     totalCents: Math.round(Number(row.total) * 100),
+    marginCents: Math.round(Number(row.margem) * 100),
   }));
 }
 

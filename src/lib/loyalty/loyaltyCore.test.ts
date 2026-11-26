@@ -35,6 +35,7 @@ describe("compras da loja que valem selo", () => {
     numeroNota,
     dataEmissao: "2026-10-01",
     totalCents,
+    marginCents: 0,
   });
 
   it("só compra de R$ 50 ou mais", () => {

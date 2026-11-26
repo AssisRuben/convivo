@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getStoreSalesForUser, type StoreSale } from "@/lib/pharmacyDb";
 import { sendPushToUser } from "@/lib/push/expoPush";
+import { creditStoreSaleCommissions } from "@/lib/referral/storeCommission";
 
 export const LOYALTY_STAMP_CARD_SIZE = 10;
 export const LOYALTY_MIN_ORDER_CENTS = 5000;
@@ -174,6 +175,14 @@ export async function syncStoreStamps(userId: string, { notify = false } = {}): 
   ]);
   const appNotas = new Set(appOrders.map((o) => o.trierNumeroNota!));
   const qualifying = qualifyingStoreSales(sales, appNotas);
+
+  // Comissão de quem indicou / do vendedor: toda compra da loja, de qualquer
+  // valor (o mínimo de R$ 50 é só do selo). Pedido do app fica de fora — já
+  // paga comissão em approveOrder. Falha aqui não pode travar os selos.
+  const storeOnlySales = sales.filter((sale) => !(sale.numeroNota != null && appNotas.has(sale.numeroNota)));
+  await creditStoreSaleCommissions(userId, storeOnlySales).catch((error) =>
+    console.error("[indicação] comissão das compras da loja:", error)
+  );
 
   const { count } = qualifying.length
     ? await prisma.loyaltyStamp.createMany({

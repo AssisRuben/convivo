@@ -45,6 +45,7 @@ export async function createUserAccount(
           referralCode: generateCode(),
           referredById: referrer && !referrerIsVendedor ? referrer.id : undefined,
           vendedorId: referrer && referrerIsVendedor ? referrer.id : undefined,
+          codeLinkedAt: referrer ? new Date() : undefined,
           cart: { create: {} },
         },
       });
@@ -90,20 +91,25 @@ export async function attributeCode(userId: string, rawCode: string): Promise<At
     return { ok: false, error: "Código não encontrado. Confira as letras e números." };
   }
 
-  const linked = await prisma.user.findUniqueOrThrow({
-    where: { id: userId },
-    select: { referredById: true, vendedorId: true },
+  // Confere e grava no mesmo UPDATE (só pega a linha se ainda não tem
+  // vínculo) — com ler-e-depois-gravar, dois pedidos simultâneos (um de
+  // amigo, outro de vendedor) passavam os dois e deixavam o cliente com
+  // os dois vínculos.
+  const { count } = await prisma.user.updateMany({
+    where: { id: userId, referredById: null, vendedorId: null },
+    data: {
+      ...(owner.isVendedor ? { vendedorId: owner.id } : { referredById: owner.id }),
+      codeLinkedAt: new Date(),
+    },
   });
-  if (linked.referredById || linked.vendedorId) {
+  if (count === 0) {
     return { ok: false, error: "Você já tem um código vinculado. Remova o atual para vincular outro." };
   }
 
   if (owner.isVendedor) {
-    await prisma.user.update({ where: { id: userId }, data: { vendedorId: owner.id } });
     return { ok: true, kind: "vendedor" };
   }
 
-  await prisma.user.update({ where: { id: userId }, data: { referredById: owner.id } });
   await checkReferralMilestones(owner.id);
   return { ok: true, kind: "amigo" };
 }
