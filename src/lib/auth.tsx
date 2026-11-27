@@ -3,7 +3,7 @@ import { deleteItemAsync, getItemAsync, setItemAsync } from "@/lib/storage";
 import { apiFetch } from "@/lib/api";
 import { clearAllCached } from "@/lib/tabDataCache";
 import { TOKEN_KEY, USER_KEY } from "@/lib/storageKeys";
-import { registerPushToken } from "@/lib/push/registerPushToken";
+import { registerPushToken, unregisterPushToken } from "@/lib/push/registerPushToken";
 import { registerForceLogoutHandler } from "@/lib/authEvents";
 
 export type AuthUser = { id: string; name: string; email: string };
@@ -77,7 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await persist(data.token, data.user);
   }
 
-  async function logout() {
+  async function clearSession() {
     clearAllCached();
     await Promise.all([
       deleteItemAsync(TOKEN_KEY),
@@ -87,8 +87,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }
 
+  async function logout() {
+    // Antes de apagar o login: a rota que desliga o push exige estar logado.
+    await unregisterPushToken();
+    await clearSession();
+  }
+
   useEffect(() => {
-    registerForceLogoutHandler(logout);
+    // Sessão expirada (401): não tenta desligar o push — a chamada daria
+    // 401 de novo e cairia aqui em loop. O token fica com a conta até o
+    // próximo login, que troca o dono dele.
+    registerForceLogoutHandler(clearSession);
   });
 
   return (

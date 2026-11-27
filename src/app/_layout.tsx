@@ -1,7 +1,8 @@
 import "../global.css";
 import { useEffect } from "react";
 import { Platform, Pressable, Text, View } from "react-native";
-import { Stack, router } from "expo-router";
+import { Stack, router, type Href } from "expo-router";
+import { resolvePushUrl } from "@/lib/push/pushRoutes";
 import * as SplashScreen from "expo-splash-screen";
 import Constants, { ExecutionEnvironment } from "expo-constants";
 import { KeyboardProvider } from "react-native-keyboard-controller";
@@ -42,45 +43,64 @@ function CrashFallback({ resetError }: { resetError: () => void }) {
   );
 }
 
+// Notificações já tratadas — a mesma pode chegar pelo listener e pelo
+// getLastNotificationResponseAsync na abertura do app.
+const handledNotificationIds = new Set<string>();
+
 // Toque numa notificação (lembrete de rotina, aviso de remédio acabando)
-// leva direto pra tela relevante — só em dispositivo real, Expo push não
-// existe no preview web usado pra testar este projeto. `expo-notifications`
-// é importado dinamicamente (não no topo do arquivo) porque o próprio
-// import já registra coisa sozinho, e desde o SDK 53 isso derruba o Expo
-// Go no Android (removido de lá, só funciona em development build) —
-// achado batendo o app real: crashava na inicialização antes mesmo de
-// chegar no `if (Platform.OS === "web")`.
-function useNotificationTapNavigation() {
+// leva direto pra tela relevante (`data.url`, ver lib/push/pushRoutes.ts)
+// — só em dispositivo real, Expo push não existe no preview web usado pra
+// testar este projeto. `expo-notifications` é importado dinamicamente
+// (não no topo do arquivo) porque o próprio import já registra coisa
+// sozinho, e desde o SDK 53 isso derruba o Expo Go no Android (removido
+// de lá, só funciona em development build) — achado batendo o app real:
+// crashava na inicialização antes mesmo de chegar no `if (Platform.OS ===
+// "web")`.
+//
+// Só liga com o login carregado e a navegação montada (`ready`): com o app
+// fechado, o toque que abriu o app chega antes disso e só é recuperado
+// pelo getLastNotificationResponseAsync — antes ele se perdia e o app
+// abria na Home.
+function useNotificationTapNavigation(ready: boolean) {
   useEffect(() => {
+    if (!ready) return;
     if (Platform.OS === "web") return;
     if (Constants.executionEnvironment === ExecutionEnvironment.StoreClient) return;
 
+    let cancelled = false;
     let subscription: { remove: () => void } | undefined;
-    import("expo-notifications").then((Notifications) => {
-      subscription = Notifications.addNotificationResponseReceivedListener((response) => {
-        const screen = response.notification.request.content.data?.screen;
-        if (screen === "medicamentos") router.push("/perfil/medicamentos");
-        else if (screen === "rotina") router.push("/rotina");
-        else if (screen === "metas") router.push("/perfil/metas");
-        else if (screen === "pilulas-sabedoria") router.push("/perfil/pilulas-sabedoria");
-        else if (screen === "gotas-de-fe") router.push("/perfil/gotas-de-fe");
-        else if (screen === "familia") router.push("/perfil/familia");
-        else if (screen === "fidelidade") router.push("/perfil/fidelidade");
-        else if (screen === "carteira") router.push("/perfil/carteira");
-        else if (screen === "chat") {
-          const threadId = response.notification.request.content.data?.threadId;
-          if (typeof threadId === "string") router.push({ pathname: "/conversa/[threadId]", params: { threadId } });
-          else router.push("/conversa");
+    import("expo-notifications").then(async (Notifications) => {
+      if (cancelled) return;
+      const open = (response: import("expo-notifications").NotificationResponse) => {
+        // botões de ação (etapas futuras) têm tratamento próprio
+        if (response.actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER) return;
+        const id = response.notification.request.identifier;
+        if (handledNotificationIds.has(id)) return;
+        handledNotificationIds.add(id);
+        const url = resolvePushUrl(response.notification.request.content.data);
+        if (url) router.push(url as Href);
+      };
+      subscription = Notifications.addNotificationResponseReceivedListener(open);
+      try {
+        const last = await Notifications.getLastNotificationResponseAsync();
+        if (!cancelled && last) {
+          open(last);
+          await Notifications.clearLastNotificationResponseAsync();
         }
-      });
+      } catch {
+        // sem resposta guardada / módulo indisponível: nada a abrir
+      }
     });
-    return () => subscription?.remove();
-  }, []);
+    return () => {
+      cancelled = true;
+      subscription?.remove();
+    };
+  }, [ready]);
 }
 
 function RootNavigator() {
-  const { isLoading } = useAuth();
-  useNotificationTapNavigation();
+  const { isLoading, token } = useAuth();
+  useNotificationTapNavigation(!isLoading && Boolean(token));
 
   useEffect(() => {
     if (!isLoading) SplashScreen.hideAsync();

@@ -4,7 +4,7 @@ import { ActivityIndicator, Text, View } from "react-native";
 import { apiFetch, type ApiChatThread } from "@/lib/api";
 import { ChatView } from "@/components/ChatView";
 import { refreshChatUnread } from "@/lib/chatUnread";
-import { dismissChatNotifications } from "@/lib/chatNotifications";
+import { dismissChatNotifications, setActiveChat } from "@/lib/chatNotifications";
 
 const POLL_MS = 5000;
 
@@ -36,8 +36,13 @@ export default function ConversaClienteScreen() {
     useCallback(() => {
       load().then(refreshChatUnread);
       const timer = setInterval(load, POLL_MS);
-      return () => clearInterval(timer);
-    }, [load])
+      // conversa na tela: push dela não aparece por cima (ver isChatOpen)
+      setActiveChat(threadId);
+      return () => {
+        clearInterval(timer);
+        setActiveChat(null);
+      };
+    }, [load, threadId])
   );
 
   if (error && !data) {

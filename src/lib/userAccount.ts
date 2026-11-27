@@ -174,6 +174,8 @@ export async function deleteUserAccount(
       allergies: [],
     },
   });
+  // conta excluída não recebe mais push em nenhum aparelho
+  await prisma.expoPushToken.deleteMany({ where: { userId } });
   // o login guardado por 1 min (apiAuth) deixa de valer na hora
   forgetActiveUser(userId);
 

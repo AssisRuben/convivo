@@ -1,11 +1,11 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
 import { ActivityIndicator, FlatList, Pressable, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { apiFetch, type ApiChatOverview, type ApiChatThreadSummary } from "@/lib/api";
 import { ChatView } from "@/components/ChatView";
 import { setChatUnread } from "@/lib/chatUnread";
-import { dismissChatNotifications } from "@/lib/chatNotifications";
+import { dismissChatNotifications, setActiveChat } from "@/lib/chatNotifications";
 
 const POLL_MS = 5000;
 
@@ -57,6 +57,9 @@ export default function ConversaScreen() {
   const router = useRouter();
   const [data, setData] = useState<ApiChatOverview | null>(null);
   const [failed, setFailed] = useState(false);
+  // load() termina depois de sair da tela às vezes: não marca a conversa
+  // como aberta se a pessoa já foi pra outra aba.
+  const focused = useRef(false);
 
   const load = useCallback(async () => {
     try {
@@ -70,8 +73,12 @@ export default function ConversaScreen() {
       setData(json);
       // Cliente abriu = leu tudo; gestor: soma do que ainda falta abrir.
       setChatUnread(json.role === "gestor" ? json.threads.reduce((s, t) => s + t.unread, 0) : 0);
-      // cliente com a conversa aberta: a notificação dela sai da barra
-      if (json.role === "cliente") dismissChatNotifications();
+      // cliente com a conversa aberta: a notificação dela sai da barra e
+      // as próximas não aparecem por cima (ver isChatOpen)
+      if (json.role === "cliente") {
+        dismissChatNotifications();
+        if (focused.current) setActiveChat("farmacia");
+      }
     } catch {
       // sem rede: tenta de novo no próximo ciclo
       setFailed(true);
@@ -80,9 +87,14 @@ export default function ConversaScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      focused.current = true;
       load();
       const timer = setInterval(load, POLL_MS);
-      return () => clearInterval(timer);
+      return () => {
+        focused.current = false;
+        clearInterval(timer);
+        setActiveChat(null);
+      };
     }, [load])
   );
 

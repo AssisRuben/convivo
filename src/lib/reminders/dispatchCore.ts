@@ -80,12 +80,18 @@ export async function dispatchDueRoutineReminders(now: Date = new Date()): Promi
     const itemMinutes = parseTimeOfDay(item.timeOfDay);
     if (Math.abs(itemMinutes - nowMinutes) > REMINDER_TOLERANCE_MINUTES) continue;
 
+    try {
+      // Registra ANTES de enviar: se duas rodadas do cron se sobrepõem, a
+      // chave única ([itemId, date]) barra a segunda e não sai push dobrado.
+      await prisma.careReminderDispatch.create({ data: { itemId: item.id, date: today } });
+    } catch {
+      continue;
+    }
     await sendPushToUser(item.userId, {
       title: "Hora de cuidar de você 💊",
       body: `${item.title} — ${item.timeOfDay}`,
       data: { screen: "rotina" },
     });
-    await prisma.careReminderDispatch.create({ data: { itemId: item.id, date: today } });
     sent += 1;
   }
 

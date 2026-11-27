@@ -608,8 +608,22 @@ model ExpoPushToken {
   userId    String
   token     String   @unique
   createdAt DateTime @default(now())
+  /// O que esta versão do app sabe fazer (ex.: "channels-v1",
+  /// "local-reminders-v1") — o servidor escolhe o que mandar por aparelho.
+  capabilities String[] @default([])
 
   user User @relation(fields: [userId], references: [id])
+}
+
+/// Ticket de um push enviado, guardado até a Expo dar o recibo de entrega
+/// (~15 min depois; some em 24h). É no recibo que aparece a maior parte
+/// dos DeviceNotRegistered — ver checkPushReceipts em lib/push/expoPush.ts.
+model PushTicket {
+  id        String   @id
+  token     String
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
 }
 
 enum GoalMetric {
