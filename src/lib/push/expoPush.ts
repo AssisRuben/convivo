@@ -15,6 +15,9 @@ export type PushPayload = {
   /** Canal Android — só vai pra aparelho com "channels-v1" (os antigos não
    * têm o canal criado e caem no "default" de sempre). */
   channel?: PushChannel;
+  /** Categoria de botões ("dose"/"cuidado", ver reminderActions.ts no
+   * app) — só pra aparelho com "actions-v1", que tem as categorias. */
+  actionCategory?: string;
 };
 
 export type PushTokenInfo = { capabilities: string[]; localRemindersUntil: Date | null };
@@ -47,6 +50,7 @@ export async function sendPushToUser(
     if (!Expo.isExpoPushToken(row.token)) continue;
     if (options.skipToken?.(row)) continue;
     const withChannel = payload.channel && row.capabilities.includes("channels-v1");
+    const withActions = payload.actionCategory && row.capabilities.includes("actions-v1");
     messages.push({
       to: row.token,
       sound: "default",
@@ -54,6 +58,7 @@ export async function sendPushToUser(
       body: payload.body,
       data,
       ...(withChannel ? { channelId: payload.channel } : {}),
+      ...(withActions ? { categoryId: payload.actionCategory } : {}),
       ...(payload.replaceKey ? { tag: payload.replaceKey, collapseId: payload.replaceKey } : {}),
     });
   }

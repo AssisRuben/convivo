@@ -15,6 +15,8 @@ export type ReminderItem = {
   daysOfWeek: number[];
   completedToday: boolean;
   medicationTrackingId: string | null;
+  /** "MEDICACAO" ganha o botão "Já tomei"; o resto, "Feito". */
+  category?: string;
   /** Último dia do tratamento; undefined = servidor antigo (não sabe). */
   remindUntil?: string | null;
 };
@@ -28,6 +30,8 @@ export type PlannedReminder = {
   fireAt: Date;
   title: string;
   body: string;
+  /** Categoria dos botões (reminderActions.ts): "dose" ou "cuidado". */
+  actionCategory: "dose" | "cuidado";
 };
 
 export const LOCAL_REMINDER_PREFIX = "rotina_";
@@ -44,6 +48,11 @@ export function localDayKey(date: Date): string {
   const m = String(date.getMonth() + 1).padStart(2, "0");
   const d = String(date.getDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
+}
+
+/** Remédio (categoria ou dose de ficha de Medicamentos) → "Já tomei". */
+export function reminderActionCategory(item: { category?: string; medicationTrackingId?: string | null }): "dose" | "cuidado" {
+  return item.category === "MEDICACAO" || item.medicationTrackingId ? "dose" : "cuidado";
 }
 
 function addDays(date: Date, days: number): Date {
@@ -95,6 +104,7 @@ export function planReminders(
         dayKey,
         fireAt,
         ...content,
+        actionCategory: reminderActionCategory(item),
       });
     }
   }

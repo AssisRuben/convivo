@@ -69,6 +69,13 @@ describe("planReminders", () => {
     expect(reminders.map((r) => r.dayKey)).toEqual(["2026-11-25", "2026-11-26"]);
   });
 
+  it("remédio ganha os botões de dose; o resto, os de cuidado", () => {
+    const [dose] = planReminders([item({ timeOfDay: "20:00", category: "MEDICACAO" })], NOW, TODAY).reminders;
+    const [ficha] = planReminders([item({ timeOfDay: "20:00", medicationTrackingId: "m1" })], NOW, TODAY).reminders;
+    const [outro] = planReminders([item({ timeOfDay: "20:00", category: "EXERCICIO" })], NOW, TODAY).reminders;
+    expect([dose.actionCategory, ficha.actionCategory, outro.actionCategory]).toEqual(["dose", "dose", "cuidado"]);
+  });
+
   it("sem horário não agenda", () => {
     expect(planReminders([item({ timeOfDay: null })], NOW, TODAY).reminders).toEqual([]);
   });

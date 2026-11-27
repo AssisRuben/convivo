@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { Platform, Pressable, Text, View } from "react-native";
 import { Stack, router, type Href } from "expo-router";
 import { resolvePushUrl } from "@/lib/push/pushRoutes";
+import { ACTION_DONE, handleReminderAction } from "@/lib/reminders/reminderActions";
 import * as SplashScreen from "expo-splash-screen";
 import Constants, { ExecutionEnvironment } from "expo-constants";
 import { KeyboardProvider } from "react-native-keyboard-controller";
@@ -72,8 +73,20 @@ function useNotificationTapNavigation(ready: boolean) {
     import("expo-notifications").then(async (Notifications) => {
       if (cancelled) return;
       const open = (response: import("expo-notifications").NotificationResponse) => {
-        // botões de ação (etapas futuras) têm tratamento próprio
-        if (response.actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER) return;
+        // Botão do lembrete ("Já tomei", "Daqui 15 min"). No Android quem
+        // trata é a tarefa em segundo plano (isso aqui só repete, sem
+        // efeito); no iOS o botão abre o app e é aqui que marca — depois
+        // mostra a Rotina, pra pessoa ver que ficou marcado.
+        if (response.actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER) {
+          handleReminderAction(response)
+            .then((wasReminder) => {
+              if (wasReminder && Platform.OS === "ios" && response.actionIdentifier === ACTION_DONE) {
+                router.push("/rotina");
+              }
+            })
+            .catch((error) => console.warn("[lembretes] ação da notificação falhou:", error));
+          return;
+        }
         const id = response.notification.request.identifier;
         if (handledNotificationIds.has(id)) return;
         handledNotificationIds.add(id);

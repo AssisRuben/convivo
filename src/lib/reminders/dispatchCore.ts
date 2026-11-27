@@ -4,6 +4,7 @@ import { zonedParts } from "@/lib/timeZone";
 import { shouldAlertMissedDose } from "@/lib/care/caregiverRules";
 import { sendPushToUser, type PushTokenInfo } from "@/lib/push/expoPush";
 import { routineReminderContent } from "@/lib/reminders/reminderText";
+import { reminderActionCategory } from "@/lib/reminders/localRemindersCore";
 import {
   estimateRunOutDate,
   daysBetween,
@@ -99,7 +100,13 @@ export async function dispatchDueRoutineReminders(now: Date = new Date()): Promi
     }
     await sendPushToUser(
       item.userId,
-      { ...routineReminderContent(item.title, item.timeOfDay), data: { screen: "rotina" }, channel: "lembretes" },
+      {
+        ...routineReminderContent(item.title, item.timeOfDay),
+        // itemId/dayKey: o botão "Já tomei" da notificação sabe o que marcar
+        data: { screen: "rotina", kind: "reminder", itemId: item.id, dayKey: today.toISOString().slice(0, 10) },
+        channel: "lembretes",
+        actionCategory: reminderActionCategory(item),
+      },
       // Aparelho que já agendou o lembrete de hoje no próprio celular
       // (lib/reminders/localReminders.ts) não recebe o de reserva — senão
       // tocaria duas vezes. App antigo / sem agendamento recebe normal.

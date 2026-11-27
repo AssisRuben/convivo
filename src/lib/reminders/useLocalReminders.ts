@@ -3,6 +3,7 @@ import { AppState } from "react-native";
 import { refreshLocalReminders, startLocalReminders } from "@/lib/reminders/localReminders";
 import { getNotificationPermission, onNotificationsGranted } from "@/lib/push/notificationPermission";
 import { pushSupported } from "@/lib/push/registerPushToken";
+import { flushPendingReminderActions } from "@/lib/reminders/reminderActions";
 
 /**
  * Lembretes locais enquanto há alguém logado ((tabs)/_layout.tsx):
@@ -15,6 +16,8 @@ export function useLocalReminders(enabled: boolean): void {
   useEffect(() => {
     if (!enabled || !pushSupported()) return;
     const stop = startLocalReminders();
+    // "Já tomei" tocado sem internet: manda agora
+    flushPendingReminderActions();
 
     let wasGranted: boolean | null = null;
     getNotificationPermission().then((p) => {
@@ -23,6 +26,7 @@ export function useLocalReminders(enabled: boolean): void {
 
     const sub = AppState.addEventListener("change", (state) => {
       if (state !== "active") return;
+      flushPendingReminderActions();
       refreshLocalReminders();
       getNotificationPermission().then((p) => {
         const granted = p === "granted";

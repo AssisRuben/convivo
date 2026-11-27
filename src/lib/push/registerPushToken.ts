@@ -5,6 +5,8 @@ import { deleteItemAsync, getItemAsync, setItemAsync } from "@/lib/storage";
 import { PUSH_TOKEN_KEY } from "@/lib/storageKeys";
 import { isChatOpen } from "@/lib/chatNotifications";
 import { ensureNotificationChannels } from "@/lib/push/notificationChannels";
+import { registerReminderCategories } from "@/lib/reminders/reminderActions";
+import { registerReminderActionTask } from "@/lib/reminders/reminderActionTask";
 
 /**
  * O que esta versão do app sabe fazer com push — vai junto com o token e
@@ -12,8 +14,10 @@ import { ensureNotificationChannels } from "@/lib/push/notificationChannels";
  * - channels-v1: canais Android novos criados (notificationChannels.ts)
  * - local-reminders-v1: agenda os lembretes de rotina no próprio celular
  *   (lib/reminders/localReminders.ts) e informa até que dia
+ * - actions-v1: botões "Já tomei" / "Daqui 15 min" (reminderActions.ts) —
+ *   o push de reserva do servidor também leva a categoria
  */
-const PUSH_CAPABILITIES = ["channels-v1", "local-reminders-v1"];
+const PUSH_CAPABILITIES = ["channels-v1", "local-reminders-v1", "actions-v1"];
 
 /**
  * Web não tem push; Expo Go também não — `expo-notifications` é importado
@@ -52,6 +56,13 @@ export async function setupNotifications(): Promise<typeof import("expo-notifica
     });
   }
   await ensureNotificationChannels(Notifications);
+  try {
+    // botões "Já tomei" / "Daqui 15 min" dos lembretes (reminderActions.ts)
+    await registerReminderCategories(Notifications);
+    await registerReminderActionTask(Notifications);
+  } catch (error) {
+    console.warn("[push] falha ao registrar os botões do lembrete:", error);
+  }
   return Notifications;
 }
 

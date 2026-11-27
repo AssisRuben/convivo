@@ -8,6 +8,7 @@ import {
   planReminders,
   type ReminderItem,
 } from "@/lib/reminders/localRemindersCore";
+import { SNOOZE_PREFIX, clearPendingReminderActions, type ReminderData } from "@/lib/reminders/reminderActions";
 
 /**
  * Lembretes de rotina agendados NO CELULAR (não mais push do servidor):
@@ -77,7 +78,9 @@ async function runSync(): Promise<void> {
         title: plan.title,
         body: plan.body,
         sound: "default",
-        data: { screen: "rotina", url: "/rotina", kind: "local-reminder", itemId: plan.itemId, dayKey: plan.dayKey },
+        data: { screen: "rotina", url: "/rotina", kind: "reminder", itemId: plan.itemId, dayKey: plan.dayKey },
+        // botões "Já tomei"/"Feito" e "Daqui 15 min" (reminderActions.ts)
+        categoryIdentifier: plan.actionCategory,
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DATE,
@@ -87,17 +90,27 @@ async function runSync(): Promise<void> {
     });
   }
 
-  // Já tocou hoje e a pessoa marcou depois: tira da barra.
+  // Já tocou hoje (local ou de reserva do servidor) e a pessoa marcou
+  // depois: tira da barra e cancela o "Daqui 15 min" que estiver pendente.
   const todayKey = localDayKey(now);
   if (snapshot.dayKey === todayKey) {
     const done = new Set(snapshot.items.filter((i) => i.completedToday).map((i) => i.id));
     if (done.size > 0) {
+      const isDoneToday = (data: ReminderData | undefined) =>
+        data?.kind === "reminder" &&
+        data.dayKey === todayKey &&
+        typeof data.itemId === "string" &&
+        done.has(data.itemId);
+
       const presented = await Notifications.getPresentedNotificationsAsync();
       for (const notification of presented) {
-        const data = notification.request.content.data as { kind?: unknown; itemId?: unknown; dayKey?: unknown } | undefined;
-        if (data?.kind !== "local-reminder" || data.dayKey !== todayKey) continue;
-        if (typeof data.itemId === "string" && done.has(data.itemId)) {
+        if (isDoneToday(notification.request.content.data as ReminderData | undefined)) {
           await Notifications.dismissNotificationAsync(notification.request.identifier);
+        }
+      }
+      for (const request of scheduled) {
+        if (request.identifier.startsWith(SNOOZE_PREFIX) && isDoneToday(request.content.data as ReminderData | undefined)) {
+          await Notifications.cancelScheduledNotificationAsync(request.identifier);
         }
       }
     }
@@ -110,19 +123,20 @@ async function runSync(): Promise<void> {
 export async function clearLocalReminders(): Promise<void> {
   last = null;
   await queue.catch(() => {});
+  await clearPendingReminderActions();
   try {
     const Notifications = await setupNotifications();
     if (!Notifications) return;
     const scheduled = await Notifications.getAllScheduledNotificationsAsync();
     for (const request of scheduled) {
-      if (request.identifier.startsWith(LOCAL_REMINDER_PREFIX)) {
+      if (request.identifier.startsWith(LOCAL_REMINDER_PREFIX) || request.identifier.startsWith(SNOOZE_PREFIX)) {
         await Notifications.cancelScheduledNotificationAsync(request.identifier);
       }
     }
     const presented = await Notifications.getPresentedNotificationsAsync();
     for (const notification of presented) {
-      const data = notification.request.content.data as { kind?: unknown } | undefined;
-      if (data?.kind === "local-reminder") await Notifications.dismissNotificationAsync(notification.request.identifier);
+      const data = notification.request.content.data as ReminderData | undefined;
+      if (data?.kind === "reminder") await Notifications.dismissNotificationAsync(notification.request.identifier);
     }
   } catch (error) {
     console.warn("[lembretes] falha ao limpar:", error);
