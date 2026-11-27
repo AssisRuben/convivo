@@ -164,6 +164,15 @@ export function treatmentProgress(
   return { day, totalDays: treatmentDays, ended: day > treatmentDays };
 }
 
+/** Último dia do tratamento com prazo ("AAAA-MM-DD"), ou null pra uso
+ * contínuo — o app para de agendar lembrete local depois dele. Mesma
+ * conta de treatmentProgress: o dia do início é o dia 1. */
+export function treatmentLastDayKey(start: Date, treatmentDays: number | null): string | null {
+  if (treatmentDays == null) return null;
+  const last = new Date(startOfDayUtc(start).getTime() + (treatmentDays - 1) * 24 * 60 * 60 * 1000);
+  return last.toISOString().slice(0, 10);
+}
+
 /**
  * Soma do mês pro uso contínuo: doses tomadas x doses previstas, do dia 1
  * do mês (ou do dia da compra, se foi depois) até hoje, inclusive.

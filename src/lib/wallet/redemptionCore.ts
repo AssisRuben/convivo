@@ -206,6 +206,7 @@ export async function redeemAtCounter(
     title: `💳 Você usou ${formatCents(input.amountCents)} de créditos`,
     body: `Saldo: ${formatCents(result.balanceCents)}. Obrigado por comprar na Farmácia Conviva!`,
     data: { screen: "carteira" },
+    channel: "conta",
   }).catch((error) => console.error("[carteira] push do resgate:", error));
 
   return { customerName: row.user.name, amountCents: input.amountCents, balanceCents: result.balanceCents };
@@ -272,6 +273,7 @@ export async function reverseRedemption(gestorId: string, redemptionId: string):
     title: "💳 Crédito devolvido",
     body: `${formatCents(redemption.amountCents)} voltaram pro seu saldo.`,
     data: { screen: "carteira" },
+    channel: "conta",
   }).catch(() => {});
 }
 

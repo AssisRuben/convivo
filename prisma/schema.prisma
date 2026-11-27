@@ -611,6 +611,9 @@ model ExpoPushToken {
   /// O que esta versão do app sabe fazer (ex.: "channels-v1",
   /// "local-reminders-v1") — o servidor escolhe o que mandar por aparelho.
   capabilities String[] @default([])
+  /// Até que dia (inclusive) este aparelho já agendou sozinho os lembretes
+  /// de rotina — até lá o servidor não manda o push de reserva pra ele.
+  localRemindersUntil DateTime? @db.Date
 
   user User @relation(fields: [userId], references: [id])
 }

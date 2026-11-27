@@ -37,7 +37,10 @@ export async function fetchCatalogHome(): Promise<ApiCatalogHome> {
 
 export async function fetchRotina(): Promise<{ items: ApiChecklistItem[]; streakDays: number }> {
   const res = await apiFetch("/api/mobile/rotina");
-  if (!res.ok) return { items: [], streakDays: 0 };
+  // Erro lança em vez de devolver lista vazia: vazia entrava no cache como
+  // se fosse "rotina sem nada" — e os lembretes locais seguem o cache,
+  // então um 500 cancelava todos. Sem cache, a tela tenta de novo no foco.
+  if (!res.ok) throw new Error(`rotina: HTTP ${res.status}`);
   return res.json();
 }
 

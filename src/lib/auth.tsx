@@ -3,7 +3,8 @@ import { deleteItemAsync, getItemAsync, setItemAsync } from "@/lib/storage";
 import { apiFetch } from "@/lib/api";
 import { clearAllCached } from "@/lib/tabDataCache";
 import { TOKEN_KEY, USER_KEY } from "@/lib/storageKeys";
-import { registerPushToken, unregisterPushToken } from "@/lib/push/registerPushToken";
+import { registerPushToken, resetPushSession, unregisterPushToken } from "@/lib/push/registerPushToken";
+import { clearLocalReminders } from "@/lib/reminders/localReminders";
 import { registerForceLogoutHandler } from "@/lib/authEvents";
 
 export type AuthUser = { id: string; name: string; email: string };
@@ -48,6 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function persist(newToken: string, newUser: AuthUser) {
     // Dados guardados das telas são da conta anterior: começa do zero.
     clearAllCached();
+    resetPushSession();
     await Promise.all([
       setItemAsync(TOKEN_KEY, newToken),
       setItemAsync(USER_KEY, JSON.stringify(newUser)),
@@ -78,6 +80,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function clearSession() {
+    // lembrete agendado no celular é da conta que saiu
+    await clearLocalReminders();
+    resetPushSession();
     clearAllCached();
     await Promise.all([
       deleteItemAsync(TOKEN_KEY),

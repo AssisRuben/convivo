@@ -13,6 +13,7 @@ import { apiFetch } from "@/lib/api";
 import { invalidateCached } from "@/lib/tabDataCache";
 import { HOME_CACHE_KEY, ROTINA_CACHE_KEY } from "@/lib/tabPrefetch";
 import { MedicationForm } from "@/components/MedicationForm";
+import { askForNotifications } from "@/lib/push/notificationPermission";
 
 type Suggestion = {
   codigoProduto: number;
@@ -85,6 +86,8 @@ export default function NovoMedicamentoScreen() {
           invalidateCached(HOME_CACHE_KEY);
           invalidateCached(ROTINA_CACHE_KEY);
           router.replace("/perfil/medicamentos");
+          // "Salvar e ativar lembretes": é a hora de pedir pra avisar
+          askForNotifications("lembrete");
         }}
       />
     );

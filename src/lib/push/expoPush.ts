@@ -1,6 +1,7 @@
 import { Expo, type ExpoPushMessage } from "expo-server-sdk";
 import { prisma } from "@/lib/prisma";
 import { pushUrlFor } from "@/lib/push/pushRoutes";
+import type { PushChannel } from "@/lib/reminders/reminderText";
 
 const expo = new Expo();
 
@@ -11,6 +12,16 @@ export type PushPayload = {
   /** Mesma chave = substitui a notificação anterior em vez de empilhar
    * (padrão WhatsApp: uma por conversa). Android: tag; iOS: collapseId. */
   replaceKey?: string;
+  /** Canal Android — só vai pra aparelho com "channels-v1" (os antigos não
+   * têm o canal criado e caem no "default" de sempre). */
+  channel?: PushChannel;
+};
+
+export type PushTokenInfo = { capabilities: string[]; localRemindersUntil: Date | null };
+
+export type SendPushOptions = {
+  /** true = não manda pra este aparelho (ex.: ele já agendou o lembrete). */
+  skipToken?: (token: PushTokenInfo) => boolean;
 };
 
 /**
@@ -19,7 +30,11 @@ export type PushPayload = {
  * já recusa no envio (`DeviceNotRegistered`); o resto dos tickets fica
  * guardado pra checkPushReceipts conferir o recibo de entrega depois.
  */
-export async function sendPushToUser(userId: string, payload: PushPayload): Promise<void> {
+export async function sendPushToUser(
+  userId: string,
+  payload: PushPayload,
+  options: SendPushOptions = {}
+): Promise<void> {
   const tokens = await prisma.expoPushToken.findMany({ where: { userId } });
   if (tokens.length === 0) return;
 
@@ -28,14 +43,17 @@ export async function sendPushToUser(userId: string, payload: PushPayload): Prom
   const data = url ? { ...payload.data, url } : payload.data;
 
   const messages: ExpoPushMessage[] = [];
-  for (const { token } of tokens) {
-    if (!Expo.isExpoPushToken(token)) continue;
+  for (const row of tokens) {
+    if (!Expo.isExpoPushToken(row.token)) continue;
+    if (options.skipToken?.(row)) continue;
+    const withChannel = payload.channel && row.capabilities.includes("channels-v1");
     messages.push({
-      to: token,
+      to: row.token,
       sound: "default",
       title: payload.title,
       body: payload.body,
       data,
+      ...(withChannel ? { channelId: payload.channel } : {}),
       ...(payload.replaceKey ? { tag: payload.replaceKey, collapseId: payload.replaceKey } : {}),
     });
   }

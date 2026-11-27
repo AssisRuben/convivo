@@ -2,7 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { todayDate } from "@/lib/timeline/format";
 import { zonedParts } from "@/lib/timeZone";
 import { shouldAlertMissedDose } from "@/lib/care/caregiverRules";
-import { sendPushToUser } from "@/lib/push/expoPush";
+import { sendPushToUser, type PushTokenInfo } from "@/lib/push/expoPush";
+import { routineReminderContent } from "@/lib/reminders/reminderText";
 import {
   estimateRunOutDate,
   daysBetween,
@@ -35,6 +36,15 @@ export function localClock(date: Date): { minutes: number; weekday: number } {
 
 function minutesSinceMidnight(date: Date): number {
   return localClock(date).minutes;
+}
+
+/** O aparelho já agendou sozinho os lembretes de `today`? */
+export function coveredByLocalReminders(token: PushTokenInfo, today: Date): boolean {
+  return (
+    token.capabilities.includes("local-reminders-v1") &&
+    token.localRemindersUntil !== null &&
+    token.localRemindersUntil.getTime() >= today.getTime()
+  );
 }
 
 function parseTimeOfDay(value: string): number {
@@ -87,11 +97,14 @@ export async function dispatchDueRoutineReminders(now: Date = new Date()): Promi
     } catch {
       continue;
     }
-    await sendPushToUser(item.userId, {
-      title: "Hora de cuidar de você 💊",
-      body: `${item.title} — ${item.timeOfDay}`,
-      data: { screen: "rotina" },
-    });
+    await sendPushToUser(
+      item.userId,
+      { ...routineReminderContent(item.title, item.timeOfDay), data: { screen: "rotina" }, channel: "lembretes" },
+      // Aparelho que já agendou o lembrete de hoje no próprio celular
+      // (lib/reminders/localReminders.ts) não recebe o de reserva — senão
+      // tocaria duas vezes. App antigo / sem agendamento recebe normal.
+      { skipToken: (token) => coveredByLocalReminders(token, today) }
+    );
     sent += 1;
   }
 
@@ -133,6 +146,7 @@ export async function dispatchMedicationRepurchaseAlerts(now: Date = new Date())
         ? `${tracking.productName} acaba amanhã. Toque pra recomprar com 1 clique.`
         : `${tracking.productName} acaba amanhã. Lembre de comprar mais.`,
       data: { screen: "medicamentos" },
+      channel: "lembretes",
     });
     await prisma.medicationRepurchaseAlert.create({
       data: { medicationTrackingId: tracking.id },
@@ -172,6 +186,7 @@ export async function dispatchDueGoalTips(now: Date = new Date()): Promise<numbe
         title: `Dica pra sua meta: ${goal.title}`,
         body: pickTipForIndex(goal.metric, index, goal.checklistItem?.category),
         data: { screen: "metas" },
+        channel: "novidades",
       });
       await prisma.goalTipDispatch.create({ data: { goalId: goal.id, tipIndex: index } });
       sent += 1;
@@ -218,6 +233,7 @@ export async function dispatchDueWisdomReminders(now: Date = new Date()): Promis
       title: "Sua pílula de sabedoria chegou 💊",
       body: "O capítulo de hoje já está liberado — leva menos de 5 minutos.",
       data: { screen: "pilulas-sabedoria" },
+      channel: "novidades",
     });
     notifiedUserIds.add(row.userId);
     // Marca TODOS os tópicos do usuário: o cron passa 2-3 vezes na janela
@@ -258,6 +274,7 @@ export async function dispatchDueFaithReminders(now: Date = new Date()): Promise
       title: "Sua gota de fé chegou 🙏",
       body: "O capítulo de hoje já está liberado — leva menos de 5 minutos.",
       data: { screen: "gotas-de-fe" },
+      channel: "novidades",
     });
     notifiedUserIds.add(row.userId);
     // Marca TODOS os livros do usuário: o cron passa 2-3 vezes na janela
@@ -336,6 +353,7 @@ export async function dispatchCaregiverMissedDoseAlerts(now: Date = new Date()):
         title: "Dose não marcada ⚠️",
         body: `${firstName} ainda não marcou ${item.title} das ${item.timeOfDay}.`,
         data: { screen: "familia" },
+        channel: "cuidador",
       });
       sent += 1;
     }

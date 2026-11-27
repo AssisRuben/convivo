@@ -5,7 +5,7 @@ import {
 } from "@/lib/timeline/achievements";
 import { todayDate } from "@/lib/timeline/format";
 import { awardCarePoints, CARE_POINTS, checkPointsToday, pointsKey, revokeCarePoints } from "@/lib/points/pointsCore";
-import { medicationStart, treatmentProgress } from "@/lib/medications/medicationCore";
+import { medicationStart, treatmentLastDayKey, treatmentProgress } from "@/lib/medications/medicationCore";
 import type { CareCategory } from "@/lib/generated/prisma/client";
 import { recordScheduleChange, sameDays } from "@/lib/care/scheduleVersion";
 import { describeDaysOfWeek, isScheduledOn } from "@/lib/medications/doseSchedule";
@@ -40,6 +40,9 @@ export type ChecklistItemView = {
    * (null = não marcado) — pro app mostrar os pontos na hora. */
   earnsPoints: boolean;
   pointsEarned: number | null;
+  /** Último dia do tratamento com prazo ("AAAA-MM-DD"); null = sem fim.
+   * O app não agenda lembrete local depois dele. */
+  remindUntil: string | null;
 };
 
 export function validateRoutineInput(input: RoutineItemInput): string {
@@ -139,6 +142,9 @@ export async function listChecklistItemsForUser(userId: string): Promise<Checkli
     activeGoals: item.goals,
     earnsPoints: earnsPointsToday(item.createdAt),
     pointsEarned: pointsById.get(item.id) ?? null,
+    remindUntil: item.medicationTracking
+      ? treatmentLastDayKey(medicationStart(item.medicationTracking), item.medicationTracking.treatmentDays)
+      : null,
   }));
 }
 

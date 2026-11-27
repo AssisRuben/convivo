@@ -4,51 +4,38 @@ import { apiFetch } from "@/lib/api";
 import { deleteItemAsync, getItemAsync, setItemAsync } from "@/lib/storage";
 import { PUSH_TOKEN_KEY } from "@/lib/storageKeys";
 import { isChatOpen } from "@/lib/chatNotifications";
+import { ensureNotificationChannels } from "@/lib/push/notificationChannels";
 
 /**
  * O que esta versão do app sabe fazer com push — vai junto com o token e
- * o servidor decide o que mandar pra cada aparelho (ex.: canal Android
- * novo só pra quem já tem o canal criado). Vazio por enquanto; cada etapa
- * nova acrescenta a sua.
+ * o servidor decide o que mandar pra cada aparelho:
+ * - channels-v1: canais Android novos criados (notificationChannels.ts)
+ * - local-reminders-v1: agenda os lembretes de rotina no próprio celular
+ *   (lib/reminders/localReminders.ts) e informa até que dia
  */
-const PUSH_CAPABILITIES: string[] = [];
+const PUSH_CAPABILITIES = ["channels-v1", "local-reminders-v1"];
 
-function pushSupported(): boolean {
+/**
+ * Web não tem push; Expo Go também não — `expo-notifications` é importado
+ * dinamicamente em todo lugar (nunca no topo do arquivo) porque o módulo
+ * tem efeito colateral no próprio import (registra um listener de token
+ * sozinho), e desde o SDK 53 o Expo Go no Android não suporta mais isso:
+ * só o import já derrubava o app inteiro antes de qualquer checagem.
+ */
+export function pushSupported(): boolean {
   if (Platform.OS === "web") return false;
-  // Expo Go: ver nota em registerPushToken
   return Constants.executionEnvironment !== ExecutionEnvironment.StoreClient;
 }
 
-let tokenListenerAttached = false;
+let handlerInstalled = false;
 
-async function sendTokenToServer(token: string): Promise<void> {
-  const res = await apiFetch("/api/mobile/push-token", {
-    method: "POST",
-    body: JSON.stringify({ token, capabilities: PUSH_CAPABILITIES }),
-  });
-  // Guarda pro logout saber qual token desligar (unregisterPushToken).
-  if (res.ok) await setItemAsync(PUSH_TOKEN_KEY, token);
-}
-
-/**
- * Pede permissão e registra o token de push da Expo no backend — só faz
- * sentido em dispositivo real (Expo push não existe no preview web usado
- * pra testar este projeto, por isso o guard de Platform). Nunca lança:
- * falha aqui não pode travar login/cadastro.
- *
- * `expo-notifications` é importado dinamicamente aqui dentro, não no topo
- * do arquivo — o módulo tem efeito colateral no próprio import (registra
- * um listener de token sozinho), e desde o SDK 53 o Expo Go no Android
- * não suporta mais isso (removido, só funciona em development build) —
- * só o import já derrubava o app inteiro no Expo Go antes de qualquer
- * checagem em runtime ter chance de rodar.
- */
-export async function registerPushToken(): Promise<void> {
-  if (!pushSupported()) return;
-
-  try {
-    const Notifications = await import("expo-notifications");
-
+/** Handler do push com o app aberto + canais — antes de qualquer pedido
+ * de permissão (Android 13 exige os canais criados antes). */
+export async function setupNotifications(): Promise<typeof import("expo-notifications") | null> {
+  if (!pushSupported()) return null;
+  const Notifications = await import("expo-notifications");
+  if (!handlerInstalled) {
+    handlerInstalled = true;
     // Sem isso o push recebido com o app aberto é descartado em silêncio.
     // Exceção: mensagem da conversa que já está na tela — ela aparece ali
     // mesmo, o banner por cima só atrapalha.
@@ -63,24 +50,51 @@ export async function registerPushToken(): Promise<void> {
         };
       },
     });
+  }
+  await ensureNotificationChannels(Notifications);
+  return Notifications;
+}
 
-    if (Platform.OS === "android") {
-      await Notifications.setNotificationChannelAsync("default", {
-        name: "Convivo",
-        importance: Notifications.AndroidImportance.MAX,
-      });
-    }
+// Até que dia os lembretes locais estão agendados — undefined = ainda não
+// calculado nesta abertura do app (não manda nada, o servidor mantém o que
+// tinha). Ver reportLocalRemindersUntil.
+let localRemindersUntil: string | null | undefined;
+let lastSentUntil: string | null | undefined;
 
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
-    let status = existingStatus;
-    if (status !== "granted") {
-      const requested = await Notifications.requestPermissionsAsync();
-      status = requested.status;
-    }
-    if (status !== "granted") {
-      console.warn("[push] permissão de notificação negada");
-      return;
-    }
+let tokenListenerAttached = false;
+
+async function sendTokenToServer(token: string): Promise<void> {
+  const until = localRemindersUntil;
+  const res = await apiFetch("/api/mobile/push-token", {
+    method: "POST",
+    body: JSON.stringify({
+      token,
+      capabilities: PUSH_CAPABILITIES,
+      ...(until !== undefined ? { localRemindersUntil: until } : {}),
+    }),
+  });
+  if (res.ok) {
+    // Guarda pro logout saber qual token desligar (unregisterPushToken).
+    await setItemAsync(PUSH_TOKEN_KEY, token);
+    if (until !== undefined) lastSentUntil = until;
+  }
+}
+
+/**
+ * Registra o token de push da Expo no backend — só se a permissão JÁ foi
+ * dada. Pedir a permissão é com askForNotifications
+ * (notificationPermission.ts), na hora em que faz sentido (criou um
+ * lembrete, virou cuidador...), com explicação antes: no iOS um "não" no
+ * pedido do sistema é definitivo. Nunca lança: falha aqui não pode travar
+ * login/cadastro.
+ */
+export async function registerPushToken(): Promise<void> {
+  try {
+    const Notifications = await setupNotifications();
+    if (!Notifications) return;
+
+    const { granted } = await Notifications.getPermissionsAsync();
+    if (!granted) return;
 
     const projectId = Constants.expoConfig?.extra?.eas?.projectId;
     if (!projectId) {
@@ -109,6 +123,23 @@ export async function registerPushToken(): Promise<void> {
   }
 }
 
+/**
+ * Lembretes locais reagendados: conta pro servidor até que dia este
+ * aparelho já está coberto (o lembrete de reserva dele pula esses dias).
+ * Só manda quando muda. Sem token registrado ainda, vai junto no próximo
+ * registro.
+ */
+export async function reportLocalRemindersUntil(until: string | null): Promise<void> {
+  localRemindersUntil = until;
+  if (until === lastSentUntil) return;
+  try {
+    const token = await getItemAsync(PUSH_TOKEN_KEY);
+    if (token) await sendTokenToServer(token);
+  } catch (error) {
+    console.warn("[push] falha ao informar os lembretes agendados:", error);
+  }
+}
+
 const UNREGISTER_TIMEOUT_MS = 4000;
 
 /**
@@ -132,4 +163,10 @@ export async function unregisterPushToken(): Promise<void> {
   } finally {
     await deleteItemAsync(PUSH_TOKEN_KEY).catch(() => {});
   }
+}
+
+/** Troca de conta: o estado do agendamento era da conta anterior. */
+export function resetPushSession(): void {
+  localRemindersUntil = undefined;
+  lastSentUntil = undefined;
 }

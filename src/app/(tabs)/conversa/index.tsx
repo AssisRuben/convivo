@@ -6,6 +6,7 @@ import { apiFetch, type ApiChatOverview, type ApiChatThreadSummary } from "@/lib
 import { ChatView } from "@/components/ChatView";
 import { setChatUnread } from "@/lib/chatUnread";
 import { dismissChatNotifications, setActiveChat } from "@/lib/chatNotifications";
+import { askForNotifications } from "@/lib/push/notificationPermission";
 
 const POLL_MS = 5000;
 
@@ -154,6 +155,8 @@ export default function ConversaScreen() {
         const json = await res.json();
         if (!res.ok) throw new Error(json?.error ?? "Não foi possível enviar");
         setData(json);
+        // mandou mensagem: vai querer saber quando a farmácia responder
+        void askForNotifications("chat");
       }}
     />
   );

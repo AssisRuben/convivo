@@ -31,6 +31,29 @@ function fresh(key: string): { data: unknown } | undefined {
   return entry;
 }
 
+// Quem precisa reagir quando o dado de uma key muda, venha de onde vier
+// (prefetch, tela, Home) — ex.: os lembretes locais seguem a Rotina
+// (lib/reminders/localReminders.ts). `undefined` = invalidado.
+type CacheListener = (data: unknown) => void;
+const listeners = new Map<string, Set<CacheListener>>();
+
+export function subscribeCached(key: string, listener: CacheListener): () => void {
+  const set = listeners.get(key) ?? new Set<CacheListener>();
+  set.add(listener);
+  listeners.set(key, set);
+  return () => set.delete(listener);
+}
+
+function notify(key: string, data: unknown): void {
+  for (const listener of listeners.get(key) ?? []) {
+    try {
+      listener(data);
+    } catch (error) {
+      console.warn("[cache] listener falhou:", error);
+    }
+  }
+}
+
 export function getCached<T>(key: string): T | undefined {
   return fresh(key)?.data as T | undefined;
 }
@@ -40,10 +63,12 @@ export function getCached<T>(key: string): T | undefined {
  * lembrar de sincronizar em todo lugar que muda o dado. */
 export function setCached<T>(key: string, data: T): void {
   cache.set(key, { data, day: today() });
+  notify(key, data);
 }
 
 export function invalidateCached(key: string): void {
   cache.delete(key);
+  notify(key, undefined);
 }
 
 
@@ -70,6 +95,7 @@ export function loadCached<T>(key: string, fetcher: () => Promise<T>): Promise<T
   const promise = fetcher()
     .then((data) => {
       cache.set(key, { data, day: today() });
+      notify(key, data);
       return data;
     })
     .finally(() => {

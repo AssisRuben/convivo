@@ -208,11 +208,13 @@ export async function syncStoreStamps(userId: string, { notify = false } = {}): 
           title: "Cartão fidelidade completo! 🎉",
           body: `Você ganhou ${formatCents(LOYALTY_REWARD_CENTS * credited)} de crédito no seu saldo.`,
           data: { screen: "fidelidade" },
+          channel: "conta",
         }
       : {
           title: "Compra registrada no cartão fidelidade ⭐",
           body: `Você tem ${stampsFilled} de ${LOYALTY_STAMP_CARD_SIZE} selos. Faltam ${LOYALTY_STAMP_CARD_SIZE - stampsFilled} pro prêmio de ${formatCents(LOYALTY_REWARD_CENTS)}.`,
           data: { screen: "fidelidade" },
+          channel: "conta",
         }
     ).catch((error) => console.error("[fidelidade] push do selo:", error));
   }

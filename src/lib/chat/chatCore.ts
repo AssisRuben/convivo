@@ -107,6 +107,7 @@ export async function sendCustomerMessage(userId: string, rawText: string): Prom
         title: chatPushTitle(thread.customer.name, thread.staffUnread),
         body: previewOf(text),
         data: { screen: "chat", threadId: thread.id },
+        channel: "chat",
         // uma notificação por conversa, trocada pela última mensagem
         replaceKey: `chat-${thread.id}`,
       });
@@ -164,6 +165,7 @@ export async function sendStaffMessage(userId: string, threadId: string, rawText
     title: chatPushTitle(STAFF_DISPLAY_NAME, thread.customerUnread),
     body: previewOf(text),
     data: { screen: "chat" },
+    channel: "chat",
     replaceKey: "chat-farmacia",
   }).catch((error) => console.error("[chat] push pro cliente:", error));
 }

@@ -7,6 +7,7 @@ import { useProfileDrawer } from "@/lib/profileDrawer";
 import { prefetchAllTabs } from "@/lib/tabPrefetch";
 import { TabIcon } from "@/components/TabIcon";
 import { useChatUnread } from "@/lib/chatUnread";
+import { useLocalReminders } from "@/lib/reminders/useLocalReminders";
 
 // Uma cor de destaque por aba, em vez da mesma cor pra todas — cada ícone
 // ganha sua "bolha" nessa cor quando ativo (ver TabIcon.tsx).
@@ -24,6 +25,8 @@ export default function TabsLayout() {
   const { open: openProfileDrawer } = useProfileDrawer();
   const insets = useSafeAreaInsets();
   const chatUnread = useChatUnread(Boolean(token));
+  // lembretes de rotina agendados no celular (lib/reminders/localReminders.ts)
+  useLocalReminders(Boolean(token));
 
   // Dispara a busca das 4 abas em paralelo assim que o usuário loga, em
   // vez de cada uma só buscar quando ganha foco pela primeira vez — troca

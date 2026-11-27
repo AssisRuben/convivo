@@ -29,6 +29,7 @@ import { RotinaCompleteToast } from "@/components/RotinaCompleteToast";
 import { getCached, invalidateCached, loadCached, setCached } from "@/lib/tabDataCache";
 import { patchHomeCache } from "@/lib/carePointsLocal";
 import { useDayChange } from "@/lib/useDayChange";
+import { askForNotifications, useNotificationPermission } from "@/lib/push/notificationPermission";
 import {
   RotinaProgressCard,
   formatDuration,
@@ -112,6 +113,7 @@ export default function RotinaScreen() {
   const [celebration, setCelebration] = useState<number | null>(null);
   const [completeToast, setCompleteToast] = useState<string | null>(null);
   const [showOtherDays, setShowOtherDays] = useState(false);
+  const { permission, refresh: refreshPermission } = useNotificationPermission();
   const loadedOnce = useRef(false);
   const hadCacheOnMount = useRef(readCachedRotina() !== undefined);
   // "completedToday" é por data — sem isso, um app que fica dias sem ser
@@ -126,6 +128,9 @@ export default function RotinaScreen() {
       const data = await loadCached(ROTINA_CACHE_KEY, fetchRotina);
       setItems(data.items ?? []);
       setStreakDays(data.streakDays ?? 0);
+    } catch {
+      // servidor/rede fora: fica o que já está na tela; nova tentativa no
+      // próximo foco (erro não entra no cache)
     } finally {
       setLoading(false);
     }
@@ -291,6 +296,8 @@ export default function RotinaScreen() {
       setItems(data.items ?? []);
       setForm(null);
       invalidateCached(HOME_CACHE_KEY);
+      // Cuidado com horário: é a hora de pedir pra avisar (não no login).
+      if (input.timeOfDay) askForNotifications("lembrete").then(refreshPermission);
     } catch (error) {
       showAlert("Erro ao salvar", error instanceof Error ? error.message : undefined);
     } finally {
@@ -490,6 +497,22 @@ export default function RotinaScreen() {
           <Text className="text-sm font-medium text-mint">Novo cuidado</Text>
         </Pressable>
       </View>
+
+      {(permission === "undetermined" || permission === "blocked") && items.some((i) => i.timeOfDay) && (
+        <Pressable
+          onPress={() => askForNotifications("lembrete", { force: true }).then(refreshPermission)}
+          className="mb-4 flex-row items-center gap-3 rounded-2xl bg-coral/10 p-4"
+        >
+          <Ionicons name="notifications-off-outline" size={22} color="#e63946" />
+          <View className="flex-1">
+            <Text className="text-sm font-bold text-navy">Lembretes desligados</Text>
+            <Text className="text-xs text-navy/60">
+              Seus cuidados têm horário, mas o celular não vai avisar. Toque pra ativar.
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color="#0b1e3d60" />
+        </Pressable>
+      )}
 
       {items.length > 0 && (
         <RotinaProgressCard

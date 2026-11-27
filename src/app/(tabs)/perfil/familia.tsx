@@ -6,6 +6,7 @@ import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { apiFetch, type ApiCaredPerson, type ApiCareOverview } from "@/lib/api";
 import { useCachedState } from "@/lib/useCachedState";
 import { showAlert } from "@/lib/alert";
+import { askForNotifications } from "@/lib/push/notificationPermission";
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
@@ -128,7 +129,11 @@ export default function FamiliaScreen() {
     if (json) {
       setCodeOpen(false);
       setCode("");
-      showAlert("Pronto!", `Agora você acompanha ${json.titularName}.`);
+      // Pedido de notificação depois do "OK" (dois alertas seguidos no iOS
+      // podem sumir): cuidador sem push não fica sabendo da dose esquecida.
+      showAlert("Pronto!", `Agora você acompanha ${json.titularName}.`, [
+        { text: "OK", onPress: () => void askForNotifications("cuidador") },
+      ]);
     }
   }
 

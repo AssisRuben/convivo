@@ -381,6 +381,9 @@ export type ApiChecklistItem = {
   /** Vale ponto hoje / quanto ganhou hoje — ausentes em servidor antigo. */
   earnsPoints?: boolean;
   pointsEarned?: number | null;
+  /** Último dia do tratamento com prazo ("AAAA-MM-DD") — ausente em
+   * servidor antigo; null = sem fim. */
+  remindUntil?: string | null;
 };
 
 export type RoutineItemInput = {
